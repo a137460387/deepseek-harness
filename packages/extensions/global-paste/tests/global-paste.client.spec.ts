@@ -1,0 +1,224 @@
+// @vitest-environment jsdom
+/**
+ * global-paste plugin halves: the browser entry's document-level paste
+ * listener against faked sessions/conversation services (with fiber teardown
+ * proving removal — HMR safety), the inert node entry, and the invariant
+ * companion's ownership reservation.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Context } from '@deepseek-ai/cordis'
+import InvariantRegistry from '@deepseek-ai/dsh-invariants'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
+import { apply, inject } from '../src/client/index.ts'
+import { apply as applyNode } from '../src/index.ts'
+import * as GlobalPasteInvariant from '../src/invariant.ts'
+
+/** A clipboard paste event carrying the given text, dispatched on document. */
+function dispatchPaste(text: string, opts: { files?: readonly File[] } = {}): ClipboardEvent {
+  // jsdom omits DataTransfer/ClipboardEvent constructors, so build a plain
+  // event with a clipboardData stub shaped exactly as the plugin reads it.
+  const dataTransfer = {
+    getData: (type: string) => type === 'text/plain' ? text : '',
+    items: (opts.files ?? []).map(file => ({ kind: 'file', getAsFile: () => file })),
+  }
+  const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent
+  Object.defineProperty(event, 'clipboardData', { value: dataTransfer, configurable: true })
+  document.dispatchEvent(event)
+  return event
+}
+
+/** Build a session list snapshot with one current session. */
+function listState(current: SessionId | undefined): SessionListState {
+  return {
+    ids: current === undefined ? [] : [current],
+    byId: {},
+    current,
+    phase: 'ready',
+    subagentsByParent: {},
+    jobsBySession: {},
+    currentAddress: undefined,
+  } as SessionListState
+}
+
+interface FakeInput {
+  setDraft: ReturnType<typeof vi.fn>
+  state: ReturnType<typeof createSnapshotStore<InputSnapshot>>
+}
+
+interface InputSnapshot {
+  readonly draft: string
+  readonly phase: 'plain' | 'adjudicating' | 'claimed' | 'submitting'
+}
+
+interface Bench {
+  ctx: Context
+  fiber: ReturnType<Context['plugin']>
+  input: FakeInput
+}
+
+interface BenchOptions {
+  readonly draft?: string
+  readonly phase?: InputSnapshot['phase']
+  readonly noSession?: boolean
+}
+
+// Track the active bench so its document listener is torn down between tests;
+// jsdom shares one document across the suite, so a leaked listener from an
+// earlier test would intercept a later test's paste and preventDefault it.
+let activeBench: Bench | undefined
+
+/**
+ * Boot the browser half over a real Context with faked sessions and
+ * conversation services. The composer textarea is mounted into the document so
+ * the plugin's elementFromPoint visibility probe sees it.
+ */
+async function bench(over: BenchOptions = {}): Promise<Bench> {
+  const SESSION = 'session' as SessionId
+  const draft = over.draft ?? ''
+  const phase = over.phase ?? 'plain'
+  const input: FakeInput = {
+    setDraft: vi.fn(),
+    state: createSnapshotStore<InputSnapshot>({ draft, phase }),
+  }
+  const list = createSnapshotStore<SessionListState>(listState(over.noSession === true ? undefined : SESSION))
+
+  const ctx = new Context()
+  ctx.provide('sessions', {
+    list,
+    scope: (id: SessionId) => id === SESSION ? ({ scopeOf: () => SESSION } as never) : undefined,
+  } as never)
+  ctx.provide('conversation', {
+    input: { for: () => input },
+  } as never)
+
+  const fiber = ctx.plugin({ inject: [...inject], apply })
+  await fiber.await()
+
+  // Mount the composer textarea the plugin queries for.
+  const composer = document.createElement('textarea')
+  composer.setAttribute('data-dsh-composer', '')
+  composer.getBoundingClientRect = () => ({
+    left: 10, top: 10, width: 400, height: 30, right: 410, bottom: 40, x: 10, y: 10, toJSON: () => ({}),
+  })
+  document.body.appendChild(composer)
+  // jsdom does not implement elementFromPoint; define it to return the composer
+  // (visible, not occluded) so the plugin's visibility probe passes.
+  document.elementFromPoint = () => composer
+
+  const bench: Bench = { ctx, fiber, input }
+  activeBench = bench
+  return bench
+}
+
+beforeEach(() => {
+  // Ensure a clean document between tests.
+  document.body.innerHTML = ''
+})
+
+afterEach(async () => {
+  if (activeBench !== undefined) {
+    await activeBench.fiber.dispose()
+    activeBench = undefined
+  }
+  vi.restoreAllMocks()
+})
+
+describe('global-paste browser half', () => {
+  it('declares the services it binds', () => {
+    expect(inject).toEqual(['sessions', 'conversation'])
+  })
+
+  it('routes whole-page text paste to the draft end', async () => {
+    const { input } = await bench({ draft: 'hello' })
+    const event = dispatchPaste(' world')
+    expect(event.defaultPrevented).toBe(true)
+    expect(input.setDraft).toHaveBeenCalledOnce()
+    expect(input.setDraft).toHaveBeenCalledWith('hello world')
+  })
+
+  it('ignores paste with no text (image-only stays with the composer)', async () => {
+    const { input } = await bench({ draft: 'hello' })
+    const event = dispatchPaste('')
+    expect(event.defaultPrevented).toBe(false)
+    expect(input.setDraft).not.toHaveBeenCalled()
+  })
+
+  it('ignores paste when there is no current session', async () => {
+    const { input } = await bench({ noSession: true })
+    const event = dispatchPaste('text')
+    expect(event.defaultPrevented).toBe(false)
+    expect(input.setDraft).not.toHaveBeenCalled()
+  })
+
+  it('ignores paste while the input machine is submitting', async () => {
+    const { input } = await bench({ phase: 'submitting' })
+    const event = dispatchPaste('text')
+    expect(event.defaultPrevented).toBe(false)
+    expect(input.setDraft).not.toHaveBeenCalled()
+  })
+
+  it('ignores paste while the input machine is adjudicating', async () => {
+    const { input } = await bench({ phase: 'adjudicating' })
+    const event = dispatchPaste('text')
+    expect(event.defaultPrevented).toBe(false)
+    expect(input.setDraft).not.toHaveBeenCalled()
+  })
+
+  it('lets the composer handle paste when it is already focused (no double-insert)', async () => {
+    const { input } = await bench({ draft: 'hello' })
+    const composer = document.querySelector<HTMLTextAreaElement>('textarea[data-dsh-composer]')!
+    composer.focus()
+    expect(document.activeElement).toBe(composer)
+    const event = dispatchPaste('text')
+    expect(event.defaultPrevented).toBe(false)
+    expect(input.setDraft).not.toHaveBeenCalled()
+  })
+
+  it('does not hijack paste focused on another editable element', async () => {
+    const { input } = await bench({ draft: 'hello' })
+    const other = document.createElement('input')
+    document.body.appendChild(other)
+    other.focus()
+    const event = dispatchPaste('text')
+    expect(event.defaultPrevented).toBe(false)
+    expect(input.setDraft).not.toHaveBeenCalled()
+  })
+
+  it('focuses the composer after routing a whole-page paste', async () => {
+    await bench({ draft: '' })
+    const composer = document.querySelector<HTMLTextAreaElement>('textarea[data-dsh-composer]')!
+    expect(document.activeElement).not.toBe(composer)
+    dispatchPaste('text')
+    expect(document.activeElement).toBe(composer)
+  })
+
+  it('fiber teardown removes the document listener (HMR safety)', async () => {
+    const { ctx, fiber, input } = await bench({ draft: '' })
+    await fiber.dispose()
+    // After teardown, a paste no longer reaches the input facade.
+    dispatchPaste('text')
+    expect(input.setDraft).not.toHaveBeenCalled()
+    // The Context is still usable (provide stayed intact; only the listener left).
+    expect(ctx).toBeDefined()
+  })
+})
+
+describe('global-paste node half', () => {
+  it('contributes no host behavior', () => {
+    expect(applyNode).not.toThrow()
+  })
+})
+
+describe('global-paste invariant companion', () => {
+  it('reserves package ownership under its declared companion name', async () => {
+    const ctx = new Context()
+    await ctx.plugin(InvariantRegistry, { enabled: true })
+    const fiber = ctx.plugin(GlobalPasteInvariant)
+    await fiber.await()
+    expect(GlobalPasteInvariant.name).toBe('client-global-paste-invariant')
+    expect(GlobalPasteInvariant.inject).toEqual(['invariants'])
+    expect(() => { (ctx.emit as (event: string) => void)('slots/changed') }).not.toThrow()
+    await fiber.dispose()
+  })
+})
