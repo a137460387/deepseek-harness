@@ -1,18 +1,25 @@
 /**
  * Whole-page paste, browser half: a document-level capture-phase `paste`
- * listener that routes clipboard text into the current session's draft when the
- * composer is not already focused. Mirrors Claude.ai's "paste anywhere into the
- * composer" behavior.
+ * listener that routes clipboard content into the current session's composer
+ * when the composer is not already focused. Mirrors Claude.ai's "paste anywhere
+ * into the composer" behavior.
  *
  * The listener rides the capture phase so it runs BEFORE the composer textarea's
- * own React `onPaste`: when the textarea is already focused the listener lets
- * the event pass through to the native handler (no double-insert). When the
- * composer is not focused (or focus is on a non-editable element), the listener
- * appends the clipboard text to the draft end through the public
- * `ctx.conversation.input` service and prevents the default paste.
+ * own React `onPaste`. Two routing paths:
  *
- * Only text is routed here. Clipboard files (images) carry no `text/plain` and
- * are left to the composer's own intake — first-party image paste is unchanged.
+ * - **Text**: appended to the draft end through the public
+ *   `ctx.conversation.input` service (`setDraft`).
+ * - **Files (images)**: re-dispatched as a paste event onto the composer
+ *   textarea, so the composer's own `onPaste` runs the full image intake
+ *   (format/limit pre-check, preview URL creation, attachment-rail rendering).
+ *   This avoids duplicating the package-private draft-image creation path and
+ *   keeps first-party image behavior intact. Verified viable in Chromium:
+ *   a script-constructed `ClipboardEvent` with a `DataTransfer` carrying File
+ *   items is honored by the target's `onPaste` (clipboardData.items and
+ *   getData are both readable).
+ *
+ * When the composer textarea is already focused the listener lets the event
+ * pass through to the native handler (no double-processing).
  * @module @deepseek-ai/dsh-client-global-paste/client
  */
 
@@ -68,29 +75,56 @@ function composerVisible(composer: HTMLTextAreaElement): boolean {
 }
 
 /**
+ * Re-dispatch a paste event carrying the given clipboard items onto the
+ * composer textarea, so its own `onPaste` runs the full image intake (format
+ * and limit pre-check, preview URL, attachment rail). The composer is focused
+ * first so the re-dispatched event is indistinguishable from a user paste while
+ * the composer is active. The original document-level event is prevented so it
+ * does not also land on whatever element held focus.
+ * @param composer - the composer textarea to target.
+ * @param clipboardData - the original event's clipboardData to mirror.
+ */
+function forwardImagePaste(composer: HTMLTextAreaElement, clipboardData: DataTransfer): void {
+  // Mirror the file items (images) onto a fresh DataTransfer. getData('text/plain')
+  // is intentionally NOT copied: the composer's onPaste would otherwise also
+  // append the text via pasteBegin, duplicating what the text branch already did
+  // (a mixed paste with both text and images splits: text → setDraft, images → here).
+  const dt = new DataTransfer()
+  for (const item of clipboardData.items) {
+    if (item.kind === 'file') {
+      const file = item.getAsFile()
+      if (file !== null) dt.items.add(file)
+    }
+  }
+  composer.focus({ preventScroll: true })
+  composer.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
+}
+
+/**
  * Client plugin body: mount the document-level capture-phase paste listener.
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => {
     const onPaste = (event: ClipboardEvent): void => {
-      // Step 1: no clipboard data or no text — leave native handling intact
-      // (this includes file/image paste, which the composer owns).
+      // No clipboard data — nothing to route; leave native handling intact.
       if (event.clipboardData === null) return
       const text = event.clipboardData.getData('text/plain')
-      if (text === '') return
+      const hasFiles = Array.from(event.clipboardData.items).some(item => item.kind === 'file')
+      // No text and no files — nothing for this listener to do.
+      if (text === '' && !hasFiles) return
 
-      // Step 2: no current session — nothing to route into.
+      // No current session — nothing to route into.
       const current = ctx.sessions.list.getSnapshot().current
       if (current === undefined) return
 
-      // Step 3: resolve the session's input facade; ignore when missing.
+      // Resolve the session's input facade; ignore when missing.
       const actx = ctx.sessions.scope(current)
       if (actx === undefined) return
       const input = ctx.conversation.input.for(actx)
 
-      // Step 4: a submit/adjudication transaction is in flight — drop the paste
-      // rather than racing the machine. `claimed` still accepts draft edits.
+      // A submit/adjudication transaction is in flight — drop the paste rather
+      // than racing the machine. `claimed` still accepts draft edits.
       const state = input.state.getSnapshot()
       if (state.phase === 'adjudicating' || state.phase === 'submitting') return
 
@@ -99,21 +133,30 @@ export function apply(ctx: ClientContext): void {
 
       const active = document.activeElement
 
-      // Step 5: composer already focused — let its own onPaste handle this; the
+      // Composer already focused — let its own onPaste handle this; the
       // capture-phase listener must not double-process. The textarea's React
       // handler runs on the bubble path after this returns without preventing.
       if (active === composer) return
 
-      // Step 6: focus is on another editable element — honor its native paste.
+      // Focus is on another editable element — honor its native paste.
       if (isEditable(active === null ? undefined : (active as HTMLElement))) return
 
-      // Step 7: composer masked by a takeover overlay — silently ignore.
+      // Composer masked by a takeover overlay — silently ignore.
       if (!composerVisible(composer)) return
 
-      // Route: append to the draft end and focus the composer without scrolling.
-      event.preventDefault()
-      input.setDraft(state.draft + text)
-      composer.focus({ preventScroll: true })
+      // Route files (images) by re-dispatching onto the composer so its own
+      // onPaste runs the image intake. Text (if any) is appended below; the
+      // forwarded event copies only file items to avoid double-inserting text.
+      if (hasFiles) {
+        event.preventDefault()
+        forwardImagePaste(composer, event.clipboardData)
+      }
+      // Route text by appending to the draft end through the public service.
+      if (text !== '') {
+        event.preventDefault()
+        input.setDraft(state.draft + text)
+        if (!hasFiles) composer.focus({ preventScroll: true })
+      }
     }
 
     document.addEventListener('paste', onPaste, true)

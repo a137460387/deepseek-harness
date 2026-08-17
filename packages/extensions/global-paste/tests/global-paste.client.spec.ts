@@ -18,14 +18,44 @@ import * as GlobalPasteInvariant from '../src/invariant.ts'
 function dispatchPaste(text: string, opts: { files?: readonly File[] } = {}): ClipboardEvent {
   // jsdom omits DataTransfer/ClipboardEvent constructors, so build a plain
   // event with a clipboardData stub shaped exactly as the plugin reads it.
+  type Item = { kind: string; type?: string; getAsFile: () => File | null }
+  const items: Item[] = (opts.files ?? []).map(file => ({ kind: 'file', type: file.type, getAsFile: () => file }))
+  if (text !== '') items.push({ kind: 'string', type: 'text/plain', getAsFile: () => null })
   const dataTransfer = {
     getData: (type: string) => type === 'text/plain' ? text : '',
-    items: (opts.files ?? []).map(file => ({ kind: 'file', getAsFile: () => file })),
+    items,
   }
   const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent
   Object.defineProperty(event, 'clipboardData', { value: dataTransfer, configurable: true })
   document.dispatchEvent(event)
   return event
+}
+
+/**
+ * jsdom omits DataTransfer and ClipboardEvent. Stub both globally so the
+ * plugin's forwardImagePaste path can construct and dispatch. The forwarded
+ * DataTransfer mirrors the same items shape dispatchPaste uses; ClipboardEvent
+ * carries it through to the composer's listener.
+ */
+function installClipboardConstructors(): void {
+  type Item = { kind: string; type?: string; getAsFile: () => File | null }
+  // A DataTransferItemList-like object: array-indexed plus add() and iteration.
+  class FakeItemList extends Array<Item> {
+    add(file: File): void { this.push({ kind: 'file', type: file.type, getAsFile: () => file }) }
+  }
+  class FakeDataTransfer {
+    items = new FakeItemList()
+    getData = () => ''
+  }
+  class FakeClipboardEvent extends Event {
+    clipboardData: { items: FakeItemList; getData: () => string }
+    constructor(type: string, init: EventInit & { clipboardData?: { items: FakeItemList; getData: () => string } } = {}) {
+      super(type, init)
+      this.clipboardData = init.clipboardData ?? { items: new FakeItemList(), getData: () => '' }
+    }
+  }
+  Object.defineProperty(globalThis, 'DataTransfer', { value: FakeDataTransfer, configurable: true, writable: true })
+  Object.defineProperty(globalThis, 'ClipboardEvent', { value: FakeClipboardEvent, configurable: true, writable: true })
 }
 
 /** Build a session list snapshot with one current session. */
@@ -114,6 +144,7 @@ async function bench(over: BenchOptions = {}): Promise<Bench> {
 beforeEach(() => {
   // Ensure a clean document between tests.
   document.body.innerHTML = ''
+  installClipboardConstructors()
 })
 
 afterEach(async () => {
@@ -137,11 +168,42 @@ describe('global-paste browser half', () => {
     expect(input.setDraft).toHaveBeenCalledWith('hello world')
   })
 
-  it('ignores paste with no text (image-only stays with the composer)', async () => {
+  it('ignores paste with no text and no files', async () => {
     const { input } = await bench({ draft: 'hello' })
     const event = dispatchPaste('')
     expect(event.defaultPrevented).toBe(false)
     expect(input.setDraft).not.toHaveBeenCalled()
+  })
+
+  it('forwards image-only paste onto the composer (no text duplication)', async () => {
+    const { input } = await bench({ draft: 'hello' })
+    const composer = document.querySelector<HTMLTextAreaElement>('textarea[data-dsh-composer]')!
+    const dispatchSpy = vi.spyOn(composer, 'dispatchEvent')
+    const image = new File([Uint8Array.of(1, 2, 3)], 'pixel.png', { type: 'image/png' })
+    const event = dispatchPaste('', { files: [image] })
+    expect(event.defaultPrevented).toBe(true)
+    // The image path forwards via a re-dispatched paste event; setDraft (text)
+    // is not called because there is no text.
+    expect(input.setDraft).not.toHaveBeenCalled()
+    // A paste event was dispatched onto the composer (dispatchEvent takes one arg).
+    const forwarded = dispatchSpy.mock.calls.find(([e]) => (e as Event).type === 'paste')
+    expect(forwarded).toBeDefined()
+    // The composer is now focused.
+    expect(document.activeElement).toBe(composer)
+  })
+
+  it('splits a mixed paste: text to setDraft, images forwarded to the composer', async () => {
+    const { input } = await bench({ draft: 'hello' })
+    const composer = document.querySelector<HTMLTextAreaElement>('textarea[data-dsh-composer]')!
+    const dispatchSpy = vi.spyOn(composer, 'dispatchEvent')
+    const image = new File([Uint8Array.of(1, 2, 3)], 'pixel.png', { type: 'image/png' })
+    const event = dispatchPaste(' world', { files: [image] })
+    expect(event.defaultPrevented).toBe(true)
+    // Text routed through the public service.
+    expect(input.setDraft).toHaveBeenCalledWith('hello world')
+    // Image forwarded onto the composer.
+    const forwarded = dispatchSpy.mock.calls.find(([e]) => (e as Event).type === 'paste')
+    expect(forwarded).toBeDefined()
   })
 
   it('ignores paste when there is no current session', async () => {
