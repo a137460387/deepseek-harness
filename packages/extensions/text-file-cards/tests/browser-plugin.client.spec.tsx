@@ -4,11 +4,12 @@
  * conversation faces and the real SlotRegistry/LocaleRuntime: the drop
  * listener stages pure text-file batches as card state (never the draft),
  * applies the size/batch ceilings with input notices, leaves images, mixed
- * batches, busy machines, and masked composers to native handling, and the
- * dock's inject face expands a card into the draft or unstages it. The dock
- * component renders the staged row (empty renders nothing). Registration
- * disposal rides the plugin fiber (HMR safety). The node half and the
- * invariant companion are exercised over the same Context.
+ * batches, busy machines, masked composers, removed sessions, and offline
+ * continuable children to native handling, and the dock's inject face expands
+ * a card into the draft or unstages it. The dock component renders the staged
+ * row (empty renders nothing). Registration disposal rides the plugin fiber
+ * (HMR safety). The node half and the invariant companion are exercised over
+ * the same Context.
  */
 import { Context } from '@deepseek-ai/cordis'
 import InvariantRegistry from '@deepseek-ai/dsh-invariants'
@@ -78,6 +79,17 @@ interface BenchOptions {
   readonly noSession?: boolean
   readonly noComposer?: boolean
   readonly occluded?: boolean
+  readonly removed?: boolean
+  readonly parentOffline?: boolean
+}
+
+/** Mutable fake of the session-level lock facts the plugin's alignment reads. */
+interface SessionLockSnapshot {
+  removed: boolean
+  subagent: {
+    address: { parentSessionId: SessionId; childSessionId: SessionId; mode: 'continuable' }
+    parentAvailable: boolean
+  } | null
 }
 
 interface Bench {
@@ -85,6 +97,7 @@ interface Bench {
   fiber: ReturnType<Context['plugin']>
   input: FakeInput
   composer: HTMLTextAreaElement | null
+  sessionSnapshot: SessionLockSnapshot
   face: () => TextFileCardsInjected
   stagedState: () => StagedFilesState
 }
@@ -103,6 +116,12 @@ async function bench(over: BenchOptions = {}): Promise<Bench> {
     state: createSnapshotStore<InputSnapshot>({ draft, phase }),
   }
   const list = createSnapshotStore<SessionListState>(listState(over.noSession === true ? undefined : SESSION))
+  const sessionSnapshot: SessionLockSnapshot = {
+    removed: over.removed === true,
+    subagent: over.parentOffline === true
+      ? { address: { parentSessionId: 'parent' as SessionId, childSessionId: SESSION, mode: 'continuable' }, parentAvailable: false }
+      : null,
+  }
 
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
@@ -115,6 +134,7 @@ async function bench(over: BenchOptions = {}): Promise<Bench> {
   ctx.provide('sessions', {
     list,
     scope: (id: SessionId) => id === SESSION ? ({ scopeOf: () => SESSION } as never) : undefined,
+    sessionOf: () => ({ getSnapshot: () => sessionSnapshot }),
   } as never)
   ctx.provide('conversation', {
     input: { for: () => input },
@@ -143,6 +163,7 @@ async function bench(over: BenchOptions = {}): Promise<Bench> {
     fiber,
     input,
     composer,
+    sessionSnapshot,
     face: () => {
       const entry = ctx.slots.entries('conversation.input.dock')[0]
       if (entry === undefined) throw new Error('dock entry not registered')
@@ -251,6 +272,24 @@ describe('text-file-cards drop takeover', () => {
     await b.fiber.dispose()
   })
 
+  it('leaves a drop through when the session is removed', async () => {
+    const b = await bench({ removed: true })
+    const event = dispatchDrop([new File(['hi'], 'a.txt', { type: 'text/plain' })], document.body)
+    expect(event.defaultPrevented).toBe(false)
+    await settle()
+    expect(b.stagedState().bySession).toEqual({})
+    await b.fiber.dispose()
+  })
+
+  it("leaves a drop through when a continuable child's parent is offline", async () => {
+    const b = await bench({ parentOffline: true })
+    const event = dispatchDrop([new File(['hi'], 'a.txt', { type: 'text/plain' })], document.body)
+    expect(event.defaultPrevented).toBe(false)
+    await settle()
+    expect(b.stagedState().bySession).toEqual({})
+    await b.fiber.dispose()
+  })
+
   it('refuses an oversized file with an error notice and stages nothing', async () => {
     const b = await bench()
     const big = new File(['x'.repeat(MAX_FILE_BYTES + 1)], 'big.txt', { type: 'text/plain' })
@@ -319,6 +358,19 @@ describe('text-file-cards inject face', () => {
     // The drop staged while plain; the machine flips to submitting before the
     // expand's pre-read check runs — the expansion must bail.
     b.input.state.set({ draft: '', phase: 'submitting' })
+    await b.face().expand(entry.id)
+    expect(b.input.setDraft).not.toHaveBeenCalled()
+    expect(b.stagedState().bySession[SESSION]?.length).toBe(1)
+    await b.fiber.dispose()
+  })
+
+  it('abandons an expand when the session turns removed after staging', async () => {
+    const b = await bench()
+    dispatchDrop([new File(['world'], 'note.txt', { type: 'text/plain' })], document.body)
+    await settle()
+    const entry = b.stagedState().bySession[SESSION]?.[0]
+    if (entry === undefined) throw new Error('staging failed')
+    b.sessionSnapshot.removed = true
     await b.face().expand(entry.id)
     expect(b.input.setDraft).not.toHaveBeenCalled()
     expect(b.stagedState().bySession[SESSION]?.length).toBe(1)

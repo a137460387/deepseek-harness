@@ -17,6 +17,14 @@
  * content would crowd out the context window once expanded), and a batch
  * beyond MAX_BATCH_FILES stages its head and reports the tail as refused.
  *
+ * Composer lock alignment: staging and expanding mirror the composer's own
+ * disabled predicate wherever a plugin can observe it — a removed session
+ * and a continuable child whose exact parent is offline leave the composer
+ * read-only, so both paths refuse there too. The remaining lock reasons are
+ * owner-prop facts with no public signal: the inert no-workspace hero has no
+ * current session (the current-session guard already covers it), and an
+ * owner block is composer-internal.
+ *
  * Any image or other non-text file in the batch lets the WHOLE batch through
  * to the composer's native image intake (no splitting), so images keep the
  * first-party path. The composer's own whole-window dragover listener already
@@ -30,7 +38,7 @@
  * @module @deepseek-ai/dsh-client-text-file-cards/client
  */
 
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { AgentContext, ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the conversation service's Context merge (ctx.conversation)
 // and the ui-conversation SlotMap merge (the input.dock entry).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -87,10 +95,31 @@ function composerVisible(composer: HTMLTextAreaElement): boolean {
 }
 
 /**
+ * Whether the session behind a scope still accepts draft edits under the
+ * composer's observable lock conditions: the session face resolves, the
+ * session is not removed, and a continuable subagent child still has its
+ * exact parent available (the composer renders read-only in all three
+ * cases). The owner-prop lock reasons (the inert hero, an owner block) have
+ * no public signal and stay out of reach.
+ * @param ctx - client root context.
+ * @param actx - the session's Agent-scoped context.
+ * @returns true when every session-level composer lock stands open.
+ */
+function sessionAcceptsEdits(ctx: ClientContext, actx: AgentContext): boolean {
+  const session = ctx.sessions.sessionOf(actx)
+  if (session === undefined) return false
+  const snapshot = session.getSnapshot()
+  if (snapshot.removed) return false
+  const subagent = snapshot.subagent
+  return subagent === null || subagent.address.mode !== 'continuable' || subagent.parentAvailable
+}
+
+/**
  * Resolve the current session's input facade when it can accept a draft edit:
- * a current session exists, its scope resolves, and the input machine is not
- * in a submit/adjudication transaction. Also returns the session id and the
- * live session list (the staged-files prune currency).
+ * a current session exists, its scope resolves, every session-level composer
+ * lock stands open, and the input machine is not in a submit/adjudication
+ * transaction. Also returns the session id and the live session list (the
+ * staged-files prune currency).
  * @param ctx - client root context.
  * @returns the input facade with its session context, or undefined to pass
  * through.
@@ -100,7 +129,7 @@ function resolveEditableInput(ctx: ClientContext) {
   const current = list.current
   if (current === undefined) return undefined
   const actx = ctx.sessions.scope(current)
-  if (actx === undefined) return undefined
+  if (actx === undefined || !sessionAcceptsEdits(ctx, actx)) return undefined
   const input = ctx.conversation.input.for(actx)
   const state = input.state.getSnapshot()
   if (state.phase === 'adjudicating' || state.phase === 'submitting') return undefined
@@ -182,15 +211,17 @@ export function apply(ctx: ClientContext): void {
         const entry = staged.get(sessionId, fileId)
         if (entry === undefined) return
         const actx = ctx.sessions.scope(sessionId)
-        if (actx === undefined) return
+        if (actx === undefined || !sessionAcceptsEdits(ctx, actx)) return
         const input = ctx.conversation.input.for(actx)
         const before = input.state.getSnapshot()
         if (before.phase === 'adjudicating' || before.phase === 'submitting') return
         const content = await entry.file.text()
-        // Re-check the machine after the async read: a submit may have started
-        // while the file was being read.
+        // Re-check after the async read: a submit may have started while the
+        // file was being read, and the session-level locks may have turned
+        // (removal, a lost parent).
         const after = input.state.getSnapshot()
         if (after.phase === 'adjudicating' || after.phase === 'submitting') return
+        if (!sessionAcceptsEdits(ctx, actx)) return
         const block = `# ${entry.name}\n${content}`
         input.setDraft(after.draft === '' ? block : `${after.draft}\n${block}`)
         staged.remove(sessionId, fileId)
