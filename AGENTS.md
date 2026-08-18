@@ -13,40 +13,55 @@ Fork 专属约束见根目录 [FORK_NOTES.md](FORK_NOTES.md)。
 ```
 vendor/      Vendored Cordis source — manifest + sync procedure in vendor/README.md
 packages/    @deepseek-ai/dsh-<pkg> workspaces at packages/<group>/<pkg>/
-  core/        product API spine: session, system-prompt, tools, agent, agent-loop
-  api/         Remote BFF assembly and Typert RPC gateway
-  typert/      type graph generator, loader, and runtime registry
-  llm/         LLM capability: Service Definition/Consumer + DeepSeek providers
-  e2b/         E2B POC: sandbox + FS/subprocess adapters
-  shell/        bash capability: Service Definition + local/pwsh providers + shell Consumers
-  subprocess/  subprocess capability + local process-tree provider
-  terminal/         persistent sessions
-  fs/          filesystem capability + policy
-  lsp/         language-server capability
-  skill/       skill provider registry + local impl + catalog/loader tool
-  web/         web capability: Service Definition + search/fetch providers + tool Consumer
-  compaction/     compaction capability + basic provider
-  context/     request-context plugins
-  subagent/    subagent capability: Service Definition + providers + delegation Consumers
-  bundle/      installable dsh --profile patch-layer bundles
-  workflow/    workflow capability + worker-thread provider + tool Consumer
-  todo/        todo_write tool
-  plan/        plan mode as logged state
-  preset/      per-session agent composition from preset cordis.yml files
-  guard/       loop-hygiene + tool-timeout plugins
-  self-modification/  the agent inspects/mounts its own plugins
-  hooks/       Claude Code/Codex hook bridges + wire-protocol library
-  session/     durable session data: persistence, projection, titles, telemetry
-  identity/    anonymous identity
-  settings/    user-settings capability + file provider
-  credentials/ credential-reference capability + env/.env provider
-  acp/         automation-only Agent Client Protocol server
-  interaction/ approval/interaction capabilities, permission, commands, ask-user
-  boot/        shared app-bin glue
-  sdk/         JSON-RPC protocol, server, and TypeScript client
-  examples/    demo bundles (agent-spine + CLI/ACP/JSON-RPC bins)
-  support/     dev/test infrastructure
-  util/        zero-dependency utilities
+  core/               product API spine
+  api/                remote BFF + RPC gateway
+  typert/             type graph + registry
+  goal/               goal persistence
+  schedule/           scheduled follow-ups
+  feedback/           human feedback
+  identity/           anonymous identity
+  llm/                LLM providers
+  e2b/                E2B POC
+  subprocess/         process-tree provider
+  shell/              bash providers + tools
+  terminal/           persistent PTY + tools
+  code-runtime/       code execution + Code Mode
+  sandbox/            process confinement
+  fs/                 filesystem + tools
+  lsp/                language servers
+  mcp/                MCP client
+  skill/              skill registry + tools
+  compaction/         compaction provider
+  context/            request context
+  subagent/           subagent + delegation tool
+  jobs/               background jobs + tools
+  workflow/           workflow engine + tools
+  web/                web search/fetch
+  attachment/         durable attachments
+  spill/              spill storage
+  todo/               todo_write tool
+  plan/               plan mode state
+  preset/             cordis.yml presets
+  guard/              loop + timeout guards
+  bundle/             profile patch bundles
+  extensions/         self-modification + fork UI extensions
+  hooks/              hook bridges + wire protocol
+  session/            persistence + projection
+  session-query/      search + lineage
+  settings/           user settings + provider
+  credentials/        credential references
+  storage/            non-session storage
+  workspace/          workspace entity
+  sdk/                JSON-RPC SDK
+  acp/                ACP server
+  interaction/        approvals + commands
+  boot/               app-bin glue
+  host/               Web-GUI host half
+  client/             Web-GUI browser half
+  examples/           demo bundles
+  runtime-diagnostics/ invariant diagnostics
+  test-support/       test infrastructure
+  util/               zero-dependency utilities
 python/      Python SDK and bundled runtime (see python/README.md)
 native/      @deepseek-ai/node-addon-landlock-run source of record (see native/README.md)
 examples/    Runnable cordis.yml leaves over packages/examples bundles (see examples/AGENTS.md)
@@ -56,7 +71,7 @@ scripts/     repo gates and generators
 website/     VitePress projection of selected bilingual docs/ sources
 ```
 
-Package groups: [packages/README.md](packages/README.md).
+Package groups and their roles: [packages/README.md](packages/README.md).
 
 ## Commands
 
