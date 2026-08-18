@@ -722,6 +722,7 @@ export function InputBar({
               aria-haspopup={workspaceTrigger ? 'menu' : undefined}
               aria-expanded={workspaceTrigger ? workspacePickerOpen : undefined}
               data-phase={input?.phase ?? 'inert'}
+              data-dsh-composer=""
               placeholder={placeholder ?? (parentOffline
                 ? t('placeholder.parentOffline')
                 : disabled

@@ -1273,6 +1273,9 @@ importers:
       '@deepseek-ai/dsh-client-connection':
         specifier: workspace:^
         version: link:../../client/connection
+      '@deepseek-ai/dsh-client-global-paste':
+        specifier: workspace:^
+        version: link:../../extensions/global-paste
       '@deepseek-ai/dsh-client-hmr':
         specifier: workspace:^
         version: link:../../client/hmr
@@ -4010,6 +4013,24 @@ importers:
       '@deepseek-ai/dsh-typert-protocol':
         specifier: workspace:^
         version: link:../../typert/protocol
+
+  packages/extensions/global-paste:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-client-runtime':
+        specifier: workspace:^
+        version: link:../../client/runtime
+      '@deepseek-ai/dsh-client-test-runtime':
+        specifier: workspace:^
+        version: link:../../test-support/client-runtime
+      '@deepseek-ai/dsh-client-ui-conversation':
+        specifier: workspace:^
+        version: link:../../client/ui-conversation
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
 
   packages/extensions/tool-cordis:
     devDependencies:
