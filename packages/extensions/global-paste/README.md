@@ -22,6 +22,18 @@ The guards, evaluated in order before routing:
 
 Text is appended to the draft **end**; an existing non-collapsed selection is not preserved (this matches the confirmed design choice). Existing reference chips (occurrences) in the draft are preserved — `setDraft` carries them as U+FFFC placeholders and only the new text is appended.
 
+## Text-file drop
+
+The plugin also mounts capture-phase `dragover`/`drop` listeners on the document. Dropping a batch of pure text files onto the composer card (`[data-composer-card]`) reads them asynchronously and appends them to the draft end — one `# <filename>` header per file, files joined by a blank line — then focuses the composer. The drop is taken over only when every guard below holds; otherwise the event is left to the composer's native whole-file intake:
+
+- The drop point is inside the composer card.
+- Every file in the batch is text — its extension matches a common text/code allowlist, or its MIME type starts with `text/`.
+- A current session exists and the input machine is not `adjudicating`/`submitting`.
+
+Any image or other non-text file in the batch lets the whole batch pass through untouched (no splitting), so images keep the first-party intake path. After the async read the input machine is re-checked; if a submit began meanwhile, the injection is abandoned.
+
+Because the takeover stops the drop from reaching the composer's own handler and an OS file drag fires no `dragend`, the plugin dispatches a synthetic `dragend` on `window` to clear the composer's drag-active overlay.
+
 ## Model Experience
 
 None. This package touches only the browser's clipboard event and the public `ctx.conversation.input` service; it sends no prompt, message, schema, stream, or tool result.
@@ -35,3 +47,7 @@ None; the package never assembles or sends provider requests.
 - **No paste-upgrade** — the composer's own `onPaste` runs the text through the input machine's `pasteBegin` transaction, which can upgrade pasted text into slash reference chips. This plugin uses the public `setDraft` path instead (the machine's keyboard face is InputBar-private and never crosses a plugin boundary), so pasted URLs and paths stay as plain text rather than becoming chips. For whole-page paste this is the desired behavior. The image path is unaffected: it re-dispatches onto the composer, so the composer's own `onPaste` (including its paste-upgrade) runs for the image portion.
 - **Browser support** — the image-forwarding path depends on the browser honoring a script-constructed `ClipboardEvent` with a `DataTransfer` carrying File items. Verified in Chromium; Firefox and Safari may restrict this (the `clipboardData` of a synthetic event can be null). On such browsers, image paste would silently fall through to the no-file branch; text paste is unaffected.
 - **Visibility probe** — the composer-occluded check uses `elementFromPoint` at the composer's center. An overlay that covers the composer but leaves the center uncovered (e.g. a thin side rail) would not be detected; the paste would route into a partially-visible composer, which is harmless.
+- **Text files only on drop** — a drop injects only files whose extension matches the text/code allowlist or whose MIME type starts with `text/`; images and other files pass through to the composer's native file intake. A file with no extension and no MIME type is not treated as text.
+- **dragover feedback** — `dragover` cannot inspect file contents (only the `Files` type), so the drop cursor shown while dragging over the composer card may not match the eventual takeover decision, which is made at `drop`.
+- **Single composer card** — the drop zone assumes exactly one composer card on the page.
+- **Synthetic dragend is broadcast** — the synthetic `dragend` dispatched on a drop takeover is received by every `window` dragend listener, not only the composer's. This matches what a real drag's end would deliver and is harmless, but other listeners do observe it.

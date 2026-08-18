@@ -22,6 +22,18 @@ Web UI 全页文本粘贴:在窗口任意位置按 Ctrl/Cmd+V,会把剪贴板的
 
 文本追加到草稿**末尾**;不保留已有非折叠选区(这是已确认的设计选择)。草稿中已有的引用 chip(occurrences)会被保留——`setDraft` 以 U+FFFC 占位符携带它们,只追加新文本。
 
+## 文本文件拖拽
+
+插件还在 document 上挂载捕获阶段的 `dragover`/`drop` 监听器。把一批纯文本文件拖放到 composer 卡片(`[data-composer-card]`)上时,会异步读取它们并追加到草稿末尾——每个文件一个 `# <文件名>` 标头,文件之间用空行分隔——随后聚焦 composer。仅当下面所有守卫都成立时才接管该 drop;否则事件交给 composer 原生的整文件 intake:
+
+- drop 落点在 composer 卡片内。
+- 批次中每个文件都是文本——其扩展名命中常见文本/代码白名单,或 MIME 类型以 `text/` 开头。
+- 存在当前会话,且输入状态机不处于 `adjudicating`/`submitting`。
+
+批次中只要含图片或其他非文本文件,就整批原样放行(不拆分),以保证图片走官方原生 intake 路径。异步读取完成后会重新检查输入状态机;若期间已开始提交,则放弃注入。
+
+由于接管会阻止 drop 到达 composer 自身的处理器,而操作系统文件拖拽不会触发 `dragend`,插件会向 `window` 派发一个合成 `dragend` 以清除 composer 的拖拽高亮遮罩。
+
 ## 模型体验
 
 无。本包只触及浏览器的剪贴板事件和公开的 `ctx.conversation.input` 服务;不发送任何 prompt、消息、schema、流或工具结果。
@@ -35,3 +47,7 @@ Web UI 全页文本粘贴:在窗口任意位置按 Ctrl/Cmd+V,会把剪贴板的
 - **无 paste-upgrade** —— composer 自身的 `onPaste` 会把文本送入输入状态机的 `pasteBegin` 事务,可把粘贴文本升级为 slash 引用 chip。本插件改用公开的 `setDraft` 路径(状态机的 keyboard 面是 InputBar 私有,不跨插件边界),因此粘贴的 URL 和路径保持为纯文本,不会变成 chip。对于全页粘贴这正是期望行为。图片路径不受影响:它重新派发到 composer,因此 composer 自身的 `onPaste`(含其 paste-upgrade)对图片部分照常运行。
 - **浏览器支持** —— 图片转发路径依赖浏览器支持脚本构造的 `ClipboardEvent` + 携带 File 的 `DataTransfer`。已在 Chromium 验证;Firefox 和 Safari 可能限制此项(合成事件的 `clipboardData` 可能为 null)。在那些浏览器上,图片粘贴会静默落到无文件分支;文本粘贴不受影响。
 - **可见性探测** —— composer 被遮挡的判断用 `elementFromPoint` 在 composer 中心点检测。若覆盖层遮住 composer 但未遮住中心点(如细侧栏),则无法检测;粘贴会路由到一个部分可见的 composer,这是无害的。
+- **拖拽仅支持文本文件** —— drop 只注入扩展名命中文本/代码白名单、或 MIME 类型以 `text/` 开头的文件;图片及其他文件放行,交给 composer 原生的文件 intake。无扩展名且无 MIME 类型的文件不视为文本。
+- **dragover 反馈** —— `dragover` 无法检查文件内容(只有 `Files` 类型),因此在 composer 卡片上拖动时显示的放置光标可能与最终的接管决定不一致——接管决定在 `drop` 时才做出。
+- **单一 composer 卡片** —— drop 区域假设页面上只有一个 composer 卡片。
+- **合成 dragend 会广播** —— drop 接管时派发的合成 `dragend` 会被所有 `window` dragend 监听器接收,而不只是 composer 的。这与真实拖拽结束时派发的事件一致、无害,但其它监听器确实会收到。

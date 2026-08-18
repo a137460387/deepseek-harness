@@ -15,9 +15,10 @@ export const name = 'client-global-paste-invariant'
 export const inject = ['invariants']
 
 /**
- * No runtime invariant: this package mounts one document-level paste listener
- * through ctx.effect and emits no cordis events. The listener's disposal rides
- * the plugin fiber (HMR safety), proven by the browser-half spec.
+ * No runtime invariant: this package mounts document-level paste and file-drop
+ * capture listeners through ctx.effect and emits no cordis events. The
+ * listeners' disposal rides the plugin fiber (HMR safety), proven by the
+ * browser-half spec.
  */
 const install: InvariantInstaller = () => {}
 
