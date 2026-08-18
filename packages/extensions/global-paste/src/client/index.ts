@@ -1,7 +1,7 @@
 /**
  * Whole-page paste and text-file drop, browser half: document-level
- * capture-phase `paste` / `dragover` / `drop` listeners that route clipboard
- * content and dropped text files into the current session's composer. Mirrors
+ * capture-phase `paste` / `drop` listeners that route clipboard content and
+ * dropped text files into the current session's composer. Mirrors
  * Claude.ai's "paste anywhere into the composer" behavior.
  *
  * The paste listener rides the capture phase so it runs BEFORE the composer
@@ -21,16 +21,20 @@
  * When the composer textarea is already focused the paste listener lets the
  * event pass through to the native handler (no double-processing).
  *
- * File drop: the capture-phase `dragover`/`drop` listeners take over a drop of
- * a PURE text-file batch that lands inside the composer card
- * (`[data-composer-card]`), reading the files and appending them to the draft
- * end (one `# <filename>` header per file, files joined by a blank line). Any
- * image or other non-text file in the batch lets the WHOLE batch through to
- * the composer's native image intake (no splitting). The takeover fires a
- * synthetic `dragend` on window so the composer's drag-active overlay — whose
- * own `onDrop` reset was skipped by the capture-phase stopPropagation and which
- * an OS file drag never ends with — clears; every other window dragend listener
- * also receives that event, matching what a real drag's end would deliver.
+ * File drop: the capture-phase `drop` listener takes over a drop of a PURE
+ * text-file batch ANYWHERE over the window — the same zone the composer's
+ * whole-window image intake covers — reading the files and appending them to
+ * the draft end (one `# <filename>` header per file, files joined by a blank
+ * line), then focuses the composer. Any image or other non-text file in the
+ * batch lets the WHOLE batch through to the composer's native image intake
+ * (no splitting). The composer's own whole-window dragover listener already
+ * allows file drops and sets the copy cursor, so this plugin adds no dragover
+ * handling; the text-vs-image decision is made at drop, when the files are
+ * readable. The takeover fires a synthetic `dragend` on window so the
+ * composer's drag-active overlay — whose own `onDrop` reset was skipped by
+ * the capture-phase stopPropagation and which an OS file drag never ends
+ * with — clears; every other window dragend listener also receives that
+ * event, matching what a real drag's end would deliver.
  * @module @deepseek-ai/dsh-client-global-paste/client
  */
 
@@ -41,15 +45,12 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 /** Selector for the composer textarea (marked by InputBar via data-dsh-composer). */
 const COMPOSER_SELECTOR = 'textarea[data-dsh-composer]'
 
-/** Selector for the composer card container (marked by InputBar via data-composer-card). */
-const COMPOSER_CARD_SELECTOR = '[data-composer-card]'
-
 /** Editable element tags whose own paste must not be hijacked. */
 const EDITABLE_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT'])
 
 /**
  * File extensions treated as plain text/code for drop intake. A dropped file is
- * text when its extension is listed here or its MIME type starts with `text/`;
+ * text if its extension is listed here or its MIME type starts with `text/`;
  * anything else (images, binaries, unrecognized) is left to the composer's
  * native image intake.
  */
@@ -144,19 +145,6 @@ function isTextFile(file: File): boolean {
 }
 
 /**
- * The composer card enclosing the drag event's drop point, or null when the
- * pointer is outside every composer card (in which case the event is left
- * alone).
- * @param event - the dragover or drop event.
- * @returns the enclosing composer-card element, or null.
- */
-function composerCardAt(event: DragEvent): Element | null {
-  const target = event.target
-  if (!(target instanceof Element)) return null
-  return target.closest(COMPOSER_CARD_SELECTOR)
-}
-
-/**
  * Resolve the current session's input facade when it can accept a draft edit:
  * a current session exists, its scope resolves, and the input machine is not in
  * a submit/adjudication transaction (`claimed` still accepts edits).
@@ -228,26 +216,12 @@ export function apply(ctx: ClientContext): void {
       }
     }
 
-    const onDragOver = (event: DragEvent): void => {
-      // Only the composer-card drop zone is taken over; anywhere else the
-      // event is left to native handling (the composer's whole-page image
-      // drop). dragover exposes only types, not files, so the text-vs-image
-      // decision is deferred to drop.
-      if (composerCardAt(event) === null) return
-      const dataTransfer = event.dataTransfer
-      if (dataTransfer === null) return
-      if (!dataTransfer.types.includes('Files')) return
-      event.preventDefault()
-      event.stopPropagation()
-      dataTransfer.dropEffect = 'copy'
-    }
-
     const onDrop = (event: DragEvent): void => {
-      // Outside the composer card, an empty batch, a batch carrying any image
-      // or other non-text file, or no live input: leave the event to native
-      // handling (the composer's whole-page image intake). Never split a batch,
-      // so images keep the first-party path.
-      if (composerCardAt(event) === null) return
+      // Whole-window takeover, matching the zone of the composer's own image
+      // intake: a drop anywhere over the window is eligible. An empty batch, a
+      // batch carrying any image or other non-text file, or no live input:
+      // leave the event to native handling (the composer's whole-window image
+      // intake). Never split a batch, so images keep the first-party path.
       const dataTransfer = event.dataTransfer
       if (dataTransfer === null) return
       const files = Array.from(dataTransfer.files)
@@ -255,6 +229,11 @@ export function apply(ctx: ClientContext): void {
       if (!files.every(isTextFile)) return
       const resolved = resolveEditableInput(ctx)
       if (resolved === undefined) return
+      const composer = document.querySelector<HTMLTextAreaElement>(COMPOSER_SELECTOR)
+      if (composer === null) return
+      // Composer masked by a takeover overlay — mirror the paste path and
+      // leave the drop to native handling instead of injecting invisibly.
+      if (!composerVisible(composer)) return
       const { input } = resolved
 
       // Take over synchronously: block the browser's file-open default and keep
@@ -277,17 +256,15 @@ export function apply(ctx: ClientContext): void {
         if (state.phase === 'adjudicating' || state.phase === 'submitting') return
         const block = blocks.join('\n\n')
         input.setDraft(state.draft === '' ? block : state.draft + '\n' + block)
-        const composer = document.querySelector<HTMLTextAreaElement>(COMPOSER_SELECTOR)
-        if (composer !== null) composer.focus({ preventScroll: true })
+        const current = document.querySelector<HTMLTextAreaElement>(COMPOSER_SELECTOR)
+        if (current !== null) current.focus({ preventScroll: true })
       })()
     }
 
     document.addEventListener('paste', onPaste, true)
-    document.addEventListener('dragover', onDragOver, true)
     document.addEventListener('drop', onDrop, true)
     return () => {
       document.removeEventListener('paste', onPaste, true)
-      document.removeEventListener('dragover', onDragOver, true)
       document.removeEventListener('drop', onDrop, true)
     }
   }, 'global-paste: document paste and file-drop listeners')
