@@ -3,7 +3,8 @@
  * global-paste plugin halves: the browser entry's document-level paste
  * listener against faked sessions/conversation services (with fiber teardown
  * proving removal — HMR safety), the inert node entry, and the invariant
- * companion's ownership reservation.
+ * companion's ownership reservation. Text-file drops are owned by the
+ * companion text-file-cards plugin and tested there.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -58,24 +59,6 @@ function installClipboardConstructors(): void {
   Object.defineProperty(globalThis, 'ClipboardEvent', { value: FakeClipboardEvent, configurable: true, writable: true })
 }
 
-/**
- * Dispatch a file drop onto the given target with a dataTransfer stub shaped as
- * the plugin's drop branch reads it (files + types). jsdom omits
- * DragEvent/DataTransfer, so the stub mirrors only what onDrop consumes.
- */
-function dispatchDrop(files: readonly File[], target: EventTarget): Event {
-  const dataTransfer = { files, types: ['Files'], dropEffect: 'none' }
-  const event = new Event('drop', { bubbles: true, cancelable: true })
-  Object.defineProperty(event, 'dataTransfer', { value: dataTransfer, configurable: true })
-  target.dispatchEvent(event)
-  return event
-}
-
-/** Let the drop's async read-and-inject continuation settle (file.text() is microtask-based). */
-async function settle(): Promise<void> {
-  await new Promise<void>((resolve) => { setTimeout(resolve, 0) })
-}
-
 /** Build a session list snapshot with one current session. */
 function listState(current: SessionId | undefined): SessionListState {
   return {
@@ -103,7 +86,6 @@ interface Bench {
   ctx: Context
   fiber: ReturnType<Context['plugin']>
   input: FakeInput
-  card: HTMLElement
   composer: HTMLTextAreaElement
 }
 
@@ -145,10 +127,9 @@ async function bench(over: BenchOptions = {}): Promise<Bench> {
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
 
-  // Mount the composer card + textarea the plugin queries for. The card carries
-  // data-composer-card so the file-drop listeners can locate the drop zone.
+  // Mount the composer textarea the plugin queries for, inside a container
+  // standing in for the composer card.
   const card = document.createElement('div')
-  card.setAttribute('data-composer-card', '')
   const composer = document.createElement('textarea')
   composer.setAttribute('data-dsh-composer', '')
   composer.getBoundingClientRect = () => ({
@@ -160,7 +141,7 @@ async function bench(over: BenchOptions = {}): Promise<Bench> {
   // (visible, not occluded) so the plugin's visibility probe passes.
   document.elementFromPoint = () => composer
 
-  const bench: Bench = { ctx, fiber, input, card, composer }
+  const bench: Bench = { ctx, fiber, input, composer }
   activeBench = bench
   return bench
 }
@@ -287,176 +268,6 @@ describe('global-paste browser half', () => {
     expect(input.setDraft).not.toHaveBeenCalled()
     // The Context is still usable (provide stayed intact; only the listener left).
     expect(ctx).toBeDefined()
-  })
-
-  describe('text-file drop', () => {
-    it('injects a single dropped text file as a "# name" block at the draft end', async () => {
-      const { input, card, composer } = await bench({ draft: 'hello' })
-      const file = new File(['world'], 'note.txt', { type: 'text/plain' })
-      const event = dispatchDrop([file], card)
-      expect(event.defaultPrevented).toBe(true)
-      await settle()
-      expect(input.setDraft).toHaveBeenCalledOnce()
-      expect(input.setDraft).toHaveBeenCalledWith('hello\n# note.txt\nworld')
-      expect(document.activeElement).toBe(composer)
-    })
-
-    it('concatenates multiple dropped text files with blank-line separators', async () => {
-      const { input, card } = await bench({ draft: '' })
-      const a = new File(['alpha'], 'a.txt', { type: 'text/plain' })
-      const b = new File(['beta'], 'b.md', { type: 'text/markdown' })
-      const event = dispatchDrop([a, b], card)
-      expect(event.defaultPrevented).toBe(true)
-      await settle()
-      expect(input.setDraft).toHaveBeenCalledWith('# a.txt\nalpha\n\n# b.md\nbeta')
-    })
-
-    it('recognizes a code file by extension when its MIME is not text/', async () => {
-      const { input, card } = await bench({ draft: '' })
-      const file = new File(['const x = 1'], 'app.ts', { type: '' })
-      const event = dispatchDrop([file], card)
-      expect(event.defaultPrevented).toBe(true)
-      await settle()
-      expect(input.setDraft).toHaveBeenCalledWith('# app.ts\nconst x = 1')
-    })
-
-    it('leaves a file with no extension and no MIME to native handling', async () => {
-      const { input, card } = await bench({ draft: '' })
-      const file = new File(['data'], 'noextension', { type: '' })
-      const event = dispatchDrop([file], card)
-      expect(event.defaultPrevented).toBe(false)
-      expect(input.setDraft).not.toHaveBeenCalled()
-    })
-
-    it('leaves an image drop to the native intake', async () => {
-      const { input, card } = await bench({ draft: '' })
-      const image = new File([Uint8Array.of(1, 2, 3)], 'pixel.png', { type: 'image/png' })
-      const event = dispatchDrop([image], card)
-      expect(event.defaultPrevented).toBe(false)
-      expect(input.setDraft).not.toHaveBeenCalled()
-    })
-
-    it('leaves a mixed text+image batch wholly to the native intake', async () => {
-      const { input, card } = await bench({ draft: '' })
-      const text = new File(['hi'], 'a.txt', { type: 'text/plain' })
-      const image = new File([Uint8Array.of(1)], 'p.png', { type: 'image/png' })
-      const event = dispatchDrop([text, image], card)
-      expect(event.defaultPrevented).toBe(false)
-      expect(input.setDraft).not.toHaveBeenCalled()
-    })
-
-    it('leaves an empty file drop to native handling', async () => {
-      const { input, card } = await bench({ draft: '' })
-      const event = dispatchDrop([], card)
-      expect(event.defaultPrevented).toBe(false)
-      expect(input.setDraft).not.toHaveBeenCalled()
-    })
-
-    it('takes over a text-file drop outside the composer card (whole window)', async () => {
-      const { input, composer } = await bench({ draft: 'hello' })
-      const file = new File(['hi'], 'a.txt', { type: 'text/plain' })
-      const event = dispatchDrop([file], document.body)
-      expect(event.defaultPrevented).toBe(true)
-      await settle()
-      expect(input.setDraft).toHaveBeenCalledWith('hello\n# a.txt\nhi')
-      expect(document.activeElement).toBe(composer)
-    })
-
-    it('takes over a drop whose target is not an element (target is irrelevant)', async () => {
-      const { input } = await bench({ draft: '' })
-      const file = new File(['hi'], 'a.txt', { type: 'text/plain' })
-      const event = dispatchDrop([file], document)
-      expect(event.defaultPrevented).toBe(true)
-      await settle()
-      expect(input.setDraft).toHaveBeenCalledWith('# a.txt\nhi')
-    })
-
-    it('leaves a text-file drop through when there is no current session', async () => {
-      const { input, card } = await bench({ draft: '', noSession: true })
-      const file = new File(['hi'], 'a.txt', { type: 'text/plain' })
-      const event = dispatchDrop([file], card)
-      expect(event.defaultPrevented).toBe(false)
-      expect(input.setDraft).not.toHaveBeenCalled()
-    })
-
-    it('leaves a text-file drop through while the machine is submitting', async () => {
-      const { input, card } = await bench({ draft: '', phase: 'submitting' })
-      const file = new File(['hi'], 'a.txt', { type: 'text/plain' })
-      const event = dispatchDrop([file], card)
-      expect(event.defaultPrevented).toBe(false)
-      expect(input.setDraft).not.toHaveBeenCalled()
-    })
-
-    it('abandons injection if the machine turns busy during the async read', async () => {
-      const { input, card } = await bench({ draft: 'hello' })
-      const file = new File(['world'], 'a.txt', { type: 'text/plain' })
-      const event = dispatchDrop([file], card)
-      // The takeover is decided synchronously (preventDefault), but the machine
-      // flips to submitting before the async read settles — the injection bails.
-      expect(event.defaultPrevented).toBe(true)
-      input.state.set({ draft: 'hello', phase: 'submitting' })
-      await settle()
-      expect(input.setDraft).not.toHaveBeenCalled()
-    })
-
-    it('still injects but skips focus if the composer unmounts during the read', async () => {
-      const { input, card, composer } = await bench({ draft: '' })
-      const file = new File(['hi'], 'a.txt', { type: 'text/plain' })
-      dispatchDrop([file], card)
-      composer.remove()
-      await settle()
-      expect(input.setDraft).toHaveBeenCalledOnce()
-    })
-
-    it('fires a synthetic window dragend on takeover to clear the composer overlay', async () => {
-      const { card } = await bench({ draft: '' })
-      const dragEnd = vi.fn()
-      window.addEventListener('dragend', dragEnd)
-      const file = new File(['hi'], 'a.txt', { type: 'text/plain' })
-      dispatchDrop([file], card)
-      expect(dragEnd).toHaveBeenCalledOnce()
-      window.removeEventListener('dragend', dragEnd)
-    })
-
-    it('ignores a drop that carries no dataTransfer', async () => {
-      const { input, card } = await bench({ draft: '' })
-      const drop = new Event('drop', { bubbles: true, cancelable: true })
-      Object.defineProperty(drop, 'dataTransfer', { value: null, configurable: true })
-      card.dispatchEvent(drop)
-      expect(drop.defaultPrevented).toBe(false)
-      expect(input.setDraft).not.toHaveBeenCalled()
-    })
-
-    it('leaves a text-file drop through when the composer is occluded', async () => {
-      const { input, card } = await bench({ draft: '' })
-      // A mask element the visibility probe hits instead of the composer:
-      // disjoint from the composer, so neither containment check passes.
-      const mask = document.createElement('div')
-      document.body.appendChild(mask)
-      document.elementFromPoint = () => mask
-      const file = new File(['hi'], 'a.txt', { type: 'text/plain' })
-      const event = dispatchDrop([file], card)
-      expect(event.defaultPrevented).toBe(false)
-      expect(input.setDraft).not.toHaveBeenCalled()
-    })
-
-    it('leaves a text-file drop through when no composer is mounted', async () => {
-      const { input, card, composer } = await bench({ draft: '' })
-      composer.remove()
-      const file = new File(['hi'], 'a.txt', { type: 'text/plain' })
-      const event = dispatchDrop([file], card)
-      expect(event.defaultPrevented).toBe(false)
-      expect(input.setDraft).not.toHaveBeenCalled()
-    })
-
-    it('fiber teardown removes the drop listener (HMR safety)', async () => {
-      const { fiber, input, card } = await bench({ draft: '' })
-      await fiber.dispose()
-      const file = new File(['hi'], 'a.txt', { type: 'text/plain' })
-      dispatchDrop([file], card)
-      await settle()
-      expect(input.setDraft).not.toHaveBeenCalled()
-    })
   })
 })
 

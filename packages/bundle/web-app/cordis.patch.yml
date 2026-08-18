@@ -241,6 +241,11 @@
     - id: global-paste
       name: '@deepseek-ai/dsh-client-global-paste'
 
+    # Text-file drop staging cards: pure text-file drops stage as cards over
+    # the composer; a click expands the file into the draft.
+    - id: text-file-cards
+      name: '@deepseek-ai/dsh-client-text-file-cards'
+
     # Goal surface: GoalBar in the input dock over the goal session projection.
     - id: ui-goal
       name: '@deepseek-ai/dsh-client-ui-goal'
