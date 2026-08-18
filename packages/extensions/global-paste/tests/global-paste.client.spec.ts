@@ -71,15 +71,6 @@ function dispatchDrop(files: readonly File[], target: EventTarget): Event {
   return event
 }
 
-/** Dispatch a dragover over the given target; fileDrag toggles the 'Files' type. */
-function dispatchDragOver(target: EventTarget, fileDrag: boolean): Event {
-  const dataTransfer = { files: [], types: fileDrag ? ['Files'] : [], dropEffect: 'none' }
-  const event = new Event('dragover', { bubbles: true, cancelable: true })
-  Object.defineProperty(event, 'dataTransfer', { value: dataTransfer, configurable: true })
-  target.dispatchEvent(event)
-  return event
-}
-
 /** Let the drop's async read-and-inject continuation settle (file.text() is microtask-based). */
 async function settle(): Promise<void> {
   await new Promise<void>((resolve) => { setTimeout(resolve, 0) })
@@ -361,20 +352,23 @@ describe('global-paste browser half', () => {
       expect(input.setDraft).not.toHaveBeenCalled()
     })
 
-    it('leaves a drop outside the composer card to native handling', async () => {
-      const { input } = await bench({ draft: '' })
+    it('takes over a text-file drop outside the composer card (whole window)', async () => {
+      const { input, composer } = await bench({ draft: 'hello' })
       const file = new File(['hi'], 'a.txt', { type: 'text/plain' })
       const event = dispatchDrop([file], document.body)
-      expect(event.defaultPrevented).toBe(false)
-      expect(input.setDraft).not.toHaveBeenCalled()
+      expect(event.defaultPrevented).toBe(true)
+      await settle()
+      expect(input.setDraft).toHaveBeenCalledWith('hello\n# a.txt\nhi')
+      expect(document.activeElement).toBe(composer)
     })
 
-    it('leaves a drop whose target is not an element to native handling', async () => {
+    it('takes over a drop whose target is not an element (target is irrelevant)', async () => {
       const { input } = await bench({ draft: '' })
       const file = new File(['hi'], 'a.txt', { type: 'text/plain' })
       const event = dispatchDrop([file], document)
-      expect(event.defaultPrevented).toBe(false)
-      expect(input.setDraft).not.toHaveBeenCalled()
+      expect(event.defaultPrevented).toBe(true)
+      await settle()
+      expect(input.setDraft).toHaveBeenCalledWith('# a.txt\nhi')
     })
 
     it('leaves a text-file drop through when there is no current session', async () => {
@@ -424,36 +418,35 @@ describe('global-paste browser half', () => {
       window.removeEventListener('dragend', dragEnd)
     })
 
-    it('ignores drag events that carry no dataTransfer', async () => {
+    it('ignores a drop that carries no dataTransfer', async () => {
       const { input, card } = await bench({ draft: '' })
       const drop = new Event('drop', { bubbles: true, cancelable: true })
       Object.defineProperty(drop, 'dataTransfer', { value: null, configurable: true })
       card.dispatchEvent(drop)
       expect(drop.defaultPrevented).toBe(false)
-      const over = new Event('dragover', { bubbles: true, cancelable: true })
-      Object.defineProperty(over, 'dataTransfer', { value: null, configurable: true })
-      card.dispatchEvent(over)
-      expect(over.defaultPrevented).toBe(false)
       expect(input.setDraft).not.toHaveBeenCalled()
     })
 
-    it('takes over dragover on the composer card for a file drag', async () => {
-      const { card } = await bench({ draft: '' })
-      const event = dispatchDragOver(card, true)
-      expect(event.defaultPrevented).toBe(true)
-      expect((event as DragEvent).dataTransfer?.dropEffect).toBe('copy')
+    it('leaves a text-file drop through when the composer is occluded', async () => {
+      const { input, card } = await bench({ draft: '' })
+      // A mask element the visibility probe hits instead of the composer:
+      // disjoint from the composer, so neither containment check passes.
+      const mask = document.createElement('div')
+      document.body.appendChild(mask)
+      document.elementFromPoint = () => mask
+      const file = new File(['hi'], 'a.txt', { type: 'text/plain' })
+      const event = dispatchDrop([file], card)
+      expect(event.defaultPrevented).toBe(false)
+      expect(input.setDraft).not.toHaveBeenCalled()
     })
 
-    it('leaves dragover outside the composer card to native handling', async () => {
-      await bench({ draft: '' })
-      const event = dispatchDragOver(document.body, true)
+    it('leaves a text-file drop through when no composer is mounted', async () => {
+      const { input, card, composer } = await bench({ draft: '' })
+      composer.remove()
+      const file = new File(['hi'], 'a.txt', { type: 'text/plain' })
+      const event = dispatchDrop([file], card)
       expect(event.defaultPrevented).toBe(false)
-    })
-
-    it('leaves a non-file dragover on the composer card to native handling', async () => {
-      const { card } = await bench({ draft: '' })
-      const event = dispatchDragOver(card, false)
-      expect(event.defaultPrevented).toBe(false)
+      expect(input.setDraft).not.toHaveBeenCalled()
     })
 
     it('fiber teardown removes the drop listener (HMR safety)', async () => {

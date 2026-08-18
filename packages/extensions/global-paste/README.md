@@ -24,19 +24,21 @@ Text is appended to the draft **end**; an existing non-collapsed selection is no
 
 ## Text-file drop
 
-The plugin also mounts capture-phase `dragover`/`drop` listeners on the document. Dropping a batch of pure text files onto the composer card (`[data-composer-card]`) reads them asynchronously and appends them to the draft end — one `# <filename>` header per file, files joined by a blank line — then focuses the composer. The drop is taken over only when every guard below holds; otherwise the event is left to the composer's native whole-file intake:
+The plugin also mounts a capture-phase `drop` listener on the document. Dropping a batch of pure text files anywhere over the window — the same zone the composer's own image intake covers — reads them asynchronously and appends them to the draft end — one `# <filename>` header per file, files joined by a blank line — then focuses the composer. A drop on the conversation area behaves exactly like a drop on the composer card. The drop is taken over only when every guard below holds; otherwise the event is left to the composer's native whole-file intake:
 
-- The drop point is inside the composer card.
 - Every file in the batch is text — its extension matches a common text/code allowlist, or its MIME type starts with `text/`.
 - A current session exists and the input machine is not `adjudicating`/`submitting`.
+- The composer is mounted and visible (not masked by a takeover overlay) — mirroring the paste path.
 
 Any image or other non-text file in the batch lets the whole batch pass through untouched (no splitting), so images keep the first-party intake path. After the async read the input machine is re-checked; if a submit began meanwhile, the injection is abandoned.
+
+The composer's own whole-window `dragover` listener already allows file drops and sets the copy cursor, so the plugin adds no `dragover` handling; the text-vs-image decision is made at `drop`, when the files are readable.
 
 Because the takeover stops the drop from reaching the composer's own handler and an OS file drag fires no `dragend`, the plugin dispatches a synthetic `dragend` on `window` to clear the composer's drag-active overlay.
 
 ## Model Experience
 
-None. This package touches only the browser's clipboard event and the public `ctx.conversation.input` service; it sends no prompt, message, schema, stream, or tool result.
+None, as the browser-side plugin only routes clipboard and drag events through the public `ctx.conversation.input` service and registers nothing model-facing.
 
 #### KV Cache effect
 
@@ -48,6 +50,5 @@ None; the package never assembles or sends provider requests.
 - **Browser support** — the image-forwarding path depends on the browser honoring a script-constructed `ClipboardEvent` with a `DataTransfer` carrying File items. Verified in Chromium; Firefox and Safari may restrict this (the `clipboardData` of a synthetic event can be null). On such browsers, image paste would silently fall through to the no-file branch; text paste is unaffected.
 - **Visibility probe** — the composer-occluded check uses `elementFromPoint` at the composer's center. An overlay that covers the composer but leaves the center uncovered (e.g. a thin side rail) would not be detected; the paste would route into a partially-visible composer, which is harmless.
 - **Text files only on drop** — a drop injects only files whose extension matches the text/code allowlist or whose MIME type starts with `text/`; images and other files pass through to the composer's native file intake. A file with no extension and no MIME type is not treated as text.
-- **dragover feedback** — `dragover` cannot inspect file contents (only the `Files` type), so the drop cursor shown while dragging over the composer card may not match the eventual takeover decision, which is made at `drop`.
-- **Single composer card** — the drop zone assumes exactly one composer card on the page.
+- **Image invitation overlay shows for text drags** — the composer's drag-active overlay is driven by its own `dragenter` listener and its copy is image-specific. The browser exposes neither file names nor contents before `drop`, so while dragging a text file the invitation still reads as the image one; the drop behavior itself is unaffected (a pure text batch joins the draft). Retitling the overlay would require changing the core `DropOverlay`, which the fork deliberately avoids.
 - **Synthetic dragend is broadcast** — the synthetic `dragend` dispatched on a drop takeover is received by every `window` dragend listener, not only the composer's. This matches what a real drag's end would deliver and is harmless, but other listeners do observe it.
