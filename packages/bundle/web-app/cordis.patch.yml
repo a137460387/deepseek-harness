@@ -246,6 +246,11 @@
     - id: text-file-cards
       name: '@deepseek-ai/dsh-client-text-file-cards'
 
+    # Usage statistics: the usageStats session projection (node half) plus the
+    # settings-tab aggregate over it (browser half); token counts only.
+    - id: usage-stats
+      name: '@deepseek-ai/dsh-client-usage-stats'
+
     # Goal surface: GoalBar in the input dock over the goal session projection.
     - id: ui-goal
       name: '@deepseek-ai/dsh-client-ui-goal'
