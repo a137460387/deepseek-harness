@@ -75,9 +75,16 @@ const projected = (ctx: Context, session: Session): TokenUsageProjection => {
 /**
  * Meter one upcoming replacement the way compaction-basic does: price the
  * replaced span from the measurement service's own nodes and log the
- * shadow-price event directly before the replace.
+ * shadow-price event directly before the replace. A present `usage` rides the
+ * event the way the llm-stream summarizer reports it.
  */
-function appendSummaryMeter(ctx: Context, session: Session, start: number, end: number): void {
+function appendSummaryMeter(
+  ctx: Context,
+  session: Session,
+  start: number,
+  end: number,
+  usage?: TokenUsage,
+): void {
   const nodes = ctx.tokenMeter.measure(session).nodes
   const startIdx = nodes.findIndex(node => node.seq === start)
   const endIdx = nodes.findIndex(node => node.seq === end)
@@ -90,6 +97,18 @@ function appendSummaryMeter(ctx: Context, session: Session, start: number, end: 
     shadowedTokenCount: shadowed.reduce((total, node) => total + node.tokens, 0),
     provider: 'mock',
     model: 'mock',
+    ...usage === undefined ? {} : { usage },
+  })
+}
+
+/** Append the replacement user message a summary metering event promises. */
+function replaceWithSummary(session: Session, start: number, end: number, sourceSeqs: number[]): void {
+  session.append('user/message', createUserMessage({
+    content: [{ type: 'text', text: 'compacted' }],
+    source: { kind: 'plugin', plugin: 'test' },
+  }), {
+    surfaceOp: { op: 'replace', start, end },
+    sourceEventSeqs: sourceSeqs,
   })
 }
 
@@ -208,17 +227,90 @@ describe('tokenUsage session projection', () => {
       source: { kind: 'user' },
     }), { surfaceOp: 'append' })
     appendSummaryMeter(ctx, session, before.seq, before.seq)
-    session.append('user/message', createUserMessage({
-      content: [{ type: 'text', text: 'compacted' }],
-      source: { kind: 'plugin', plugin: 'test' },
-    }), {
-      surfaceOp: { op: 'replace', start: before.seq, end: before.seq },
-      sourceEventSeqs: [before.seq],
-    })
+    replaceWithSummary(session, before.seq, before.seq, [before.seq])
 
     expect(projected(ctx, session)).toEqual({
       uncachedInputTokens: 12,
       outputTokens: 3,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    })
+  })
+
+  it('accumulates a compaction summary usage in full', async () => {
+    const { ctx, session } = await harness()
+    startStep(session, 1, 1)
+    const source = usageChunk(session, { inputTokens: 12, outputTokens: 3 }, 1, 1)
+    finalUsage(session, { inputTokens: 12, outputTokens: 3 }, 1, 1, [source])
+    const before = session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'before compaction' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    appendSummaryMeter(ctx, session, before.seq, before.seq, {
+      inputTokens: 40,
+      outputTokens: 6,
+      cacheWriteTokens: 2,
+    })
+    replaceWithSummary(session, before.seq, before.seq, [before.seq])
+
+    expect(projected(ctx, session)).toEqual({
+      uncachedInputTokens: 52,
+      outputTokens: 9,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 2,
+    })
+  })
+
+  it('skips a compaction summary that reported no usage without a change push', async () => {
+    const { ctx, session } = await harness()
+    startStep(session, 1, 1)
+    const source = usageChunk(session, { inputTokens: 12, outputTokens: 3 }, 1, 1)
+    finalUsage(session, { inputTokens: 12, outputTokens: 3 }, 1, 1, [source])
+    const before = session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'before compaction' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    const changes: unknown[] = []
+    ctx.sessionProjections.onChanged((_session, key, value) => {
+      if (key === 'tokenUsage') changes.push(value)
+    })
+    appendSummaryMeter(ctx, session, before.seq, before.seq)
+    replaceWithSummary(session, before.seq, before.seq, [before.seq])
+
+    expect(projected(ctx, session)).toEqual({
+      uncachedInputTokens: 12,
+      outputTokens: 3,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    })
+    expect(changes).toHaveLength(0)
+  })
+
+  it('keeps the last-sample replacement intact when a summary lands between steps', async () => {
+    const { ctx, session } = await harness()
+    // Step 1 fails after its chunk sample: the early sample must survive.
+    startStep(session, 1, 1)
+    usageChunk(session, { inputTokens: 10, outputTokens: 2 }, 1, 1)
+    session.append('step/end', { turn: 1, step: 1 })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    // A manual compaction between turns reports its own usage.
+    const before = session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'before compaction' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    appendSummaryMeter(ctx, session, before.seq, before.seq, {
+      inputTokens: 40,
+      outputTokens: 5,
+    })
+    replaceWithSummary(session, before.seq, before.seq, [before.seq])
+    // Step 2 of a later turn replaces its own chunk sample normally.
+    startStep(session, 2, 1)
+    const second = usageChunk(session, { inputTokens: 20, outputTokens: 4 }, 2, 1)
+    finalUsage(session, { inputTokens: 25, outputTokens: 7 }, 2, 1, [second])
+
+    expect(projected(ctx, session)).toEqual({
+      uncachedInputTokens: 75,
+      outputTokens: 14,
       cacheReadTokens: 0,
       cacheWriteTokens: 0,
     })
@@ -231,6 +323,7 @@ describe('tokenUsage session projection', () => {
     const checkpoint = JSON.parse(JSON.stringify(
       ctx.sessionProjections.checkpoint(session),
     )) as ReturnType<typeof ctx.sessionProjections.checkpoint>
+    expect(checkpoint.tokenUsage?.ver).toBe(2)
 
     await meterFiber.dispose()
     expect(ctx.sessionProjections.snapshot(session).values).not.toHaveProperty('tokenUsage')

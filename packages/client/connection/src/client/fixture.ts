@@ -854,6 +854,12 @@ function usageSampleOf(event: SessionEvent): FixtureUsageSample | undefined {
     : { turn: item.data.turn, step: item.data.step, usage }
 }
 
+/** Read a compaction summary's own usage, when the summarizer reported one. */
+function summaryUsageOf(event: SessionEvent): TokenUsage | undefined {
+  const item = event as unknown as { type: string; data: { usage?: TokenUsage } }
+  return item.type === 'compaction/summary' ? item.data.usage : undefined
+}
+
 /** Fixture parallel of token-meter's last-sample-replacing usage projection. */
 function tokenUsageOf(log: readonly SessionEvent[]): FixtureTokenUsageProjection {
   const totals: FixtureTokenUsageProjection = {
@@ -868,6 +874,15 @@ function tokenUsageOf(log: readonly SessionEvent[]): FixtureTokenUsageProjection
     buckets: FixtureTokenUsageProjection
   } | null = null
   for (const event of log) {
+    // A summary carries no turn/step, so its usage never replaces a sample.
+    const summary = summaryUsageOf(event)
+    if (summary !== undefined) {
+      totals.uncachedInputTokens += summary.inputTokens
+      totals.outputTokens += summary.outputTokens
+      totals.cacheReadTokens += summary.cacheReadTokens ?? 0
+      totals.cacheWriteTokens += summary.cacheWriteTokens ?? 0
+      continue
+    }
     const sample = usageSampleOf(event)
     if (sample === undefined) continue
     const buckets: FixtureTokenUsageProjection = {
@@ -1104,6 +1119,17 @@ function projectionFramesOf(id: SessionId, log: readonly SessionEvent[], event: 
       { type: 'session/projection', sessionId: id, key: 'tokenUsage', value: tokenUsageOf(log), seq: event.seq },
       { type: 'session/projection', sessionId: id, key: 'contextPressure', value: contextPressureOf(log), seq: event.seq },
     )
+  }
+  // A summary's own usage advances only the usage totals; the pressure
+  // projection samples request paths exclusively.
+  if (summaryUsageOf(event) !== undefined) {
+    frames.push({
+      type: 'session/projection',
+      sessionId: id,
+      key: 'tokenUsage',
+      value: tokenUsageOf(log),
+      seq: event.seq,
+    })
   }
   if (type === 'request/context') {
     frames.push({
