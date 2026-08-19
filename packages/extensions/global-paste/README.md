@@ -14,6 +14,7 @@ The guards, evaluated in order before routing:
 
 - No `text/plain` and no files → ignored.
 - No current session → ignored.
+- The session-level composer locks are closed (the session is removed; a continuable subagent child's exact parent is offline) → ignored, matching the composer's read-only states.
 - The input machine is `adjudicating` or `submitting` → ignored (a submit transaction is in flight).
 - The composer textarea is already `document.activeElement` → ignored (let the native `onPaste` handle it; no double-insert). This also protects the re-dispatched image event: after `forwardImagePaste` focuses the composer and dispatches, the bubbling event re-enters the capture listener but hits this guard and returns.
 - Focus is on another editable element (input/textarea/contenteditable) → ignored (honor that element's own paste).

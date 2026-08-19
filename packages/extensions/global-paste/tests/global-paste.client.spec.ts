@@ -3,8 +3,10 @@
  * global-paste plugin halves: the browser entry's document-level paste
  * listener against faked sessions/conversation services (with fiber teardown
  * proving removal — HMR safety), the inert node entry, and the invariant
- * companion's ownership reservation. Text-file drops are owned by the
- * companion text-file-cards plugin and tested there.
+ * companion's ownership reservation. Locked sessions (removed, an offline
+ * continuable parent) ignore pastes like the composer's own read-only states.
+ * Text-file drops are owned by the companion text-file-cards plugin and tested
+ * there.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -93,6 +95,17 @@ interface BenchOptions {
   readonly draft?: string
   readonly phase?: InputSnapshot['phase']
   readonly noSession?: boolean
+  readonly removed?: boolean
+  readonly parentOffline?: boolean
+}
+
+/** Mutable fake of the session-level lock facts the plugin's alignment reads. */
+interface SessionLockSnapshot {
+  removed: boolean
+  subagent: {
+    address: { parentSessionId: SessionId; childSessionId: SessionId; mode: 'continuable' }
+    parentAvailable: boolean
+  } | null
 }
 
 // Track the active bench so its document listener is torn down between tests;
@@ -114,11 +127,18 @@ async function bench(over: BenchOptions = {}): Promise<Bench> {
     state: createSnapshotStore<InputSnapshot>({ draft, phase }),
   }
   const list = createSnapshotStore<SessionListState>(listState(over.noSession === true ? undefined : SESSION))
+  const sessionSnapshot: SessionLockSnapshot = {
+    removed: over.removed === true,
+    subagent: over.parentOffline === true
+      ? { address: { parentSessionId: 'parent' as SessionId, childSessionId: SESSION, mode: 'continuable' }, parentAvailable: false }
+      : null,
+  }
 
   const ctx = new Context()
   ctx.provide('sessions', {
     list,
     scope: (id: SessionId) => id === SESSION ? ({ scopeOf: () => SESSION } as never) : undefined,
+    sessionOf: () => ({ getSnapshot: () => sessionSnapshot }),
   } as never)
   ctx.provide('conversation', {
     input: { for: () => input },
@@ -213,6 +233,20 @@ describe('global-paste browser half', () => {
 
   it('ignores paste when there is no current session', async () => {
     const { input } = await bench({ noSession: true })
+    const event = dispatchPaste('text')
+    expect(event.defaultPrevented).toBe(false)
+    expect(input.setDraft).not.toHaveBeenCalled()
+  })
+
+  it('ignores paste when the session is removed', async () => {
+    const { input } = await bench({ removed: true })
+    const event = dispatchPaste('text')
+    expect(event.defaultPrevented).toBe(false)
+    expect(input.setDraft).not.toHaveBeenCalled()
+  })
+
+  it("ignores paste when a continuable child's parent is offline", async () => {
+    const { input } = await bench({ parentOffline: true })
     const event = dispatchPaste('text')
     expect(event.defaultPrevented).toBe(false)
     expect(input.setDraft).not.toHaveBeenCalled()

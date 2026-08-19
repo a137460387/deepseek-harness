@@ -20,13 +20,21 @@
  * When the composer textarea is already focused the paste listener lets the
  * event pass through to the native handler (no double-processing).
  *
+ * Composer lock alignment: paste routing mirrors the composer's own disabled
+ * predicate wherever a plugin can observe it — a removed session and a
+ * continuable child whose exact parent is offline leave the composer
+ * read-only, so the listener ignores pastes there too. The remaining lock
+ * reasons are owner-prop facts with no public signal: the inert no-workspace
+ * hero has no current session (the current-session guard already covers it),
+ * and an owner block is composer-internal.
+ *
  * Text-file DROPS are owned by the companion `text-file-cards` plugin, which
  * mounts its own capture-phase drop listener and stages dropped text files as
  * cards over the composer.
  * @module @deepseek-ai/dsh-client-global-paste/client
  */
 
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { AgentContext, ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the conversation service's Context merge (ctx.conversation).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 
@@ -104,9 +112,30 @@ function forwardImagePaste(composer: HTMLTextAreaElement, clipboardData: DataTra
 }
 
 /**
+ * Whether the session behind a scope still accepts draft edits under the
+ * composer's observable lock conditions: the session face resolves, the
+ * session is not removed, and a continuable subagent child still has its
+ * exact parent available (the composer renders read-only in all three
+ * cases). The owner-prop lock reasons (the inert hero, an owner block) have
+ * no public signal and stay out of reach.
+ * @param ctx - client root context.
+ * @param actx - the session's Agent-scoped context.
+ * @returns true when every session-level composer lock stands open.
+ */
+function sessionAcceptsEdits(ctx: ClientContext, actx: AgentContext): boolean {
+  const session = ctx.sessions.sessionOf(actx)
+  if (session === undefined) return false
+  const snapshot = session.getSnapshot()
+  if (snapshot.removed) return false
+  const subagent = snapshot.subagent
+  return subagent === null || subagent.address.mode !== 'continuable' || subagent.parentAvailable
+}
+
+/**
  * Resolve the current session's input facade when it can accept a draft edit:
- * a current session exists, its scope resolves, and the input machine is not in
- * a submit/adjudication transaction (`claimed` still accepts edits).
+ * a current session exists, its scope resolves, every session-level composer
+ * lock stands open, and the input machine is not in a submit/adjudication
+ * transaction (`claimed` still accepts edits).
  * @param ctx - client root context.
  * @returns the input facade and its state snapshot, or undefined to pass
  * through.
@@ -115,7 +144,7 @@ function resolveEditableInput(ctx: ClientContext) {
   const current = ctx.sessions.list.getSnapshot().current
   if (current === undefined) return undefined
   const actx = ctx.sessions.scope(current)
-  if (actx === undefined) return undefined
+  if (actx === undefined || !sessionAcceptsEdits(ctx, actx)) return undefined
   const input = ctx.conversation.input.for(actx)
   const state = input.state.getSnapshot()
   if (state.phase === 'adjudicating' || state.phase === 'submitting') return undefined

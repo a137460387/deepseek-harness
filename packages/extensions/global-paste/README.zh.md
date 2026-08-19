@@ -14,6 +14,7 @@ Web UI 全页文本粘贴:在窗口任意位置按 Ctrl/Cmd+V,会把剪贴板的
 
 - 无 `text/plain` 且无文件 → 忽略。
 - 无当前会话 → 忽略。
+- 会话级 composer 锁关闭(会话已被移除;可续接 subagent 子会话的精确父会话离线)→ 忽略,与 composer 的只读状态一致。
 - 输入状态机处于 `adjudicating` 或 `submitting` → 忽略(提交事务进行中)。
 - composer textarea 已是 `document.activeElement` → 忽略(交给原生 `onPaste` 处理,避免重复插入)。这也保护了重新派发的图片事件:`forwardImagePaste` 聚焦 composer 并派发后,冒泡的事件重新进入捕获监听器,但命中此守卫直接返回。
 - 焦点在其它可编辑元素(input/textarea/contenteditable)→ 忽略(尊重该元素自身的粘贴)。
