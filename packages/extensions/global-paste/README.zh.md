@@ -36,5 +36,5 @@ Web UI 全页文本粘贴:在窗口任意位置按 Ctrl/Cmd+V,会把剪贴板的
 ## 已知限制与后续工作
 
 - **无 paste-upgrade** —— composer 自身的 `onPaste` 会把文本送入输入状态机的 `pasteBegin` 事务,可把粘贴文本升级为 slash 引用 chip。本插件改用公开的 `setDraft` 路径(状态机的 keyboard 面是 InputBar 私有,不跨插件边界),因此粘贴的 URL 和路径保持为纯文本,不会变成 chip。对于全页粘贴这正是期望行为。图片路径不受影响:它重新派发到 composer,因此 composer 自身的 `onPaste`(含其 paste-upgrade)对图片部分照常运行。
-- **浏览器支持** —— 图片转发路径依赖浏览器支持脚本构造的 `ClipboardEvent` + 携带 File 的 `DataTransfer`。已在 Chromium 验证;Firefox 和 Safari 可能限制此项(合成事件的 `clipboardData` 可能为 null)。在那些浏览器上,图片粘贴会静默落到无文件分支;文本粘贴不受影响。
+- **浏览器支持** —— 图片转发路径依赖浏览器支持脚本构造的 `ClipboardEvent` + 携带 File 的 `DataTransfer`。已在 Chromium 验证;其他引擎可能限制此项(合成事件的 `clipboardData` 可能为 null,旧版 Safari 构造 `DataTransfer` 时直接抛 TypeError)。构造失败会柔性降级:混合粘贴仍路由文本半边并聚焦 composer,纯图片粘贴则放行原生处理,不会半吞事件。在构造成功但不理会转发的浏览器上,图片粘贴静默无效;文本粘贴不受影响。
 - **可见性探测** —— composer 被遮挡的判断用 `elementFromPoint` 在 composer 中心点检测。若覆盖层遮住 composer 但未遮住中心点(如细侧栏),则无法检测;粘贴会路由到一个部分可见的 composer,这是无害的。

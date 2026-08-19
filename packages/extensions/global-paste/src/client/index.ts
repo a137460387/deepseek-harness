@@ -15,7 +15,9 @@
  *   keeps first-party image behavior intact. Verified viable in Chromium:
  *   a script-constructed `ClipboardEvent` with a `DataTransfer` carrying File
  *   items is honored by the target's `onPaste` (clipboardData.items and
- *   getData are both readable).
+ *   getData are both readable). A browser whose constructors throw (old
+ *   Safari) fails soft — the image half is left to native handling and the
+ *   text half still routes.
  *
  * When the composer textarea is already focused the paste listener lets the
  * event pass through to the native handler (no double-processing).
@@ -92,10 +94,36 @@ function composerVisible(composer: HTMLTextAreaElement): boolean {
  * first so the re-dispatched event is indistinguishable from a user paste while
  * the composer is active. The original document-level event is prevented so it
  * does not also land on whatever element held focus.
+ *
+ * Browsers that cannot construct the synthetic clipboard pieces (old Safari
+ * throws TypeError on the `DataTransfer` constructor or the `clipboardData`
+ * init) fail soft: the forward is reported as unavailable so the caller leaves
+ * the paste to native handling instead of half-swallowing it.
+ * @param composer - the composer textarea to target.
+ * @param clipboardData - the original event's clipboardData to mirror.
+ * @returns true when the forwarded paste was constructed and dispatched.
+ */
+function forwardImagePaste(composer: HTMLTextAreaElement, clipboardData: DataTransfer): boolean {
+  try {
+    dispatchForwardedPaste(composer, clipboardData)
+    return true
+  } catch {
+    // Old Safari throws TypeError constructing a DataTransfer or a ClipboardEvent
+    // with a clipboardData init, making the image forward unavailable. Nothing
+    // else can reach here: dispatchForwardedPaste only runs DOM constructors and
+    // calls, and letting the error escape the listener would break the text
+    // branch below — a constructor failure must not swallow the whole paste.
+    return false
+  }
+}
+
+/**
+ * Construct and dispatch the forwarded paste event (the throwing part of
+ * {@link forwardImagePaste}, isolated so the caller can fail soft).
  * @param composer - the composer textarea to target.
  * @param clipboardData - the original event's clipboardData to mirror.
  */
-function forwardImagePaste(composer: HTMLTextAreaElement, clipboardData: DataTransfer): void {
+function dispatchForwardedPaste(composer: HTMLTextAreaElement, clipboardData: DataTransfer): void {
   // Mirror the file items (images) onto a fresh DataTransfer. getData('text/plain')
   // is intentionally NOT copied: the composer's onPaste would otherwise also
   // append the text via pasteBegin, duplicating what the text branch already did
@@ -189,17 +217,18 @@ export function apply(ctx: ClientContext): void {
       if (!composerVisible(composer)) return
 
       // Route files (images) by re-dispatching onto the composer so its own
-      // onPaste runs the image intake. Text (if any) is appended below; the
-      // forwarded event copies only file items to avoid double-inserting text.
-      if (hasFiles) {
-        event.preventDefault()
-        forwardImagePaste(composer, event.clipboardData)
-      }
+      // onPaste runs the image intake. A browser that cannot construct the
+      // synthetic pieces leaves the image half to native handling; text (if
+      // any) is still routed below, and the forwarded event copies only file
+      // items to avoid double-inserting text.
+      const forwarded = hasFiles && forwardImagePaste(composer, event.clipboardData)
+      if (forwarded) event.preventDefault()
       // Route text by appending to the draft end through the public service.
       if (text !== '') {
         event.preventDefault()
         input.setDraft(state.draft + text)
-        if (!hasFiles) composer.focus({ preventScroll: true })
+        // Focus the composer when the image forward did not already do it.
+        if (!forwarded) composer.focus({ preventScroll: true })
       }
     }
 

@@ -5,8 +5,10 @@
  * proving removal — HMR safety), the inert node entry, and the invariant
  * companion's ownership reservation. Locked sessions (removed, an offline
  * continuable parent) ignore pastes like the composer's own read-only states.
- * Text-file drops are owned by the companion text-file-cards plugin and tested
- * there.
+ * A browser whose synthetic clipboard constructors throw fails soft: text
+ * routing survives a mixed paste and an image-only paste falls to native
+ * handling. Text-file drops are owned by the companion text-file-cards plugin
+ * and tested there.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -180,6 +182,17 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
+/**
+ * Install a DataTransfer constructor that throws, standing in for old Safari
+ * where `new DataTransfer()` raises TypeError.
+ */
+function installThrowingDataTransfer(): void {
+  function ThrowingDataTransfer(): never {
+    throw new TypeError('not constructible')
+  }
+  Object.defineProperty(globalThis, 'DataTransfer', { value: ThrowingDataTransfer, configurable: true, writable: true })
+}
+
 describe('global-paste browser half', () => {
   it('declares the services it binds', () => {
     expect(inject).toEqual(['sessions', 'conversation'])
@@ -229,6 +242,28 @@ describe('global-paste browser half', () => {
     // Image forwarded onto the composer.
     const forwarded = dispatchSpy.mock.calls.find(([e]) => e.type === 'paste')
     expect(forwarded).toBeDefined()
+  })
+
+  it('keeps text routing alive when the synthetic clipboard constructor throws', async () => {
+    const { input } = await bench({ draft: 'hello' })
+    const composer = document.querySelector<HTMLTextAreaElement>('textarea[data-dsh-composer]')!
+    installThrowingDataTransfer()
+    const image = new File([Uint8Array.of(1, 2, 3)], 'pixel.png', { type: 'image/png' })
+    const event = dispatchPaste(' world', { files: [image] })
+    // The text half still routes and takes over the paste for it.
+    expect(event.defaultPrevented).toBe(true)
+    expect(input.setDraft).toHaveBeenCalledWith('hello world')
+    // The fallback focuses the composer since the forward did not.
+    expect(document.activeElement).toBe(composer)
+  })
+
+  it('leaves an image-only paste to native handling when the constructor throws', async () => {
+    const { input } = await bench({ draft: 'hello' })
+    installThrowingDataTransfer()
+    const image = new File([Uint8Array.of(1, 2, 3)], 'pixel.png', { type: 'image/png' })
+    const event = dispatchPaste('', { files: [image] })
+    expect(event.defaultPrevented).toBe(false)
+    expect(input.setDraft).not.toHaveBeenCalled()
   })
 
   it('ignores paste when there is no current session', async () => {
