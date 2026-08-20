@@ -61,6 +61,7 @@ packages/    @deepseek-ai/dsh-<pkg> workspaces at packages/<group>/<pkg>/
   examples/           demo bundles
   runtime-diagnostics/ invariant diagnostics
   test-support/       test infrastructure
+  experimental/       private prototypes excluded from official releases
   util/               zero-dependency utilities
 python/      Python SDK and bundled runtime (see python/README.md)
 native/      @deepseek-ai/node-addon-landlock-run source of record (see native/README.md)
