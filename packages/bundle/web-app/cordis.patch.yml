@@ -272,6 +272,12 @@
     - id: usage-stats
       name: '@deepseek-ai/dsh-client-usage-stats'
 
+    # Composer history recall: ArrowUp at the caret-zero composer position
+    # walks back through the current session's sent messages; ArrowDown walks
+    # forward and restores the pre-traversal draft.
+    - id: input-history-recall
+      name: '@deepseek-ai/dsh-client-input-history-recall'
+
     # Goal surface: GoalBar in the input dock over the goal session projection.
     - id: ui-goal
       name: '@deepseek-ai/dsh-client-ui-goal'

@@ -15,3 +15,4 @@ agent 修改自身运行时：检查已加载的插件与服务接口、定义�
 | [`global-paste/`](global-paste/README.md) | fork：全页粘贴路由——文本走公开 input 服务，图片转发到 composer | client 面；document 捕获监听器 |
 | [`text-file-cards/`](text-file-cards/README.md) | fork：composer 上方的文本文件拖拽暂存卡片，点击展开 | client 面；注册 input dock slot |
 | [`usage-stats/`](usage-stats/README.md) | fork：`usageStats` 会话投影之上的使用统计设置页——按路由、按天、按月的 token 数量 | 双面；注册投影单元与 settings-section slot |
+| [`input-history-recall/`](input-history-recall/README.md) | fork：composer 的 ArrowUp/ArrowDown 历史召回——翻当前会话已发送消息，退出遍历时恢复进入前草稿 | client 面；document 捕获监听器 |

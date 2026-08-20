@@ -78,6 +78,7 @@
     { "path": "./packages/client/ui-subagent" },
     { "path": "./packages/extensions/global-paste" },
     { "path": "./packages/extensions/text-file-cards" },
+    { "path": "./packages/extensions/input-history-recall" },
     { "path": "./packages/extensions/usage-stats/tsconfig.client.json" },
     { "path": "./packages/client/ui-jobs" },
     { "path": "./packages/client/ui-directory-picker-browse" },

@@ -15,3 +15,4 @@ The group also hosts the fork's Web UI input extensions as self-contained browse
 | [`global-paste/`](global-paste/README.md) | Fork: whole-page paste routing — text through the public input service, images forwarded onto the composer | client face; document capture listener |
 | [`text-file-cards/`](text-file-cards/README.md) | Fork: text-file drop staging cards over the composer, expanded on click | client face; registers the input dock slot |
 | [`usage-stats/`](usage-stats/README.md) | Fork: usage statistics settings tab over the `usageStats` session projection — token counts by route, day, and month | dual face; registers a projection unit and the settings-section slot |
+| [`input-history-recall/`](input-history-recall/README.md) | Fork: composer ArrowUp/ArrowDown history recall of the current session's sent messages, with the pre-traversal draft restored on exit | client face; document capture listener |
