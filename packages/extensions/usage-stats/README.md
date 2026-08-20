@@ -30,6 +30,6 @@ None; the package never assembles or sends provider requests.
 - **Counts inherit the `tokenUsage` scope** — main-loop requests and compaction summarizer calls; auxiliary title generation (`session-title-llm`) logs no usage and stays uncounted (see the token-meter README's limitation).
 - **The donut is whole-history** — the range selector scopes the trend chart only; the share view answers "which route dominates overall".
 - **The activity calendar caps at 53 weeks** — usage older than a year still counts toward every headline figure; it just leaves the calendar grid.
-- **Backfill is sequential** — sessions whose list baseline predates the unit are refolded one history call at a time; a large pre-plugin history makes the first open slower.
+- **Backfill is bounded and cached** — sessions whose list baseline predates the unit are refolded through the history tail page at most eight calls in flight; a completed backfill is reused on later refreshes while the baseline still lacks the key (failed backfills are retried), so only the first open pays the fold cost.
 - **The composition hint is heuristic-adjacent but exact in practice** — the absent hint fires when every observed session's history tail also lacked the key, which is precisely "the host composition does not register the unit".
 - **Chart palette is five hues** — the sixth and later series share a neutral color; the legend keeps them distinguishable by name.

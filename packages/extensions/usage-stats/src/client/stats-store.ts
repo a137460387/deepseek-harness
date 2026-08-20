@@ -5,7 +5,9 @@
  * persisted projection cache); sessions whose baseline predates the unit —
  * recorded before the plugin existed, so no cache row carries the key — are
  * backfilled through the history tail page, whose `projections` block folds
- * the whole log through every registered unit.
+ * the whole log through every registered unit, at a bounded in-flight cap,
+ * and a completed backfill is reused on later refreshes while the baseline
+ * still lacks the key.
  *
  * @module @deepseek-ai/dsh-client-usage-stats/client/stats-store
  */
@@ -81,6 +83,32 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+/** History backfill calls allowed in flight at once. */
+const BACKFILL_CONCURRENCY = 8
+
+/**
+ * Run one task per item with at most `limit` tasks in flight.
+ * @param items - the work queue.
+ * @param limit - the in-flight cap.
+ * @param worker - one item's task.
+ */
+async function pool<T>(
+  items: readonly T[],
+  limit: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
+  let next = 0
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (;;) {
+      const index = next
+      next += 1
+      const item = items[index]
+      if (item === undefined) return
+      await worker(item)
+    }
+  }))
+}
+
 /**
  * Section controller over the sessions wire face.
  */
@@ -88,16 +116,24 @@ export class UsageStatsController {
   /** The section's snapshot store (the inject hooks compartment seat). */
   readonly store: SnapshotStore<UsageStatsSectionState> = createSnapshotStore(INITIAL)
   private running = false
+  /**
+   * Completed history backfills, keyed by session. A later load reuses one
+   * while the list baseline still lacks the key; a session absent from the
+   * list drops its entry. Failed backfills are not cached, so a refresh
+   * retries them.
+   */
+  private readonly backfilled = new Map<SessionId, UsageStatsProjection>()
 
   constructor(private readonly api: Pick<IApiClient['sessions'], 'list' | 'history'>) {}
 
   /**
    * Gather every session's usage value: the list baseline first, then a
-   * history backfill per session whose baseline lacked the key. A backfill
-   * that also lacks the key counts toward `absentCount` — the host folds
-   * every registered unit into the tail page, so an absent key there means
-   * the unit is not composed. A single unreadable session contributes an
-   * empty value instead of failing the page.
+   * bounded-concurrency history backfill for sessions whose baseline lacked
+   * the key and no completed backfill is cached. A backfill that also lacks
+   * the key counts toward `absentCount` — the host folds every registered
+   * unit into the tail page, so an absent key there means the unit is not
+   * composed. A single unreadable session contributes an empty value instead
+   * of failing the page.
    */
   async load(): Promise<void> {
     if (this.running) return
@@ -112,16 +148,20 @@ export class UsageStatsController {
       const missing: SessionId[] = []
       for (const item of items) {
         const value = item.projections?.values.usageStats
+        const cached = this.backfilled.get(item.sessionId)
         if (isUsageStats(value)) values[item.sessionId] = value
+        else if (cached !== undefined) values[item.sessionId] = cached
         else missing.push(item.sessionId)
       }
       let absentCount = 0
-      for (const sessionId of missing) {
+      await pool(missing, BACKFILL_CONCURRENCY, async (sessionId) => {
         try {
           const history = await this.api.history({ sessionId })
           const value = history.result.ok ? history.result.value.projections?.values.usageStats : undefined
-          if (isUsageStats(value)) values[sessionId] = value
-          else {
+          if (isUsageStats(value)) {
+            this.backfilled.set(sessionId, value)
+            values[sessionId] = value
+          } else {
             values[sessionId] = { quarters: {} }
             absentCount += 1
           }
@@ -129,6 +169,9 @@ export class UsageStatsController {
           values[sessionId] = { quarters: {} }
           absentCount += 1
         }
+      })
+      for (const sessionId of [...this.backfilled.keys()]) {
+        if (!items.some(item => item.sessionId === sessionId)) this.backfilled.delete(sessionId)
       }
       this.store.set({
         status: 'ready',
@@ -153,6 +196,7 @@ export class UsageStatsController {
   /** Drop back to the idle snapshot (connection reset: rescan on next open). */
   reset(): void {
     this.running = false
+    this.backfilled.clear()
     this.store.set(INITIAL)
   }
 }

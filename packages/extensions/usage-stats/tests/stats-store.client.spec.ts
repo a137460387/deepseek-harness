@@ -1,9 +1,12 @@
 /**
  * The section controller: the list baseline is the fast path, sessions whose
- * baseline predates the unit are backfilled through the history tail page,
- * an absent key even there counts toward the composition hint, single-session
- * failures degrade to empty values instead of failing the page, list failures
- * surface as the error status, and overlapping loads collapse to one run.
+ * baseline predates the unit are backfilled through the history tail page at
+ * a bounded in-flight cap, completed backfills are reused on later loads
+ * while the baseline still lacks the key (failures are retried instead), an
+ * absent key even there counts toward the composition hint, single-session
+ * failures degrade to empty values instead of failing the page, list
+ * failures surface as the error status, and overlapping loads collapse to
+ * one run.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -25,11 +28,16 @@ function fakeApi(options: {
   rows: Row[]
   historyValues?: Record<string, Record<string, unknown>>
   historyThrow?: string[]
+  /** Throw on the first history call per session only, then succeed. */
+  historyFlaky?: string[]
   listError?: string
   listThrow?: boolean
-}): { api: SessionsApi; listCalls: () => number; historyCalls: () => string[] } {
+}): { api: SessionsApi; listCalls: () => number; historyCalls: () => string[]; maxInFlight: () => number } {
   let listCalls = 0
   const historyCalls: string[] = []
+  const flakyRemaining = new Set(options.historyFlaky ?? [])
+  let inFlight = 0
+  let peakInFlight = 0
   const api = {
     async list() {
       listCalls += 1
@@ -41,12 +49,26 @@ function fakeApi(options: {
     },
     async history(payload: { sessionId: string }) {
       historyCalls.push(payload.sessionId)
+      inFlight += 1
+      peakInFlight = Math.max(peakInFlight, inFlight)
+      // Yield so overlapping backfills are observable in the peak.
+      await new Promise(resolve => setTimeout(resolve, 0))
+      inFlight -= 1
       if (options.historyThrow?.includes(payload.sessionId)) throw new Error('history failed')
+      if (flakyRemaining.has(payload.sessionId)) {
+        flakyRemaining.delete(payload.sessionId)
+        throw new Error('history failed')
+      }
       const values = options.historyValues?.[payload.sessionId] ?? {}
       return { rpcId: 'r', result: { ok: true as const, value: { events: [], hasMore: false, projections: { asOfSeq: 0, values } } } }
     },
   } as unknown as SessionsApi
-  return { api, listCalls: () => listCalls, historyCalls: () => historyCalls }
+  return {
+    api,
+    listCalls: () => listCalls,
+    historyCalls: () => historyCalls,
+    maxInFlight: () => peakInFlight,
+  }
 }
 
 const VALUE: UsageStatsProjection = {
@@ -105,6 +127,48 @@ describe('UsageStatsController', () => {
     expect(state.values.b).toEqual(VALUE)
   })
 
+  it('bounds the history backfill in-flight count', async () => {
+    const rows = Array.from({ length: 20 }, (_, index) => ({
+      sessionId: `s${index}`,
+      projections: { asOfSeq: 1, values: {} },
+    }))
+    const { api, historyCalls, maxInFlight } = fakeApi({
+      rows,
+      historyValues: Object.fromEntries(rows.map(row => [row.sessionId, { usageStats: VALUE }])),
+    })
+    const controller = new UsageStatsController(api)
+    await controller.load()
+    expect(historyCalls().length).toBe(20)
+    expect(maxInFlight()).toBeLessThanOrEqual(8)
+    expect(maxInFlight()).toBeGreaterThan(1)
+  })
+
+  it('reuses completed backfills on a later load while the baseline lacks the key', async () => {
+    const { api, historyCalls } = fakeApi({
+      rows: [{ sessionId: 'a', projections: { asOfSeq: 1, values: {} } }],
+      historyValues: { a: { usageStats: VALUE } },
+    })
+    const controller = new UsageStatsController(api)
+    await controller.load()
+    await controller.load()
+    expect(historyCalls()).toEqual(['a'])
+    expect(controller.store.getSnapshot().values.a).toEqual(VALUE)
+  })
+
+  it('retries a failed backfill on the next load instead of caching the failure', async () => {
+    const { api, historyCalls } = fakeApi({
+      rows: [{ sessionId: 'a', projections: { asOfSeq: 1, values: {} } }],
+      historyFlaky: ['a'],
+      historyValues: { a: { usageStats: VALUE } },
+    })
+    const controller = new UsageStatsController(api)
+    await controller.load()
+    expect(controller.store.getSnapshot().values.a).toEqual({ quarters: {} })
+    await controller.load()
+    expect(historyCalls()).toEqual(['a', 'a'])
+    expect(controller.store.getSnapshot().values.a).toEqual(VALUE)
+  })
+
   it('surfaces a refused list call as the error status with the host message', async () => {
     const { api } = fakeApi({ rows: [], listError: 'boom' })
     const controller = new UsageStatsController(api)
@@ -128,8 +192,11 @@ describe('UsageStatsController', () => {
     expect(listCalls()).toBe(1)
   })
 
-  it('reset() drops back to the idle snapshot', async () => {
-    const { api } = fakeApi({ rows: [] })
+  it('reset() drops back to the idle snapshot and clears the backfill cache', async () => {
+    const { api, historyCalls } = fakeApi({
+      rows: [{ sessionId: 'a', projections: { asOfSeq: 1, values: {} } }],
+      historyValues: { a: { usageStats: VALUE } },
+    })
     const controller = new UsageStatsController(api)
     await controller.load()
     controller.reset()
@@ -140,6 +207,8 @@ describe('UsageStatsController', () => {
       sessionCount: 0,
       absentCount: 0,
     })
+    await controller.load()
+    expect(historyCalls()).toEqual(['a', 'a'])
   })
 
   it('marks the store loading while a read is in flight', async () => {
