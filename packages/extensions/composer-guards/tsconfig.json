@@ -18,9 +18,6 @@
       "path": "../../client/ui-conversation"
     },
     {
-      "path": "../composer-guards"
-    },
-    {
       "path": "../../runtime-diagnostics/invariants"
     }
   ]

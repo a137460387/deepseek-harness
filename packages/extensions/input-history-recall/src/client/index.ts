@@ -15,11 +15,12 @@
  *
  * Guards, evaluated in order before a key is claimed: IME composition (the
  * candidate window owns the arrow keys), composer focus, the session-level
- * composer locks (removed session, offline continuable parent — mirroring
- * global-paste), a non-plain input phase (a claimed command line or a submit
- * transaction must not be overwritten), and an open candidate menu (the
- * slash pipeline's own arrow arbitration wins; the key is left to pass
- * through to the composer's React handler).
+ * composer locks (removed session, offline continuable parent — the shared
+ * predicate from `@deepseek-ai/dsh-client-composer-guards`, requested as a
+ * module-table row through `dsh.client.external`), a non-plain input phase
+ * (a claimed command line or a submit transaction must not be overwritten),
+ * and an open candidate menu (the slash pipeline's own arrow arbitration
+ * wins; the key is left to pass through to the composer's React handler).
  *
  * The traversal state is one in-memory slot in the apply closure: it survives
  * no reload, ends on session switches and on a cleared draft (a send), and
@@ -33,6 +34,7 @@ import type { ClientContext, SessionFace, SessionId } from '@deepseek-ai/dsh-cli
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: pulls the input-trigger service's Context merge (ctx.inputTriggers).
 import type {} from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import { sessionAcceptsEdits } from '@deepseek-ai/dsh-client-composer-guards/client'
 
 /** Selector for the composer textarea (marked by InputBar via data-dsh-composer). */
 const COMPOSER_SELECTOR = 'textarea[data-dsh-composer]'
@@ -54,22 +56,6 @@ interface RecallSlot {
  * pipeline still get history recall.
  */
 export const inject = ['sessions', 'conversation']
-
-/**
- * Whether the session still accepts draft edits under the composer's
- * observable lock conditions: not removed, and a continuable subagent child
- * still has its exact parent available (the composer renders read-only in
- * both cases). The owner-prop lock reasons (the inert hero, an owner block)
- * have no public signal and stay out of reach, as in global-paste.
- * @param session - the session face behind the current scope.
- * @returns true when every session-level composer lock stands open.
- */
-function sessionAcceptsEdits(session: SessionFace): boolean {
-  const snapshot = session.getSnapshot()
-  if (snapshot.removed) return false
-  const subagent = snapshot.subagent
-  return subagent === null || subagent.address.mode !== 'continuable' || subagent.parentAvailable
-}
 
 /**
  * The current session's sent texts, oldest first: user and steering message

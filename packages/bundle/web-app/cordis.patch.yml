@@ -258,6 +258,12 @@
     - id: ui-jobs
       name: '@deepseek-ai/dsh-client-ui-jobs'
 
+    # Shared composer guards for the fork input plugins below: a library row
+    # whose browser half supplies the visibility/lock predicates they request
+    # through dsh.client.external (node half is an inert shell).
+    - id: composer-guards
+      name: '@deepseek-ai/dsh-client-composer-guards'
+
     # Whole-page paste: Ctrl/Cmd+V anywhere routes text into the composer draft.
     - id: global-paste
       name: '@deepseek-ai/dsh-client-global-paste'

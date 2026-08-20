@@ -25,7 +25,10 @@
  * Composer lock alignment: paste routing mirrors the composer's own disabled
  * predicate wherever a plugin can observe it — a removed session and a
  * continuable child whose exact parent is offline leave the composer
- * read-only, so the listener ignores pastes there too. The remaining lock
+ * read-only, so the listener ignores pastes there too. The visibility and
+ * lock predicates are the shared ones from
+ * `@deepseek-ai/dsh-client-composer-guards` (a module-table row requested
+ * through `dsh.client.external`). The remaining lock
  * reasons are owner-prop facts with no public signal: the inert no-workspace
  * hero has no current session (the current-session guard already covers it),
  * and an owner block is composer-internal.
@@ -36,9 +39,10 @@
  * @module @deepseek-ai/dsh-client-global-paste/client
  */
 
-import type { AgentContext, ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the conversation service's Context merge (ctx.conversation).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { composerVisible, resolveEditableInput } from '@deepseek-ai/dsh-client-composer-guards/client'
 
 /** Selector for the composer textarea (marked by InputBar via data-dsh-composer). */
 const COMPOSER_SELECTOR = 'textarea[data-dsh-composer]'
@@ -61,30 +65,6 @@ function isEditable(el: HTMLElement | null | undefined): boolean {
   if (el === null || el === undefined) return false
   if (EDITABLE_TAGS.has(el.tagName)) return true
   return el.isContentEditable
-}
-
-/**
- * Whether the composer textarea is currently visible and not covered by an
- * overlay (an approval/user-question takeover panel can keep the InputBar DOM
- * alive while visually masking it). Probes the composer's center with
- * elementFromPoint: if the topmost element there is not the composer or a
- * descendant of the composer's owner, the composer is considered occluded and
- * the paste is silently ignored rather than routed into a hidden field.
- * @param composer - the composer textarea element.
- * @returns true when the composer is visible to the user.
- */
-function composerVisible(composer: HTMLTextAreaElement): boolean {
-  const rect = composer.getBoundingClientRect()
-  // A zero-size composer (collapsed dock) cannot receive a focused paste.
-  if (rect.width === 0 || rect.height === 0) return false
-  const cx = rect.left + rect.width / 2
-  const cy = rect.top + rect.height / 2
-  // Offscreen composer: the center is outside the viewport.
-  if (cx < 0 || cy < 0 || cx > window.innerWidth || cy > window.innerHeight) return false
-  const hit = document.elementFromPoint(cx, cy)
-  if (hit === null) return false
-  // The composer itself or anything inside its dock reads as visible.
-  return hit === composer || composer.contains(hit) || hit.contains(composer)
 }
 
 /**
@@ -137,46 +117,6 @@ function dispatchForwardedPaste(composer: HTMLTextAreaElement, clipboardData: Da
   }
   composer.focus({ preventScroll: true })
   composer.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
-}
-
-/**
- * Whether the session behind a scope still accepts draft edits under the
- * composer's observable lock conditions: the session face resolves, the
- * session is not removed, and a continuable subagent child still has its
- * exact parent available (the composer renders read-only in all three
- * cases). The owner-prop lock reasons (the inert hero, an owner block) have
- * no public signal and stay out of reach.
- * @param ctx - client root context.
- * @param actx - the session's Agent-scoped context.
- * @returns true when every session-level composer lock stands open.
- */
-function sessionAcceptsEdits(ctx: ClientContext, actx: AgentContext): boolean {
-  const session = ctx.sessions.sessionOf(actx)
-  if (session === undefined) return false
-  const snapshot = session.getSnapshot()
-  if (snapshot.removed) return false
-  const subagent = snapshot.subagent
-  return subagent === null || subagent.address.mode !== 'continuable' || subagent.parentAvailable
-}
-
-/**
- * Resolve the current session's input facade when it can accept a draft edit:
- * a current session exists, its scope resolves, every session-level composer
- * lock stands open, and the input machine is not in a submit/adjudication
- * transaction (`claimed` still accepts edits).
- * @param ctx - client root context.
- * @returns the input facade and its state snapshot, or undefined to pass
- * through.
- */
-function resolveEditableInput(ctx: ClientContext) {
-  const current = ctx.sessions.list.getSnapshot().current
-  if (current === undefined) return undefined
-  const actx = ctx.sessions.scope(current)
-  if (actx === undefined || !sessionAcceptsEdits(ctx, actx)) return undefined
-  const input = ctx.conversation.input.for(actx)
-  const state = input.state.getSnapshot()
-  if (state.phase === 'adjudicating' || state.phase === 'submitting') return undefined
-  return { input, state }
 }
 
 /**

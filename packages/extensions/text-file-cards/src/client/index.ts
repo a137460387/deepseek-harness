@@ -20,7 +20,10 @@
  * Composer lock alignment: staging and expanding mirror the composer's own
  * disabled predicate wherever a plugin can observe it — a removed session
  * and a continuable child whose exact parent is offline leave the composer
- * read-only, so both paths refuse there too. The remaining lock reasons are
+ * read-only, so both paths refuse there too. The visibility and lock
+ * predicates are the shared ones from
+ * `@deepseek-ai/dsh-client-composer-guards` (a module-table row requested
+ * through `dsh.client.external`). The remaining lock reasons are
  * owner-prop facts with no public signal: the inert no-workspace hero has no
  * current session (the current-session guard already covers it), and an
  * owner block is composer-internal.
@@ -38,12 +41,15 @@
  * @module @deepseek-ai/dsh-client-text-file-cards/client
  */
 
-import type { AgentContext, ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the conversation service's Context merge (ctx.conversation)
 // and the ui-conversation SlotMap merge (the input.dock entry).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+import {
+  composerVisible, resolveEditableInput, sessionAcceptsEdits,
+} from '@deepseek-ai/dsh-client-composer-guards/client'
 import { TextFileCardsDock, type TextFileCardsInjected } from './TextFileCardsDock.tsx'
 import { en, zh, type TextFileCardsKey } from './locales.ts'
 import {
@@ -69,72 +75,6 @@ const COMPOSER_SELECTOR = 'textarea[data-dsh-composer]'
  * slots (the dock registration).
  */
 export const inject = ['slots', 'sessions', 'conversation', 'locale']
-
-/**
- * Whether the composer textarea is currently visible and not covered by an
- * overlay (an approval/user-question takeover panel can keep the InputBar DOM
- * alive while visually masking it). Probes the composer's center with
- * elementFromPoint: if the topmost element there is not the composer or a
- * descendant of the composer's owner, the composer is considered occluded and
- * the drop is left to native handling rather than staged invisibly.
- * @param composer - the composer textarea element.
- * @returns true when the composer is visible to the user.
- */
-function composerVisible(composer: HTMLTextAreaElement): boolean {
-  const rect = composer.getBoundingClientRect()
-  // A zero-size composer (collapsed dock) cannot receive a drop.
-  if (rect.width === 0 || rect.height === 0) return false
-  const cx = rect.left + rect.width / 2
-  const cy = rect.top + rect.height / 2
-  // Offscreen composer: the center is outside the viewport.
-  if (cx < 0 || cy < 0 || cx > window.innerWidth || cy > window.innerHeight) return false
-  const hit = document.elementFromPoint(cx, cy)
-  if (hit === null) return false
-  // The composer itself or anything inside its dock reads as visible.
-  return hit === composer || composer.contains(hit) || hit.contains(composer)
-}
-
-/**
- * Whether the session behind a scope still accepts draft edits under the
- * composer's observable lock conditions: the session face resolves, the
- * session is not removed, and a continuable subagent child still has its
- * exact parent available (the composer renders read-only in all three
- * cases). The owner-prop lock reasons (the inert hero, an owner block) have
- * no public signal and stay out of reach.
- * @param ctx - client root context.
- * @param actx - the session's Agent-scoped context.
- * @returns true when every session-level composer lock stands open.
- */
-function sessionAcceptsEdits(ctx: ClientContext, actx: AgentContext): boolean {
-  const session = ctx.sessions.sessionOf(actx)
-  if (session === undefined) return false
-  const snapshot = session.getSnapshot()
-  if (snapshot.removed) return false
-  const subagent = snapshot.subagent
-  return subagent === null || subagent.address.mode !== 'continuable' || subagent.parentAvailable
-}
-
-/**
- * Resolve the current session's input facade when it can accept a draft edit:
- * a current session exists, its scope resolves, every session-level composer
- * lock stands open, and the input machine is not in a submit/adjudication
- * transaction. Also returns the session id and the live session list (the
- * staged-files prune currency).
- * @param ctx - client root context.
- * @returns the input facade with its session context, or undefined to pass
- * through.
- */
-function resolveEditableInput(ctx: ClientContext) {
-  const list = ctx.sessions.list.getSnapshot()
-  const current = list.current
-  if (current === undefined) return undefined
-  const actx = ctx.sessions.scope(current)
-  if (actx === undefined || !sessionAcceptsEdits(ctx, actx)) return undefined
-  const input = ctx.conversation.input.for(actx)
-  const state = input.state.getSnapshot()
-  if (state.phase === 'adjudicating' || state.phase === 'submitting') return undefined
-  return { input, sessionId: current, liveSessionIds: list.ids }
-}
 
 /**
  * Client plugin body: mount the capture-phase drop listener and the dock
@@ -211,7 +151,9 @@ export function apply(ctx: ClientContext): void {
         const entry = staged.get(sessionId, fileId)
         if (entry === undefined) return
         const actx = ctx.sessions.scope(sessionId)
-        if (actx === undefined || !sessionAcceptsEdits(ctx, actx)) return
+        if (actx === undefined) return
+        const session = ctx.sessions.sessionOf(actx)
+        if (session === undefined || !sessionAcceptsEdits(session)) return
         const input = ctx.conversation.input.for(actx)
         const before = input.state.getSnapshot()
         if (before.phase === 'adjudicating' || before.phase === 'submitting') return
@@ -221,7 +163,8 @@ export function apply(ctx: ClientContext): void {
         // (removal, a lost parent).
         const after = input.state.getSnapshot()
         if (after.phase === 'adjudicating' || after.phase === 'submitting') return
-        if (!sessionAcceptsEdits(ctx, actx)) return
+        const recheck = ctx.sessions.sessionOf(actx)
+        if (recheck === undefined || !sessionAcceptsEdits(recheck)) return
         const block = `# ${entry.name}\n${content}`
         input.setDraft(after.draft === '' ? block : `${after.draft}\n${block}`)
         staged.remove(sessionId, fileId)

@@ -27,6 +27,9 @@
       "path": "../../client/ui-slots"
     },
     {
+      "path": "../composer-guards"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
     }
   ]

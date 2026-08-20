@@ -81,6 +81,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/client/ui-commands': { kind: 'indirect', reason: 'The dispatch paths trigger the host command.execute RPC; each command handler\'s host package owns any model-visible effect.' },
   'packages/client/ui-model-selection': { kind: 'indirect', reason: 'Selection routes session.selectModel; the Host snapshots the selection at the next prompt-assembly boundary and owns the model-visible effect.' },
   'packages/client/ui-goal': { kind: 'indirect', reason: 'The strip verbs route goal.* mutations; the host GoalService owns the model-visible goal/change context message.' },
+  'packages/extensions/composer-guards': { kind: 'none', reason: 'Browser-side guard predicates shared by the input plugins; registers nothing model-facing.' },
   'packages/extensions/global-paste': { kind: 'none', reason: 'Browser-side clipboard paste intake over the public input service; registers nothing model-facing.' },
   'packages/extensions/text-file-cards': { kind: 'none', reason: 'Browser-side drop staging over the public input service; expanded content rides the ordinary draft, and the package registers nothing model-facing of its own.' },
   'packages/extensions/usage-stats': { kind: 'none', reason: 'Browser-side settings surface plus a host-side read-only usage projection; folds and aggregates already-logged token usage and registers nothing model-facing.' },

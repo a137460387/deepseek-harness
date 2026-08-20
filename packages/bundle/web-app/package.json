@@ -81,6 +81,7 @@
     "@deepseek-ai/dsh-client-ui-subagent": "workspace:^",
     "@deepseek-ai/dsh-client-ui-jobs": "workspace:^",
     "@deepseek-ai/dsh-client-global-paste": "workspace:^",
+    "@deepseek-ai/dsh-client-composer-guards": "workspace:^",
     "@deepseek-ai/dsh-client-text-file-cards": "workspace:^",
     "@deepseek-ai/dsh-client-usage-stats": "workspace:^",
     "@deepseek-ai/dsh-client-input-history-recall": "workspace:^",

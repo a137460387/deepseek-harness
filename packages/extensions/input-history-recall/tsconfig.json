@@ -21,6 +21,9 @@
       "path": "../../client/ui-input-trigger"
     },
     {
+      "path": "../composer-guards"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
     }
   ]

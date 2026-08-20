@@ -1,6 +1,6 @@
 {
-  "name": "@deepseek-ai/dsh-client-input-history-recall",
-  "description": "Composer history recall: ArrowUp at the caret-zero position of the composer walks back through the current session's sent messages; ArrowDown walks forward and restores the pre-traversal draft",
+  "name": "@deepseek-ai/dsh-client-composer-guards",
+  "description": "Shared composer guards for fork browser plugins: the composer visibility probe, the session-level edit-lock predicate, and editable-input resolution over the public client services",
   "version": "0.1.0-rc.8",
   "type": "module",
   "main": "lib/index.js",
@@ -23,14 +23,6 @@
   },
   "dsh": {
     "client": {
-      "inject": [
-        "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-client-ui-input-trigger"
-      ],
-      "external": [
-        "@deepseek-ai/dsh-client-composer-guards/client"
-      ],
       "platform": "web"
     }
   },
@@ -42,24 +34,20 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
-    "directory": "packages/extensions/input-history-recall"
+    "directory": "packages/extensions/composer-guards"
   },
   "publishConfig": {
     "access": "public"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-client-composer-guards": "workspace:^",
     "@deepseek-ai/dsh-client-runtime": "workspace:^",
     "@deepseek-ai/dsh-client-ui-conversation": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-input-trigger": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-client-composer-guards": "workspace:^",
     "@deepseek-ai/dsh-client-runtime": "workspace:^",
     "@deepseek-ai/dsh-client-ui-conversation": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-input-trigger": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"
   },

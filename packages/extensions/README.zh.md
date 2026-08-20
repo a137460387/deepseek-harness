@@ -16,3 +16,4 @@ agent 修改自身运行时：检查已加载的插件与服务接口、定义�
 | [`text-file-cards/`](text-file-cards/README.md) | fork：composer 上方的文本文件拖拽暂存卡片，点击展开 | client 面；注册 input dock slot |
 | [`usage-stats/`](usage-stats/README.md) | fork：`usageStats` 会话投影之上的使用统计设置页——按路由、按天、按月的 token 数量 | 双面；注册投影单元与 settings-section slot |
 | [`input-history-recall/`](input-history-recall/README.md) | fork：composer 的 ArrowUp/ArrowDown 历史召回——翻当前会话已发送消息，退出遍历时恢复进入前草稿 | client 面；document 捕获监听器 |
+| [`composer-guards/`](composer-guards/README.md) | fork：上方各输入插件以模块表行请求的共享 composer 谓词（可见性探测、会话锁、可编辑 input 解析） | client 面；经 `dsh.client.external` 的库行 |
