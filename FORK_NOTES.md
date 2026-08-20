@@ -23,6 +23,8 @@
 
 - **upstream 合并后的固定人工收尾**(两轮实测踩坑)：其一，upstream 的 release bump 不会带动 `packages/extensions/*` 下的 fork-only 包，合并后需人工核对这些包的 `version` 是否仍对齐 root 版本——constraints 门会报不匹配，但不会提示原因是 bump 漏掉；其二，upstream 删除某包后，本地曾构建过该包的话会留下未跟踪的 `lib/`、`node_modules/` 等构建产物残留，跑 `pnpm run clean` 清理(clean 脚本即为此设计)。
 
+- **重新构建 fork 扩展包后必须重启长驻的 `dsh web` 进程**(第二次踩同型坑：8/20 一次是旧进程不刷新新 UI、静默服务旧版本，8/21 一次是浏览器端直接报错)——进程的 client boot 图在启动时固化，而 `/plugins/*/client.js` 路由每次请求都从磁盘现读，旧图配新 bundle 时，消费新供给行(新增或修改了 `dsh.client.external` 模块请求)的包在加载期报"模块表缺失"，浏览器端呈现 "Failed to load plugins" 失败页；该报错文案中的 "build-time externals drift" 措辞有误导性——实际是进程比磁盘产物旧，与构建配置无关；排查：用 netstat 定位监听目标端口的 PID 并核对其启动时间是否早于本次改动，是则停掉旧进程重启。
+
 ## Fork 课题待办
 
 ### UI 插件开关(2026-08-18 评估，暂不启动)
