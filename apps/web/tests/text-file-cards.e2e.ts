@@ -134,7 +134,8 @@ describe('web e2e: text-file drop staging cards', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-text-cards-oversized'))
     const oversized = 'x'.repeat(MAX_FILE_BYTES + 1)
     await dropFile(page, '[data-conversation-scroll]', { name: 'big.txt', content: oversized, type: 'text/plain' })
-    await page.getByRole('status').filter({ hasText: 'were not added' }).waitFor({ timeout: 5_000 })
+    // Error notices render as Toast banners (role=alert) since rc.8.
+    await page.getByRole('alert').filter({ hasText: 'were not added' }).waitFor({ timeout: 5_000 })
     expect(await page.locator('[data-text-file-cards]').count()).toBe(0)
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
