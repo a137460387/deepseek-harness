@@ -675,6 +675,18 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
 }
 
 /**
+ * The JSON string-literal body of a value: what `JSON.stringify` writes
+ * between the quotes. Placeholder substitution splices values into fixture
+ * JSONL text, where a Windows path must arrive backslash-escaped; on POSIX
+ * the transform is the identity (JSON escapes no character of those paths).
+ * @param value - the raw string to embed inside fixture JSON text.
+ * @returns the escaped literal body, without surrounding quotes.
+ */
+function jsonLiteral(value: string): string {
+  return JSON.stringify(value).slice(1, -1)
+}
+
+/**
  * Serialize a live session to the canonical raw session-JSONL layout — the
  * in-memory record-mode harvest, so the on-disk zstd default never matters.
  */
@@ -702,7 +714,7 @@ export async function recordFixture(scaffold: WebScaffold, sessionId: SessionId,
   if (agent === undefined) throw new Error(`record harvest: no live agent for ${sessionId}`)
   const fresh = scrubRequestHeaders(rawSessionLog(agent.session))
     .split(sessionId).join('{{sessionId}}')
-    .split(scaffold.workspaceCwd).join('{{cwd}}')
+    .split(jsonLiteral(scaffold.workspaceCwd)).join('{{cwd}}')
     .replace(/"rpcId":"[^"]+"/g, '"rpcId":"{{rpcId}}"')
   const existing = existsSync(fixturePath) ? await readFile(fixturePath, 'utf8') : ''
   const stable = stabilizeFixtureMessageIds([fresh], [existing])[0]
@@ -751,12 +763,12 @@ export function fixtureUserPrompts(fixtureText: string): string[] {
  */
 export function realizeSeedFixture(scaffold: WebScaffold, fixtureText: string, id: string): string {
   const realized = fixtureText
-    .split('{{sessionId}}').join(id)
-    .split('{{cwd}}').join(scaffold.workspaceCwd)
+    .split('{{sessionId}}').join(jsonLiteral(id))
+    .split('{{cwd}}').join(jsonLiteral(scaffold.workspaceCwd))
   const fixtureCwd = (JSON.parse(realized.split('\n', 1)[0]!) as { cwd?: string }).cwd
   return fixtureCwd === undefined
     ? realized
-    : realized.split(fixtureCwd).join(scaffold.workspaceCwd)
+    : realized.split(jsonLiteral(fixtureCwd)).join(jsonLiteral(scaffold.workspaceCwd))
 }
 
 export async function seedSession(
@@ -837,10 +849,15 @@ async function persistSeedSession(
  */
 function normalizeAria(snapshot: string, workspaceCwd: string): string {
   // The session heading renders the workspace's basename, not the full
-  // path, so both spellings must collapse to the token.
-  const base = workspaceCwd.split('/').pop()!
+  // path, so both spellings must collapse to the token. The separator class
+  // covers both POSIX and Windows path spellings.
+  const base = workspaceCwd.split(/[\\/]/).pop()!
   return snapshot
+    // Tool args and results render as raw JSON text, so the cwd appears both
+    // raw (plain text regions) and JSON-escaped (rendered JSON) in one
+    // snapshot; on POSIX the two spellings are identical.
     .split(workspaceCwd).join('{{cwd}}')
+    .split(jsonLiteral(workspaceCwd)).join('{{cwd}}')
     .split(base).join('{{workspace}}')
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '{{uuid}}')
     // The optional space in `\d+m ?\d+s` covers both minute spellings: the
