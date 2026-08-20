@@ -73,7 +73,7 @@ export function UsageStatsSection(props: UsageStatsSectionProps): ReactNode {
   const { useUsageStats, t, load } = props
   const state = useUsageStats(snapshot => snapshot)
   const [range, setRange] = useState<StatsRange>('week')
-  const [dimension, setDimension] = useState<RouteDimension>('provider')
+  const [dimension, setDimension] = useState<RouteDimension>('model')
   const [mode, setMode] = useState<HeatmapMode>('daily')
 
   useEffect(() => {

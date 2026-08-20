@@ -10,6 +10,7 @@ import type { ReactNode } from 'react'
 import type { DayKey } from '../aggregate.ts'
 import { formatTokens } from '../aggregate.ts'
 import { seriesColor } from './palette.ts'
+import css from '../UsageStatsSection.module.css'
 
 /** One trend line. */
 export interface TrendSeries {
@@ -62,7 +63,6 @@ export function TrendChart(props: TrendChartProps): ReactNode {
 
   return (
     <svg
-      className="usageTrend"
       role="img"
       aria-label={ariaLabel}
       viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
@@ -74,9 +74,9 @@ export function TrendChart(props: TrendChartProps): ReactNode {
             x2={WIDTH - PAD_RIGHT}
             y1={y(value)}
             y2={y(value)}
-            className="usageTrendGrid"
+            className={css.usageTrendGrid}
           />
-          <text x={PAD_LEFT - 6} y={y(value) + 4} textAnchor="end" className="usageTrendLabel">
+          <text x={PAD_LEFT - 6} y={y(value) + 4} textAnchor="end" className={css.usageTrendLabel}>
             {formatTokens(Math.round(value))}
           </text>
         </g>
@@ -92,12 +92,12 @@ export function TrendChart(props: TrendChartProps): ReactNode {
             fill="none"
             stroke={seriesColor(seriesIndex)}
             strokeWidth={1.5}
-            className="usageTrendLine"
+            className={css.usageTrendLine}
           />
         )
       })}
       {labelIndices.map(index => (
-        <text key={index} x={x(index)} y={HEIGHT - 6} textAnchor="middle" className="usageTrendLabel">
+        <text key={index} x={x(index)} y={HEIGHT - 6} textAnchor="middle" className={css.usageTrendLabel}>
           {days[index]}
         </text>
       ))}

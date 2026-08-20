@@ -12,6 +12,7 @@ import type { ReactNode } from 'react'
 import type { DayKey, HeatmapMode } from '../aggregate.ts'
 import { formatTokens, mondayIndex, shiftDay } from '../aggregate.ts'
 import { HEATMAP_LEVELS } from './palette.ts'
+import css from '../UsageStatsSection.module.css'
 
 /** Cell geometry: 13px squares with 3px gaps; a label gutter and month row. */
 const CELL = 13
@@ -93,7 +94,6 @@ export function HeatmapCalendar(props: HeatmapCalendarProps): ReactNode {
 
   return (
     <svg
-      className="usageHeatmap"
       role="img"
       aria-label={ariaLabel}
       viewBox={`0 0 ${width} ${height}`}
@@ -118,7 +118,7 @@ export function HeatmapCalendar(props: HeatmapCalendarProps): ReactNode {
           key={row}
           x={0}
           y={MONTH_ROW + row * (CELL + GAP) + CELL - 2}
-          className="usageHeatmapLabel"
+          className={css.usageHeatmapLabel}
         >
           {weekdayLabels[row]}
         </text>
@@ -136,7 +136,7 @@ export function HeatmapCalendar(props: HeatmapCalendarProps): ReactNode {
             key={`m-${cell.day}`}
             x={LABEL_WIDTH + week * (CELL + GAP)}
             y={9}
-            className="usageHeatmapLabel"
+            className={css.usageHeatmapLabel}
           >
             {month}
           </text>
@@ -157,11 +157,11 @@ export function HeatmapCalendar(props: HeatmapCalendarProps): ReactNode {
         x={legendRight - 5 * (CELL + GAP) - 4}
         y={height - 2}
         textAnchor="end"
-        className="usageHeatmapLabel"
+        className={css.usageHeatmapLabel}
       >
         {legend.less}
       </text>
-      <text x={legendRight + 2} y={height - 2} className="usageHeatmapLabel">
+      <text x={legendRight + 2} y={height - 2} className={css.usageHeatmapLabel}>
         {legend.more}
       </text>
     </svg>

@@ -8,6 +8,7 @@
 import type { ReactNode } from 'react'
 import { formatTokens } from '../aggregate.ts'
 import { seriesColor } from './palette.ts'
+import css from '../UsageStatsSection.module.css'
 
 /** One donut share. */
 export interface DonutShare {
@@ -45,9 +46,8 @@ export function DonutChart(props: DonutChartProps): ReactNode {
   let offset = 0
 
   return (
-    <div className="usageDonut">
+    <div className={css.usageDonut}>
       <svg
-        className="usageDonutSvg"
         role="img"
         aria-label={ariaLabel}
         viewBox={`0 0 ${SIZE} ${SIZE}`}
@@ -60,7 +60,7 @@ export function DonutChart(props: DonutChartProps): ReactNode {
           r={RADIUS}
           fill="none"
           strokeWidth={STROKE}
-          className="usageDonutTrack"
+          className={css.usageDonutTrack}
         />
         {shares.map((share, index) => {
           const fraction = total === 0 ? 0 : share.total / total
@@ -82,26 +82,26 @@ export function DonutChart(props: DonutChartProps): ReactNode {
           offset += dash
           return element
         })}
-        <text x={CENTER} y={CENTER - 2} textAnchor="middle" className="usageDonutTotal">
+        <text x={CENTER} y={CENTER - 2} textAnchor="middle" className={css.usageDonutTotal}>
           {formatTokens(total)}
         </text>
-        <text x={CENTER} y={CENTER + 14} textAnchor="middle" className="usageDonutCaption">
+        <text x={CENTER} y={CENTER + 14} textAnchor="middle" className={css.usageDonutCaption}>
           {totalLabel}
         </text>
       </svg>
-      <ul className="usageDonutLegend">
+      <ul className={css.usageDonutLegend}>
         {shares.map((share, index) => (
-          <li key={share.key} className="usageDonutLegendRow">
+          <li key={share.key} className={css.usageDonutLegendRow}>
             <span
-              className="usageDonutSwatch"
+              className={css.usageDonutSwatch}
               style={{ background: seriesColor(index) }}
               aria-hidden="true"
             />
-            <span className="usageDonutLegendKey">{share.key}</span>
-            <span className="usageDonutLegendValue">
+            <span className={css.usageDonutLegendKey}>{share.key}</span>
+            <span className={css.usageDonutLegendValue}>
               {total === 0 ? '0%' : `${Math.round((share.total / total) * 100)}%`}
             </span>
-            <span className="usageDonutLegendTokens">{formatTokens(share.total)}</span>
+            <span className={css.usageDonutLegendTokens}>{formatTokens(share.total)}</span>
           </li>
         ))}
       </ul>

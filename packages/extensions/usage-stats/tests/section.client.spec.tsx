@@ -83,8 +83,9 @@ describe('UsageStatsSection', () => {
     expect(screen.getByRole('img', { name: '活动日历' })).toBeTruthy()
     expect(screen.getByRole('img', { name: 'Token 趋势' })).toBeTruthy()
     expect(screen.getByRole('img', { name: '用量占比' })).toBeTruthy()
-    // The trend legend and the donut legend both name the only series.
-    expect(screen.getAllByText('deepseek').length).toBe(2)
+    // The trend legend and the donut legend both name the only series; the
+    // default dimension is model.
+    expect(screen.getAllByText('deepseek-chat').length).toBe(2)
   })
 
   it('moves the aria-pressed seat when toggles switch', () => {
@@ -105,11 +106,12 @@ describe('UsageStatsSection', () => {
     expect(daily.getAttribute('aria-pressed')).toBe('false')
 
     // The dimension toggle renders in both the trend and donut blocks; one
-    // shared state moves both seats.
+    // shared state moves both seats. The default dimension is model.
     const byModel = screen.getAllByRole('button', { name: '按模型' })
-    expect(byModel.every(button => button.getAttribute('aria-pressed') === 'false')).toBe(true)
-    fireEvent.click(byModel[0]!)
     expect(byModel.every(button => button.getAttribute('aria-pressed') === 'true')).toBe(true)
+    const byProvider = screen.getAllByRole('button', { name: '按提供方' })
+    fireEvent.click(byProvider[0]!)
+    expect(byModel.every(button => button.getAttribute('aria-pressed') === 'false')).toBe(true)
 
     const allTime = screen.getByRole('button', { name: '全部时间' })
     expect(allTime.getAttribute('aria-pressed')).toBe('false')
