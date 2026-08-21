@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-21-composer-guards-shared-module-row.md
 2026-08-21-composer-guards-shared-module-row.md: 16ecbbda1746e43acdcc2a5305138c6a40f1f1f9
-2026-08-21-composer-guards-shared-module-row.zh.md: a752ed139ccc757df23aeed89c5b4fa9fc3172fb
+2026-08-21-composer-guards-shared-module-row.zh.md: 1b3b9b9e40845c4d30d1414f0c78ae1b1fd03d29

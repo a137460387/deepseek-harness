@@ -10,7 +10,7 @@ fork 需要 Claude.ai 的 composer 手势:光标在第 0 位且无选区时,Arro
 
 ## 决策
 
-功能以 `packages/extensions/input-history-recall`(`@deepseek-ai/dsh-client-input-history-recall`)落地,一个自包含的浏览器半插件,落位遵循[落位 Agent Note](../architecture/2026-08-19-fork-ui-extensions-placement.md)。所有输入输出均走公开缝隙:
+功能以 `packages/extensions/input-history-recall`(`@deepseek-ai/dsh-client-input-history-recall`)落地,一个自包含的浏览器半插件,落位遵循[落位 Agent Note](../architecture/2026-08-19-fork-ui-extensions-placement.zh.md)。所有输入输出均走公开缝隙:
 
 - **按键捕获**:document 级 `keydown` 监听器挂在捕获阶段,先于 InputBar 的 React `onKeyDown` 运行。被认领的按键 `preventDefault()`(不做原生光标移动)且 `stopPropagation()`(composer 自身的处理器不会看到——InputBar 的菜单仲裁不受影响)。composer 经 `textarea[data-dsh-composer]` 只读定位,global-paste 与 text-file-cards 已在消费该选择器。
 - **历史来源**:`ctx.sessions.sessionOf(actx).getSnapshot().nodes`,过滤 `user` 与 `steering` 节点并拼接文本块,每次按键现读。不存在第二份历史副本,也未新增任何事件或服务。

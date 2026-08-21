@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-这些谓词移入 `packages/extensions/composer-guards`（`@deepseek-ai/dsh-client-composer-guards`），即仓库首条纯供给（supplier-only）动态行。本包遵循[落位 note](2026-08-19-fork-ui-extensions-placement.md)确立的全部 fork 扩展惯例——自包含于 `packages/extensions/`、惰性 node 半、`./invariant` 伴生件、双语 README、版本对齐 root——外加 [client shell 分层 note](2026-08-15-client-shells-and-dynamic-packages.md) 定义的模块请求机制：
+这些谓词移入 `packages/extensions/composer-guards`（`@deepseek-ai/dsh-client-composer-guards`），即仓库首条纯供给（supplier-only）动态行。本包遵循[落位 note](2026-08-19-fork-ui-extensions-placement.zh.md)确立的全部 fork 扩展惯例——自包含于 `packages/extensions/`、惰性 node 半、`./invariant` 伴生件、双语 README、版本对齐 root——外加 [client shell 分层 note](2026-08-15-client-shells-and-dynamic-packages.zh.md) 定义的模块请求机制：
 
 - 浏览器半导出三个谓词与一个惰性 `apply`；不提供任何服务或 slot。每个消费包在自己的 `dsh.client.external` 中声明 `@deepseek-ai/dsh-client-composer-guards/client`，并以对等的 peer 与 dev 依赖持有该包；boot 图组装器把供给行排在消费包之前，浏览器模块表把请求解析到该行的导出（`<id>/client` 与裸包名归一化到同一行）。
 - `sessionAcceptsEdits` 直接接收 `SessionFace`——input-history-recall 的签名。另外两份拷贝内联的 `(ctx, actx)` 形态只是每个调用点一次 `ctx.sessions.sessionOf(actx)` 调用，SessionFace 形式才是共享内核。

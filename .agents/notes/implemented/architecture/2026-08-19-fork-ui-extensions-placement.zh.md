@@ -14,7 +14,7 @@ fork Web UI 扩展是 `packages/extensions/` 下自包含的浏览器半插件�
 
 - **global-paste**(`@deepseek-ai/dsh-client-global-paste`):一个 document 级捕获阶段 `paste` 监听器。文本经公开 `ctx.conversation.input` 服务(`setDraft`)追加;图片通过向 composer textarea 重新派发携带 `DataTransfer`(内含 file 项)的合成 `ClipboardEvent` 转发,让 composer 自身的 `onPaste` 跑完整的官方图片 intake——复制包私有的 `browserDraftAttachment` 路径会违反 FORK_NOTES.md。混合粘贴拆分:文本走服务,图片走转发。
 - **text-file-cards**(`@deepseek-ai/dsh-client-text-file-cards`):一个 document 级捕获阶段 `drop` 监听器接管纯文本批次,以会话 id 为键把 `File` 对象整体暂存在快照 store 中,经官方 `conversation.input.dock` slot 渲染卡片;展开卡片走公开 input 服务。图片与混合批次放行给 composer 原生 intake。
-- 两者各带 `./invariant` 伴生件保留包名所有权,不进入 host 聚合,并镜像 composer 的会话级锁(见[锁镜像 Agent Note](../bug-fix/2026-08-19-fork-ui-composer-lock-mirroring.md))。
+- 两者各带 `./invariant` 伴生件保留包名所有权,不进入 host 聚合,并镜像 composer 的会话级锁(见[锁镜像 Agent Note](../bug-fix/2026-08-19-fork-ui-composer-lock-mirroring.zh.md))。
 
 落位:`extensions/` 而非 `packages/client/`。该组章程就是产品 spine 之外的能力——已有浏览器半包(`cordis-client-runner`、`ui-cordis`)且被 host 聚合排除——fork 浏览器插件放这里无需新开组,upstream 的 `client/` 包也免于在其组 README 与引用中混入 fork 行,合并面收敛到本组 README 一处。
 

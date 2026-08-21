@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-client-global-paste",
   "description": "Whole-page text paste into the composer: Ctrl/Cmd+V anywhere routes the clipboard text into the current session's draft without first focusing the input",
-  "version": "0.1.0-rc.8",
+  "version": "0.1.1-rc.1",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

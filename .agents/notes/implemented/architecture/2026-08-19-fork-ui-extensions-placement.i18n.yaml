@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-19-fork-ui-extensions-placement.md
 2026-08-19-fork-ui-extensions-placement.md: da4a717284c9852b44c97a1ff4e7b3f8629d9ca6
-2026-08-19-fork-ui-extensions-placement.zh.md: cc52e5faf21882c04b5bf616f277b92e874d5c80
+2026-08-19-fork-ui-extensions-placement.zh.md: 24c72648c0f6ab37a37e09d31c6369faa234af60

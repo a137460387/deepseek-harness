@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-20-web-input-history-recall.md
 2026-08-20-web-input-history-recall.md: b4af85e17fe342b7cc88e862c1372b166b56095c
-2026-08-20-web-input-history-recall.zh.md: 1d4da7d1611b8db0cf99c4e4caae597b90ccd6dc
+2026-08-20-web-input-history-recall.zh.md: 62bc88adf5c19821a795484e572f0c3afef67e5b

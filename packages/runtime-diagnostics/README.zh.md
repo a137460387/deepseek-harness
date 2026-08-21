@@ -6,4 +6,4 @@
 
 | 包 | 职责 |
 |---|---|
-| [`invariants/`](invariants/README.md) | 可配置的 `InvariantRegistry` 服务(`ctx.invariants`),每个包的 `./invariant` 伴生件都注册其下 |
+| [`invariants/`](invariants/README.zh.md) | 可配置的 `InvariantRegistry` 服务(`ctx.invariants`),每个包的 `./invariant` 伴生件都注册其下 |

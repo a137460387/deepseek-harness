@@ -10,7 +10,7 @@ Web UI 只展示单会话 token 总量（状态条、subagent 目录），回答
 
 ## Decision
 
-双面 fork 包 [`packages/extensions/usage-stats/`](../../../../packages/extensions/usage-stats/README.md)（`@deepseek-ai/dsh-client-usage-stats`）：
+双面 fork 包 [`packages/extensions/usage-stats/`](../../../../packages/extensions/usage-stats/README.zh.md)（`@deepseek-ai/dsh-client-usage-stats`）：
 
 - **Node 半边**在 `ctx.sessionProjections` 上注册 `usageStats` 会话投影单元（`dsh-session-stats` 形态）。折叠与 `tokenUsage` 口径完全一致——带 `(turn, step)` 替换语义的分片样本、压缩摘要用量全额累加——但按 UTC 刻钟与路由分桶。路由归属读最近的 `request/header` 的 provider/model；摘要自带路由；头事件之前的用量（实践中不合法）落 `unknown` 路由。归零的槽位被修剪，无活动会话折叠为 `{ quarters: {} }`。
 - **递送走标准投影机制**——`session/projection` 实时帧、持久化投影缓存、会话列表基线——本包不拥有任何通道。
