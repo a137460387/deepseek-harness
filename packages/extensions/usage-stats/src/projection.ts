@@ -23,23 +23,6 @@ import type { UsageBuckets, UsageStatsProjection } from './types.ts'
 /** Route attribution for samples that precede every `request/header`. */
 const UNKNOWN_ROUTE = { provider: 'unknown', model: 'unknown' } as const
 
-/** Fold state: the served quarters plus the attribution facts the folds carry. */
-interface UsageStatsState {
-  /** The view's quarter buckets (see {@link UsageStatsProjection}). */
-  quarters: UsageStatsProjection['quarters']
-  /** Nearest preceding `request/header` route; null before one lands. */
-  route: { provider: string; model: string } | null
-  /** The last (turn, step) sample with its bucket placement, for replacement. */
-  last: {
-    turn: number
-    step: number
-    quarter: number
-    provider: string
-    model: string
-    buckets: UsageBuckets
-  } | null
-}
-
 const bucketsSchema = z.object({
   uncachedInputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
@@ -50,6 +33,36 @@ const bucketsSchema = z.object({
 const usageStatsSchema = z.object({
   quarters: z.record(z.string(), z.record(z.string(), z.record(z.string(), bucketsSchema))),
 }).strict()
+
+/**
+ * The usageStats unit's state schema — the one definition of the state
+ * shape; the state type is inferred from it.
+ */
+const usageStatsStateSchema = z.object({
+  quarters: z.record(z.string(), z.record(z.string(), z.record(z.string(), bucketsSchema))),
+  /** Nearest preceding `request/header` route; null before one lands. */
+  route: z.object({
+    provider: z.string(),
+    model: z.string(),
+  }).strict().nullable(),
+  /** The last (turn, step) sample with its bucket placement, for replacement. */
+  last: z.object({
+    turn: z.number().int().nonnegative(),
+    step: z.number().int().nonnegative(),
+    quarter: z.number().int().nonnegative(),
+    provider: z.string(),
+    model: z.string(),
+    buckets: bucketsSchema,
+  }).strict().nullable(),
+}).strict()
+
+type UsageStatsState = z.infer<typeof usageStatsStateSchema>
+
+declare module '@deepseek-ai/dsh-session-projection/types' {
+  interface SessionProjectionStateMap {
+    usageStats: UsageStatsState
+  }
+}
 
 const bucketsFrom = (usage: TokenUsage): UsageBuckets => ({
   uncachedInputTokens: usage.inputTokens,
@@ -127,10 +140,11 @@ function applyBucketDelta(
 }
 
 /** The `usageStats` unit registered on `ctx.sessionProjections` (exported for the unit spec). */
-export const usageStatsProjectionDefinition: ProjectionDefinition<'usageStats', UsageStatsState> = {
+export const usageStatsProjectionDefinition = {
   key: 'usageStats',
-  schema: usageStatsSchema,
-  init: () => ({ quarters: {}, route: null, last: null }),
+  stateVersion: 1,
+  stateSchema: usageStatsStateSchema,
+  init: (): UsageStatsState => ({ quarters: {}, route: null, last: null }),
   apply: (state, event) => {
     if (event.type === 'request/header') {
       const { provider, model } = event.data.header.config
@@ -193,9 +207,8 @@ export const usageStatsProjectionDefinition: ProjectionDefinition<'usageStats', 
       last: { turn, step, quarter, provider: route.provider, model: route.model, buckets },
     }
   },
-  view: state => ({ quarters: state.quarters }),
-  stateVersion: 1,
-}
+  wire: { viewSchema: usageStatsSchema, view: state => ({ quarters: state.quarters }) },
+} satisfies ProjectionDefinition<'usageStats', UsageStatsState>
 
 /** Pointwise negation for reversing a previous sample's placement. */
 function negate(buckets: UsageBuckets): UsageBuckets {

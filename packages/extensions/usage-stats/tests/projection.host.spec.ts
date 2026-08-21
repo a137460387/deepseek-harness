@@ -84,7 +84,7 @@ function fold(events: readonly SessionEvent[]): { state: unknown; view: UsageSta
   for (const item of events) {
     state = usageStatsProjectionDefinition.apply(state, item)
   }
-  return { state, view: usageStatsProjectionDefinition.view(state) }
+  return { state, view: usageStatsProjectionDefinition.wire.view(state) }
 }
 
 /** The bucket a quarter/route slot carries, or undefined. */
