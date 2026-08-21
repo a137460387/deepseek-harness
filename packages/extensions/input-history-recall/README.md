@@ -11,7 +11,7 @@ How the traversal works:
 - **History source**: read fresh from the current session's conversation snapshot on each keypress — `user` and `steering` message nodes, text blocks concatenated. Image-only messages contribute nothing; non-text blocks are skipped. No second copy of the history exists.
 - **Draft writes** go through the public `ctx.conversation.input` service (`setDraft`), so a recalled message is an ordinary draft edit: it persists through the machine's draft mirror and can be undone with Ctrl/Cmd-Z.
 - **Draft stash**: the pre-traversal draft is held in one in-memory slot; ArrowDown past the newest entry writes it back (an empty pre-traversal draft restores as empty).
-- **Traversal state** is that one in-memory slot: it survives no reload and is reset by session switches and by a cleared draft (a successful send).
+- **Traversal state** is that one in-memory slot: it survives no reload and is reset by session switches, by a cleared draft (a successful send), and by a user edit of the recalled text.
 
 The guards, evaluated in order before a key is claimed:
 
@@ -24,8 +24,9 @@ The guards, evaluated in order before a key is claimed:
 - The slash candidate menu is open → ignored: the input-trigger pipeline's own arrow arbitration wins, and the key passes through to the composer's React handler.
 - ArrowUp while not traversing additionally requires `selectionStart === selectionEnd === 0`; ArrowDown while not traversing always passes through.
 - At the oldest entry, ArrowUp is swallowed without changing the displayed content.
+- While traversing, a draft that no longer matches the traversal's last written entry (the user edited the recalled text) ends the traversal and hands the key back to native handling.
 
-While a traversal is live, ArrowUp/ArrowDown skip the caret recheck (the draft rewrite leaves the caret wherever the engine puts it), so edits made mid-traversal keep the cursor position. The input-trigger service is read optionally through `ctx.get`, so compositions without the slash pipeline still get history recall.
+While a traversal is live, ArrowUp/ArrowDown skip the caret recheck (the draft rewrite leaves the caret wherever the engine puts it), so edits made mid-traversal keep the cursor position. Editing the recalled text itself, however, ends the traversal: the slot records what the plugin last wrote, and a draft that differs from it on the next keypress means the user has taken over — the traversal ends, that key passes through, and later arrows behave as if no traversal had been started (a later ArrowUp re-enters through the caret-at-0 gate). An edit reverted back to the exact written text keeps the traversal alive (plain string comparison). The input-trigger service is read optionally through `ctx.get`, so compositions without the slash pipeline still get history recall.
 
 ## Model Experience
 

@@ -21,10 +21,13 @@
  * (a claimed command line or a submit transaction must not be overwritten),
  * and an open candidate menu (the slash pipeline's own arrow arbitration
  * wins; the key is left to pass through to the composer's React handler).
+ * While a traversal is live, a draft that no longer matches the traversal's
+ * last written entry (the user edited the recalled text) ends the traversal
+ * and hands the key back to native handling.
  *
  * The traversal state is one in-memory slot in the apply closure: it survives
- * no reload, ends on session switches and on a cleared draft (a send), and
- * never crosses a plugin boundary.
+ * no reload, ends on session switches, on a cleared draft (a send), and on a
+ * user edit of the recalled text, and never crosses a plugin boundary.
  *
  * @module @deepseek-ai/dsh-client-input-history-recall/client
  */
@@ -47,6 +50,8 @@ interface RecallSlot {
   cursor: number
   /** Draft as it was before the first ArrowUp; restored when ArrowDown walks past the newest entry. */
   stash: string
+  /** The entry the traversal last wrote into the draft; a live draft that differs from it is the user's own edit and ends the traversal. */
+  written: string
 }
 
 /**
@@ -139,6 +144,19 @@ export function apply(ctx: ClientContext): void {
       // draft cleared while traversing.
       if (active !== null && state.draft === '') active = null
 
+      // A draft the plugin did not write last ends the traversal AND hands
+      // this key back: the user has edited the recalled text, and both
+      // overwriting the edit and merely claiming the key would surprise.
+      // This is a different dimension from the caret recheck the traversal
+      // skips — after a plugin write the caret is engine-placed and not
+      // stably observable, but the written content is exactly known, so any
+      // divergence is the user's own edit. Plain string comparison, so an
+      // edit reverted back to the written text keeps the traversal alive.
+      if (active !== null && state.draft !== active.written) {
+        active = null
+        return
+      }
+
       const history = sentTexts(session)
       if (event.key === 'ArrowUp') {
         if (active === null) {
@@ -147,7 +165,9 @@ export function apply(ctx: ClientContext): void {
           // draft rewrite leaves the caret where the engine puts it.
           if (composer.selectionStart !== 0 || composer.selectionEnd !== 0) return
           if (history.length === 0) return
-          active = { sessionId: current, cursor: history.length, stash: state.draft }
+          // `written` seeds from the entry draft because the first history
+          // write happens later in this same keypress.
+          active = { sessionId: current, cursor: history.length, stash: state.draft, written: state.draft }
         }
         // Already at the oldest entry (or the history read came back empty):
         // swallow the key and hold the displayed content.
@@ -178,6 +198,9 @@ export function apply(ctx: ClientContext): void {
         return
       }
       input.setDraft(text)
+      // Track what the traversal wrote: the next keypress compares the live
+      // draft against it to detect a user edit.
+      active.written = text
       swallow(event)
     }
 

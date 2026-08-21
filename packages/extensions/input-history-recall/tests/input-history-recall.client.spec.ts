@@ -7,9 +7,11 @@
  * Lock states (removed session, an offline continuable parent, submit/
  * adjudicate/claim phases, an open candidate menu, IME composition) leave the
  * key to native handling like the composer's own read-only states. The
- * traversal round trip (recall older, walk forward, restore the stashed
- * draft), the session-switch reset, and the send-clear reset are asserted
- * against a stateful draft fake.
+ * traversal round trip (recall order, stash restore, empty-draft restore),
+ * the session-switch reset, the send-clear reset, and the user-edit takeover
+ * reset (a draft that no longer matches the traversal's last write ends it
+ * and hands the key back; an edit reverted back to the written text keeps
+ * it) are asserted against a stateful draft fake.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -454,6 +456,41 @@ describe('input-history-recall browser half', () => {
     const event = press(composer!, 'ArrowDown')
     expect(event.defaultPrevented).toBe(false)
     expect(input.setDraft).toHaveBeenCalledTimes(1)
+  })
+
+  it('ends the traversal and hands the key back when the user edits the recalled draft', async () => {
+    const { composer, inputs } = await bench({ draft: 'wip' })
+    const input = inputs.get('a' as SessionId)!
+    press(composer!, 'ArrowUp')
+    expect(input.state.getSnapshot().draft).toBe('second')
+    // A user edit arrives through the input machine, not the plugin's
+    // setDraft path; the next arrow key must neither claim nor overwrite it.
+    input.state.set({ draft: 'second (edited)', phase: 'plain' })
+    const up = press(composer!, 'ArrowUp')
+    expect(up.defaultPrevented).toBe(false)
+    expect(input.setDraft).toHaveBeenCalledTimes(1)
+    expect(input.state.getSnapshot().draft).toBe('second (edited)')
+    // The traversal is gone: ArrowDown passes through instead of walking.
+    const down = press(composer!, 'ArrowDown')
+    expect(down.defaultPrevented).toBe(false)
+    expect(input.setDraft).toHaveBeenCalledTimes(1)
+    expect(input.state.getSnapshot().draft).toBe('second (edited)')
+  })
+
+  it('keeps the traversal when an edit is reverted back to the last written entry', async () => {
+    const { composer, inputs } = await bench({ draft: 'wip' })
+    const input = inputs.get('a' as SessionId)!
+    press(composer!, 'ArrowUp')
+    expect(input.state.getSnapshot().draft).toBe('second')
+    // Typed away and undone back to the exact written text: plain string
+    // comparison treats the draft as not taken over.
+    input.state.set({ draft: 'changed', phase: 'plain' })
+    input.state.set({ draft: 'second', phase: 'plain' })
+    const event = press(composer!, 'ArrowUp')
+    expect(event.defaultPrevented).toBe(true)
+    expect(input.setDraft).toHaveBeenCalledTimes(2)
+    expect(input.setDraft).toHaveBeenLastCalledWith('first')
+    expect(input.state.getSnapshot().draft).toBe('first')
   })
 
   it('ends the traversal when the current session switches', async () => {
