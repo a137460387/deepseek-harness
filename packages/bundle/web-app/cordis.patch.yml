@@ -289,6 +289,12 @@
     - id: draft-keeper
       name: '@deepseek-ai/dsh-client-draft-keeper'
 
+    # In-conversation find: Ctrl/Cmd+F opens a find bar over the active chat
+    # view, matching the loaded window's text with wrap-around navigation
+    # and center-scroll highlights.
+    - id: find-in-chat
+      name: '@deepseek-ai/dsh-client-find-in-chat'
+
     # Goal surface: GoalBar in the input dock over the goal session projection.
     - id: ui-goal
       name: '@deepseek-ai/dsh-client-ui-goal'
