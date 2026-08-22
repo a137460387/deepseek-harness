@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-fork 浏览器输入插件（`global-paste`、`text-file-cards`、`input-history-recall`）共享的 composer 守卫：插件侧写入被允许到达 composer 之前，三方各自需要的三个谓词。
+fork 浏览器输入插件（`global-paste`、`text-file-cards`、`input-history-recall`、`draft-keeper`）共享的 composer 守卫：插件侧写入被允许到达 composer 之前，各方需要的三个谓词。
 
 - **`composerVisible(composer)`** —— composer 文本域可见且未被接管浮层遮挡（在 composer 中心用 `elementFromPoint` 探测）。
 - **`sessionAcceptsEdits(session)`** —— 所有会话级 composer 锁均处于开启状态：会话未被移除，且 continuable 子代理的精确父会话仍然在线。
@@ -22,5 +22,5 @@ fork 浏览器输入插件（`global-paste`、`text-file-cards`、`input-history
 
 ## Known Limitations and Deferred Work
 
-- **roster 耦合** —— 消费包经 `dsh.client.external` 到达本包，因此挂载任一消费包的组合必须同时挂载本行。web-app bundle 将四者一同挂载；省略供给行的自定义组合会在图组装处以缺少请求错误失败，而不是留到运行时。
+- **roster 耦合** —— 消费包经 `dsh.client.external` 到达本包，因此挂载任一消费包的组合必须同时挂载本行。web-app bundle 将五者一同挂载；省略供给行的自定义组合会在图组装处以缺少请求错误失败，而不是留到运行时。
 - **可见性探测精度** —— 遮挡检查在 composer 中心使用 `elementFromPoint`。覆盖了 composer 但未盖住中心的浮层不会被检出；调用方会写入一个部分可见的 composer，这无伤大雅。

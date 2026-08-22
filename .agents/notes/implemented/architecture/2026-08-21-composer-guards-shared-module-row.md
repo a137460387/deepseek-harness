@@ -15,7 +15,7 @@ The predicates moved to `packages/extensions/composer-guards` (`@deepseek-ai/dsh
 - The browser half exports the three predicates and an inert `apply`; it provides no services or slots. Each consumer declares `@deepseek-ai/dsh-client-composer-guards/client` in its `dsh.client.external` and keeps that package as matching peer and dev dependency; the boot-graph composer orders the supplier row before its consumers, and the browser module table resolves the request to the row's exports (`<id>/client` and the bare id normalize to the same row).
 - `sessionAcceptsEdits` takes the `SessionFace` directly — input-history-recall's signature. The `(ctx, actx)` shape the other two copies inlined is one `ctx.sessions.sessionOf(actx)` call at each call site, and the SessionFace form is the shared core.
 - `resolveEditableInput` returns the superset `{ input, state, sessionId, liveSessionIds }`: global-paste consumes `state`, text-file-cards consumes `sessionId`/`liveSessionIds` (its staged-files prune currency), and the extra fields cost each consumer nothing.
-- Deployment coupling is explicit and load-time loud: a composition mounting any consumer must mount the supplier row or graph composition rejects the missing request; the web-app bundle mounts the four together.
+- Deployment coupling is explicit and load-time loud: a composition mounting any consumer must mount the supplier row or graph composition rejects the missing request; the web-app bundle mounts the five together.
 
 ## Testing
 
@@ -35,5 +35,5 @@ The predicates moved to `packages/extensions/composer-guards` (`@deepseek-ai/dsh
 
 - The duplication gate's remaining red is exactly the three recorded usage-stats clones (usage-stats internal ×1, usage-stats ↔ token-meter ×2), which stay as accepted legacy.
 - composer-guards is the first exercised `dsh.client.external` supplier. The mechanism was designed for this shape — package rows and exact static keys are the only suppliers — but this is its first live consumer set; a second user should confirm the path against this precedent.
-- The three consumers now hard-require the supplier row at composition time. Within the fork's single shipped composition (the web-app bundle) this is invisible, but a downstream composition that mounts, say, global-paste without composer-guards fails at graph composition with a missing-request error rather than at runtime.
-- A future fourth composer plugin should request the same row instead of re-copying the predicates; the consumers' module docs and the extensions README name the supplier.
+- The four consumers (draft-keeper, the composer draft-persistence plugin, joined as the fourth) now hard-require the supplier row at composition time. Within the fork's single shipped composition (the web-app bundle) this is invisible, but a downstream composition that mounts, say, global-paste without composer-guards fails at graph composition with a missing-request error rather than at runtime.
+- A future composer plugin should request the same row instead of re-copying the predicates, as draft-keeper did; the consumers' module docs and the extensions README name the supplier.

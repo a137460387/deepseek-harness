@@ -1,10 +1,10 @@
 /**
  * Shared composer guards, browser half: the three predicates the fork's
- * composer plugins (global-paste, text-file-cards, input-history-recall)
- * share for deciding whether a plugin-side write may reach the composer right
- * now — whether the composer textarea is visible and unoccluded, whether the
- * session-level composer locks stand open, and whether the current session's
- * input facade can accept a draft edit.
+ * composer plugins (global-paste, text-file-cards, input-history-recall,
+ * draft-keeper) share for deciding whether a plugin-side write may reach the
+ * composer right now — whether the composer textarea is visible and
+ * unoccluded, whether the session-level composer locks stand open, and
+ * whether the current session's input facade can accept a draft edit.
  *
  * This package is a library row, not a feature plugin: its `apply` is inert
  * and it provides no services or slots. It exists as a dynamic `dsh.client`

@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Shared composer guards for the fork's browser input plugins (`global-paste`, `text-file-cards`, `input-history-recall`): the three predicates each of them needs before a plugin-side write may reach the composer.
+Shared composer guards for the fork's browser input plugins (`global-paste`, `text-file-cards`, `input-history-recall`, `draft-keeper`): the three predicates each of them needs before a plugin-side write may reach the composer.
 
 - **`composerVisible(composer)`** — the composer textarea is visible and not occluded by a takeover overlay (probed with `elementFromPoint` at the composer's center).
 - **`sessionAcceptsEdits(session)`** — every session-level composer lock stands open: the session is not removed, and a continuable subagent child still has its exact parent available.
@@ -22,5 +22,5 @@ None; the package never assembles or sends provider requests.
 
 ## Known Limitations and Deferred Work
 
-- **Roster coupling** — consumers reach this package through `dsh.client.external`, so a composition mounting any consumer must also mount this row. The web-app bundle mounts the four together; a custom composition omitting the supplier fails graph composition with a missing-request error rather than at runtime.
+- **Roster coupling** — consumers reach this package through `dsh.client.external`, so a composition mounting any consumer must also mount this row. The web-app bundle mounts the five together; a custom composition omitting the supplier fails graph composition with a missing-request error rather than at runtime.
 - **Visibility probe precision** — the occluded check uses `elementFromPoint` at the composer's center. An overlay that covers the composer but leaves the center uncovered would not be detected; callers route into a partially-visible composer, which is harmless.

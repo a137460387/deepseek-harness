@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/extensions/composer-guards/README.md
-README.md: fbad9c9750d2b95822925a1074506a5ceed8c0de
-README.zh.md: 3926eab13d080bf99927c77257aee2460fd47fe5
+README.md: 715babb02490d0a1f9b2227b4482318c07b4bfba
+README.zh.md: 5c1e76c122224b9209a32b028f98fbbe127f37f9

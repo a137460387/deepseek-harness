@@ -15,7 +15,7 @@ Status: implemented
 - 浏览器半导出三个谓词与一个惰性 `apply`；不提供任何服务或 slot。每个消费包在自己的 `dsh.client.external` 中声明 `@deepseek-ai/dsh-client-composer-guards/client`，并以对等的 peer 与 dev 依赖持有该包；boot 图组装器把供给行排在消费包之前，浏览器模块表把请求解析到该行的导出（`<id>/client` 与裸包名归一化到同一行）。
 - `sessionAcceptsEdits` 直接接收 `SessionFace`——input-history-recall 的签名。另外两份拷贝内联的 `(ctx, actx)` 形态只是每个调用点一次 `ctx.sessions.sessionOf(actx)` 调用，SessionFace 形式才是共享内核。
 - `resolveEditableInput` 返回超集 `{ input, state, sessionId, liveSessionIds }`：global-paste 消费 `state`，text-file-cards 消费 `sessionId`/`liveSessionIds`（其暂存文件的清理货币），多余字段对另一方零成本。
-- 部署耦合显式且在装载期报错：挂载任一消费包的组合必须同时挂载供给行，否则图组装以缺少请求拒绝；web-app bundle 将四者一同挂载。
+- 部署耦合显式且在装载期报错：挂载任一消费包的组合必须同时挂载供给行，否则图组装以缺少请求拒绝；web-app bundle 将五者一同挂载。
 
 ## Testing
 
@@ -35,5 +35,5 @@ Status: implemented
 
 - duplication 门剩余的红恰好是三处已记录的 usage-stats 克隆（usage-stats 内部 ×1、usage-stats ↔ token-meter ×2），作为接受的存量保留。
 - composer-guards 是首个被实际使用的 `dsh.client.external` 供给方。该机制本就为此形态设计——包行与精确静态键是仅有的两类供给方——但这是它首个在用的消费组合；第二个使用者应对照本先例确认该路径。
-- 三个消费包现在在组合期硬性依赖供给行。在 fork 唯一的已发布组合（web-app bundle）内这不可见，但挂载了 global-paste 却缺 composer-guards 的下游组合会在图组装处以缺少请求报错，而不是留到运行时。
-- 未来第四个 composer 插件应请求同一行而不是再复制谓词；三个消费包的模块文档与 extensions README 均指名了供给方。
+- 四个消费包（composer 草稿持久化插件 draft-keeper 作为第四个加入）现在在组合期硬性依赖供给行。在 fork 唯一的已发布组合（web-app bundle）内这不可见，但挂载了 global-paste 却缺 composer-guards 的下游组合会在图组装处以缺少请求报错，而不是留到运行时。
+- 未来新的 composer 插件应请求同一行而不是再复制谓词，draft-keeper 已如此落地；各消费包的模块文档与 extensions README 均指名了供给方。
