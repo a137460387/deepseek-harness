@@ -46,23 +46,27 @@ export interface DraftStore {
 }
 
 /**
- * Validate and parse the on-disk payload.
+ * Validate and parse the on-disk payload. The record is accepted only
+ * whole: any structural violation (wrong version, non-object drafts, a
+ * non-string or empty entry) discards the entire record — partial data is
+ * never resurrected from a malformed neighbor.
  * @param raw - the stored JSON text.
  * @returns the parsed entries; empty when the record is malformed.
  */
 function parseRecord(raw: string): Map<string, string> {
-  const drafts = new Map<string, string>()
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
   } catch {
-    return drafts
+    return new Map()
   }
-  if (typeof parsed !== 'object' || parsed === null) return drafts
+  if (typeof parsed !== 'object' || parsed === null) return new Map()
   const { version, drafts: values } = parsed as Partial<DraftRecord>
-  if (version !== 1 || typeof values !== 'object' || values === null) return drafts
+  if (version !== 1 || typeof values !== 'object' || values === null) return new Map()
+  const drafts = new Map<string, string>()
   for (const [sessionId, text] of Object.entries(values)) {
-    if (typeof text === 'string' && text !== '') drafts.set(sessionId, text)
+    if (typeof text !== 'string' || text === '') return new Map()
+    drafts.set(sessionId, text)
   }
   return drafts
 }

@@ -182,14 +182,23 @@ export function apply(ctx: ClientContext): void {
       if (actx === undefined) return
       const input = ctx.conversation.input.for(actx)
       maybeRestore(sessionId, input)
-      const subject: Watch = { sessionId, off: () => {}, queueHeld: false }
-      let last = input.state.getSnapshot().draft
+      // Baseline capture: a draft that predates this subscription (typed
+      // during the boot gap, or already live at an HMR remount) mirrors like
+      // any edit; a draft that sits in a pending queue starts held.
+      const snapshot = input.state.getSnapshot()
+      const subject: Watch = {
+        sessionId,
+        off: () => {},
+        queueHeld: snapshot.draft === '' && snapshot.queue.length > 0,
+      }
+      if (snapshot.draft !== '') onDraft(subject, snapshot.draft, snapshot.queue.length)
+      let last = snapshot.draft
       subject.off = input.state.subscribe(() => {
-        const snapshot = input.state.getSnapshot()
-        if (snapshot.draft !== last) {
-          last = snapshot.draft
-          onDraft(subject, snapshot.draft, snapshot.queue.length)
-        } else if (subject.queueHeld && snapshot.draft === '' && snapshot.queue.length === 0) {
+        const next = input.state.getSnapshot()
+        if (next.draft !== last) {
+          last = next.draft
+          onDraft(subject, next.draft, next.queue.length)
+        } else if (subject.queueHeld && next.draft === '' && next.queue.length === 0) {
           // The steering queue drained with the draft still empty: the held
           // text reached the turn, so its entry goes.
           subject.queueHeld = false

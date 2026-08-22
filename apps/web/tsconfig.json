@@ -100,7 +100,8 @@
     "tests/complex-history.perf.ts",
     "tests/pwsh-terminal.e2e.ts",
     "tests/workflow-run.e2e.ts",
-    "tests/text-file-cards.e2e.ts"
+    "tests/text-file-cards.e2e.ts",
+    "tests/draft-keeper.e2e.ts"
   ],
   "references": [
     {
