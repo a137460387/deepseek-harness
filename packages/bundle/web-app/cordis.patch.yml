@@ -284,6 +284,11 @@
     - id: input-history-recall
       name: '@deepseek-ai/dsh-client-input-history-recall'
 
+    # Draft persistence: the current session's unsent draft is mirrored to
+    # localStorage per session and restored after a reload, plain text only.
+    - id: draft-keeper
+      name: '@deepseek-ai/dsh-client-draft-keeper'
+
     # Goal surface: GoalBar in the input dock over the goal session projection.
     - id: ui-goal
       name: '@deepseek-ai/dsh-client-ui-goal'

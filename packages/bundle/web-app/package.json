@@ -85,6 +85,7 @@
     "@deepseek-ai/dsh-client-text-file-cards": "workspace:^",
     "@deepseek-ai/dsh-client-usage-stats": "workspace:^",
     "@deepseek-ai/dsh-client-input-history-recall": "workspace:^",
+    "@deepseek-ai/dsh-client-draft-keeper": "workspace:^",
     "@deepseek-ai/dsh-client-ui-theme": "workspace:^",
     "@deepseek-ai/dsh-client-ui-tool": "workspace:^",
     "@deepseek-ai/dsh-client-ui-workflow-run": "workspace:^",
