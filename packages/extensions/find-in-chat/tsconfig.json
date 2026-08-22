@@ -21,6 +21,9 @@
       "path": "../../client/ui-slots"
     },
     {
+      "path": "../../client/ui-layout"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
     }
   ]
