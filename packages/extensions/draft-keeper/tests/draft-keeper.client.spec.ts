@@ -118,7 +118,7 @@ async function bench(over: BenchOptions = {}): Promise<Bench> {
     id,
     makeInput({ draft: over.draft ?? '', phase: over.phase ?? 'plain', queue: over.queue ?? [] }),
   ]))
-  const currentId = over.current ?? (sessionIds[0] as string | undefined)
+  const currentId = over.current ?? sessionIds[0]
   const list = createSnapshotStore<SessionListState>(listState(currentId, sessionIds, over.listPhase ?? 'ready'))
   const sessionSnapshot: SessionLockSnapshot = { removed: over.removed === true, subagent: null }
 
@@ -374,10 +374,10 @@ describe('draft-keeper browser half', () => {
     const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new DOMException('quota', 'QuotaExceededError')
     })
-    expect(() => setDraftOf(b, 's1', 'doomed')).not.toThrow()
+    expect(() => { setDraftOf(b, 's1', 'doomed') }).not.toThrow()
     await runDebounce()
     expect(storedDrafts()).toEqual({})
-    expect(() => setDraftOf(b, 's1', '')).not.toThrow()
+    expect(() => { setDraftOf(b, 's1', '') }).not.toThrow()
     setItem.mockRestore()
   })
 
@@ -386,7 +386,7 @@ describe('draft-keeper browser half', () => {
     vi.stubGlobal('localStorage', undefined)
     const b = await bench()
     expect(b.input('s1' as SessionId).setDraft).not.toHaveBeenCalled()
-    expect(() => setDraftOf(b, 's1', 'never stored')).not.toThrow()
+    expect(() => { setDraftOf(b, 's1', 'never stored') }).not.toThrow()
     await runDebounce()
     vi.unstubAllGlobals()
     expect(storedDrafts()).toEqual({ s1: 'unread' })

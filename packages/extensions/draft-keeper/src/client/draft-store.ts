@@ -61,10 +61,10 @@ function parseRecord(raw: string): Map<string, string> {
     return new Map()
   }
   if (typeof parsed !== 'object' || parsed === null) return new Map()
-  const { version, drafts: values } = parsed as Partial<DraftRecord>
+  const { version, drafts: values } = parsed as { version?: unknown; drafts?: unknown }
   if (version !== 1 || typeof values !== 'object' || values === null) return new Map()
   const drafts = new Map<string, string>()
-  for (const [sessionId, text] of Object.entries(values)) {
+  for (const [sessionId, text] of Object.entries(values as Record<string, unknown>)) {
     if (typeof text !== 'string' || text === '') return new Map()
     drafts.set(sessionId, text)
   }

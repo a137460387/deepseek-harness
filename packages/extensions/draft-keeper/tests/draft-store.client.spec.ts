@@ -106,15 +106,15 @@ describe('createDraftStore', () => {
     const store = createDraftStore(storage, 'dsh.draft-keeper')
     store.set('s1', 'first')
     storage.setItem.mockImplementation(() => { throw new DOMException('quota', 'QuotaExceededError') })
-    expect(() => store.set('s1', 'second')).not.toThrow()
+    expect(() => { store.set('s1', 'second') }).not.toThrow()
     expect(storage.map.get('dsh.draft-keeper')).toBe(JSON.stringify({ version: 1, drafts: { s1: 'first' } }))
     // The latch is permanent: later reads see the last good record only.
     storage.setItem.mockImplementation((key: string, value: string) => { storage.map.set(key, value) })
     store.set('s2', 'never written')
     expect(readRecord(storage).drafts).toEqual({ s1: 'first' })
-    expect(() => store.remove('s1')).not.toThrow()
+    expect(() => { store.remove('s1') }).not.toThrow()
     expect(readRecord(storage).drafts).toEqual({ s1: 'first' })
-    expect(() => store.prune([])).not.toThrow()
+    expect(() => { store.prune([]) }).not.toThrow()
     expect(readRecord(storage).drafts).toEqual({ s1: 'first' })
   })
 
@@ -123,7 +123,7 @@ describe('createDraftStore', () => {
     storage.getItem.mockImplementation(() => { throw new DOMException('unavailable', 'SecurityError') })
     const store = createDraftStore(storage, 'dsh.draft-keeper')
     expect(store.get('s1')).toBeUndefined()
-    expect(() => store.set('s1', 'text')).not.toThrow()
+    expect(() => { store.set('s1', 'text') }).not.toThrow()
     expect(storage.setItem).not.toHaveBeenCalled()
   })
 
