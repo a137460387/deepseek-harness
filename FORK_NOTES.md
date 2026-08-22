@@ -23,7 +23,22 @@
 
 - **upstream 合并后的固定人工收尾**(三轮实测):其一,upstream 的 release bump 不会带动 `packages/extensions/*` 下的 fork-only 包,合并后需人工核对这些包的 `version` 是否仍对齐 root 版本——constraints 门会报不匹配,但不会提示原因是 bump 漏掉;其二,upstream 删除某包后,本地曾构建过该包的话会留下未跟踪的 `lib/`、`node_modules/` 等构建产物残留,跑 `pnpm run clean` 清理(clean 脚本即为此设计);其三,upstream 已收紧 pairing 门——zh 侧文档里指向配对文档(README/Agent Note)的链接必须指向 `.zh.md` 对应文件,fork 早前写的 zh 链接指英文侧会在 corpus 检查报 wrong locale,修正后逐对 `verify-translation-pairing --write` 重录;其四,upstream 重构了 `ProjectionDefinition`(`schema` → `stateSchema` + `wire: { viewSchema, view }`,注册 API 按客户端可见/仅 host 两态分派),fork 的投影包(usage-stats)在每次涉及 `packages/session/session-projection` 的合并后需照 upstream 自己的 token-meter 形态迁移,state 语义未变时 `stateVersion` 不动。
 
+- **upstream 同步操作纪律**(2026-08-22 增补)：同步前必做——`git fetch upstream` 后用 git 对象 diff 逐个核实冲突面文件（`packages/llm/token-meter/src/usage-projection.ts`、`packages/client/ui-conversation/src/client/skeleton/InputBar.tsx`、`packages/extensions/cordis-client-runner/src/client/slot-catalog.ts`、`packages/client/connection/src/client/fixture.ts`、`apps/web/tests/scaffold.ts`），结论追加到下方「Upstream 同步基线」小节；合并后必做——重新生成 `slot-catalog.ts`（脚本产物，禁止手工编辑）；合并后必查——`InputBar.tsx` 的 `data-dsh-composer` 属性仍存在（`global-paste`、`text-file-cards`、`input-history-recall` 的 composer 选择器依赖它）。
+
 - **重新构建 fork 扩展包后必须重启长驻的 `dsh web` 进程**(第二次踩同型坑：8/20 一次是旧进程不刷新新 UI、静默服务旧版本，8/21 一次是浏览器端直接报错)——进程的 client boot 图在启动时固化，而 `/plugins/*/client.js` 路由每次请求都从磁盘现读，旧图配新 bundle 时，消费新供给行(新增或修改了 `dsh.client.external` 模块请求)的包在加载期报"模块表缺失"，浏览器端呈现 "Failed to load plugins" 失败页；该报错文案中的 "build-time externals drift" 措辞有误导性——实际是进程比磁盘产物旧，与构建配置无关；排查：用 netstat 定位监听目标端口的 PID 并核对其启动时间是否早于本次改动，是则停掉旧进程重启。
+
+## Upstream 同步基线（2026-08-22 已核实）
+
+- 当前基线：`upstream/master` = `b150a551b8`（tag `dsh-v0.1.1-rc.2`），fork 落后 0 提交、领先 36 提交；`99f6f02fec`（rc.7）是其祖先——上游自 rc.7 起 fast-forward +743 提交，master 历史从未重写；fork 对上游的净差为 146 文件、+8,466/-71。
+- 2026-08-22 审计的「上游谱系漂移」（中等风险）已核实关闭：假象来自本地 upstream 引用过期叠加 raw.githubusercontent CDN 缓存返回 rc.7 时代的文件内容，与 git 对象证据矛盾。
+- 教训：判断上游状态一律以 `git fetch` 之后的本地 git 对象为准，禁止依赖 raw/CDN 网页内容下结论。
+
+## 已知本地补丁（fork 对上游文件的直接修改）
+
+- **token-meter compaction 用量修复**（commit `016d287703`）：`packages/llm/token-meter/src/usage-projection.ts`（tokenUsage `stateVersion` 1→2、`compaction/summary` 用量全额累计分支）+ 同包 `token-usage-projection.spec.ts` + token-meter README×3 + `packages/client/connection/src/client/fixture.ts` 镜像分支。已核实 `b150a551b8` 不含此修复；状态：上游化 PR 准备中。
+- **InputBar 稳定选择器**：`packages/client/ui-conversation/src/client/skeleton/InputBar.tsx` 的 `data-dsh-composer=""` 单行注入（`global-paste`、`text-file-cards`、`input-history-recall` 经 `textarea[data-dsh-composer]` 定位 composer）。当前与上游的净差仅此 1 行；状态：拟向上游提 issue 索要官方稳定 composer 标记。
+- **web e2e scaffold Windows 修复**：`apps/web/tests/scaffold.ts` 的 `jsonLiteral` 占位符替换（Windows 反斜杠 cwd 裸拼接产生非法 JSON 转义，曾致 25 个 e2e 整文件失败；POSIX 上为恒等变换）；状态：候选上游化。
+- **slot-catalog 再生成**：`packages/extensions/cordis-client-runner/src/client/slot-catalog.ts` 是脚本再生成产物而非手工补丁，与上游的冲突以重新生成解决（见上方同步操作纪律）。
 
 ## Fork 课题待办
 
