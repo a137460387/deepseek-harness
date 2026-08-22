@@ -5,8 +5,8 @@
  * while the baseline still lacks the key (failures are retried instead), an
  * absent key even there counts toward the composition hint, single-session
  * failures degrade to empty values instead of failing the page, list
- * failures surface as the error status, and overlapping loads collapse to
- * one run.
+ * failures surface as the error status, overlapping loads collapse to
+ * one run, and a load that completes after a reset is discarded.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -209,6 +209,35 @@ describe('UsageStatsController', () => {
     })
     await controller.load()
     expect(historyCalls()).toEqual(['a', 'a'])
+  })
+
+  it('discards a load that completes after a reset', async () => {
+    let release: (() => void) | undefined
+    const api = {
+      list: async () => ({
+        rpcId: 'r',
+        result: { ok: true as const, value: { items: [{ sessionId: 'a', projections: { asOfSeq: 1, values: {} } }] } },
+      }),
+      history: () => new Promise((resolve) => {
+        release = () => {
+          resolve({ rpcId: 'r', result: { ok: true, value: { events: [], hasMore: false, projections: { asOfSeq: 0, values: { usageStats: VALUE } } } } })
+        }
+      }),
+    } as unknown as SessionsApi
+    const controller = new UsageStatsController(api)
+    const pending = controller.load()
+    // Let the list read resolve and the backfill reach its in-flight history read.
+    await new Promise(resolve => setTimeout(resolve, 0))
+    controller.reset()
+    release?.()
+    await pending
+    expect(controller.store.getSnapshot()).toEqual<UsageStatsSectionState>({
+      status: 'idle',
+      error: null,
+      values: {},
+      sessionCount: 0,
+      absentCount: 0,
+    })
   })
 
   it('marks the store loading while a read is in flight', async () => {

@@ -117,6 +117,13 @@ export class UsageStatsController {
   readonly store: SnapshotStore<UsageStatsSectionState> = createSnapshotStore(INITIAL)
   private running = false
   /**
+   * Connection-lifetime generation: reset() advances it, and a load that
+   * completes on a stale generation discards its result instead of
+   * overwriting the reset snapshot, repopulating the cleared backfill cache,
+   * or releasing a newer load's running flag.
+   */
+  private generation = 0
+  /**
    * Completed history backfills, keyed by session. A later load reuses one
    * while the list baseline still lacks the key; a session absent from the
    * list drops its entry. Failed backfills are not cached, so a refresh
@@ -138,6 +145,7 @@ export class UsageStatsController {
   async load(): Promise<void> {
     if (this.running) return
     this.running = true
+    const generation = this.generation
     const previous = this.store.getSnapshot()
     this.store.set({ ...previous, status: 'loading', error: null })
     try {
@@ -159,7 +167,9 @@ export class UsageStatsController {
           const history = await this.api.history({ sessionId })
           const value = history.result.ok ? history.result.value.projections?.values.usageStats : undefined
           if (isUsageStats(value)) {
-            this.backfilled.set(sessionId, value)
+            // Only the load's own generation may repopulate the cache reset()
+            // cleared; after a reset the entry belongs to the dead connection.
+            if (this.generation === generation) this.backfilled.set(sessionId, value)
             values[sessionId] = value
           } else {
             values[sessionId] = { quarters: {} }
@@ -170,6 +180,10 @@ export class UsageStatsController {
           absentCount += 1
         }
       })
+      // A reset landed while this load was in flight: its result belongs to
+      // the dead connection and must not overwrite the reset snapshot or
+      // prune the cache the reset cleared.
+      if (this.generation !== generation) return
       for (const sessionId of [...this.backfilled.keys()]) {
         if (!items.some(item => item.sessionId === sessionId)) this.backfilled.delete(sessionId)
       }
@@ -181,6 +195,8 @@ export class UsageStatsController {
         absentCount,
       })
     } catch (error) {
+      // A stale load reports nothing: the reset already owns the snapshot.
+      if (this.generation !== generation) return
       this.store.set({
         status: 'error',
         error: messageOf(error),
@@ -189,12 +205,18 @@ export class UsageStatsController {
         absentCount: previous.absentCount,
       })
     } finally {
-      this.running = false
+      // A stale load must not release a newer load's running flag.
+      if (this.generation === generation) this.running = false
     }
   }
 
-  /** Drop back to the idle snapshot (connection reset: rescan on next open). */
+  /**
+   * Drop back to the idle snapshot (connection reset: rescan on next open).
+   * The generation advance discards any load still in flight: its late
+   * completion neither overwrites this snapshot nor repopulates the cache.
+   */
   reset(): void {
+    this.generation += 1
     this.running = false
     this.backfilled.clear()
     this.store.set(INITIAL)
