@@ -3228,6 +3228,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-authorization` — requires `credentials` ([`packages/credentials/authorization/src/index.ts`](../packages/credentials/authorization/src/index.ts))
 - `@deepseek-ai/dsh-client-composer-guards` ([`packages/extensions/composer-guards/src/index.ts`](../packages/extensions/composer-guards/src/index.ts))
 - `@deepseek-ai/dsh-client-draft-keeper` ([`packages/extensions/draft-keeper/src/index.ts`](../packages/extensions/draft-keeper/src/index.ts))
+- `@deepseek-ai/dsh-client-find-in-chat` ([`packages/extensions/find-in-chat/src/index.ts`](../packages/extensions/find-in-chat/src/index.ts))
 - `@deepseek-ai/dsh-client-global-paste` ([`packages/extensions/global-paste/src/index.ts`](../packages/extensions/global-paste/src/index.ts))
 - `@deepseek-ai/dsh-client-input-history-recall` ([`packages/extensions/input-history-recall/src/index.ts`](../packages/extensions/input-history-recall/src/index.ts))
 - `@deepseek-ai/dsh-client-locale` ([`packages/client/locale/src/index.ts`](../packages/client/locale/src/index.ts))

@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-22-chat-find-in-bar.md
+2026-08-22-chat-find-in-bar.md: 3318256d910bb91040b34d63f625938db968b4b4
+2026-08-22-chat-find-in-bar.zh.md: b30e7cb80b5b43a57fb42273bd4e676e936c65ef
