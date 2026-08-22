@@ -309,7 +309,7 @@ describe('find controller search and stepping', () => {
     addRow(b.flow, 'needle a', 'row-1')
     addRow(b.flow, 'needle b', 'row-2')
     const scrollTo = vi.fn()
-    b.scroll.scrollTo = scrollTo as unknown as HTMLElement['scrollTo']
+    b.scroll.scrollTo = scrollTo
     key('f', { ctrl: true })
     b.controller.setQuery('needle')
     scrollTo.mockClear()

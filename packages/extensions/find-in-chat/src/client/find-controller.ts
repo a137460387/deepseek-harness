@@ -65,9 +65,9 @@ export interface FindState {
 /** The controller face the bar and the plugin body consume. */
 export interface FindController {
   /** Subscribe to state changes (useSyncExternalStore-compatible). */
-  subscribe(listener: () => void): () => void
+  readonly subscribe: (listener: () => void) => () => void
   /** Latest state snapshot. */
-  getSnapshot(): FindState
+  readonly getSnapshot: () => FindState
   /** The bar registers its input element; the Enter family gates to it. */
   bindInput(element: HTMLElement | null): void
   /** Replace the query and re-run the search (index resets to the head). */
@@ -123,7 +123,7 @@ export function createFindController(deps: FindControllerDeps): FindController {
     set: (name: string, ranges: readonly Range[]) => void
     clear: (name: string) => void
   } | null => {
-    if (typeof CSS === 'undefined' || CSS === null || !('highlights' in CSS) || CSS.highlights === null) return null
+    if (typeof CSS === 'undefined' || !('highlights' in CSS)) return null
     if (typeof Highlight === 'undefined') return null
     const registry = CSS.highlights
     return {

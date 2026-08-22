@@ -23,7 +23,11 @@ export interface ChatTextMatch {
   readonly end: number
 }
 
-/** Whether a query is searchable: non-empty after trimming. */
+/**
+ * Whether a query is searchable: non-empty after trimming.
+ * @param query - the raw query text.
+ * @returns true when the query contains any non-whitespace character.
+ */
 export function isSearchable(query: string): boolean {
   return query.trim() !== ''
 }

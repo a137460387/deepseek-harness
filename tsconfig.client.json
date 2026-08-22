@@ -27,6 +27,7 @@
     "packages/extensions/ui-cordis/src/css-modules.d.ts",
     "packages/extensions/text-file-cards/src/css-modules.d.ts",
     "packages/extensions/usage-stats/src/css-modules.d.ts",
+    "packages/extensions/find-in-chat/src/css-modules.d.ts",
     "packages/client/tsdown.client.ts",
     "scripts/client-build-environment.ts",
     "scripts/*.client.spec.ts",
