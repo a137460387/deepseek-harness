@@ -26,6 +26,9 @@ import type {
   SessionId,
   TodoItem,
 } from '@deepseek-ai/dsh-session/types'
+// Type-only: the `compaction/summary` SessionEventMap merge (summarizer
+// usage), from the cordis-free /types leaf rather than the host-side root.
+import type {} from '@deepseek-ai/dsh-compaction/types'
 // Type-only: the brand constructor is host-side; the fixture casts at its
 // wire-fabrication boundary (the schema layer's one-cast-point posture).
 import type { CommandId } from '@deepseek-ai/dsh-commands/brand'
@@ -856,8 +859,7 @@ function usageSampleOf(event: SessionEvent): FixtureUsageSample | undefined {
 
 /** Read a compaction summary's own usage, when the summarizer reported one. */
 function summaryUsageOf(event: SessionEvent): TokenUsage | undefined {
-  const item = event as unknown as { type: string; data: { usage?: TokenUsage } }
-  return item.type === 'compaction/summary' ? item.data.usage : undefined
+  return event.type === 'compaction/summary' ? event.data.usage : undefined
 }
 
 /** Fixture parallel of token-meter's last-sample-replacing usage projection. */
