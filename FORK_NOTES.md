@@ -27,9 +27,10 @@
 
 - **重新构建 fork 扩展包后必须重启长驻的 `dsh web` 进程**(第二次踩同型坑：8/20 一次是旧进程不刷新新 UI、静默服务旧版本，8/21 一次是浏览器端直接报错)——进程的 client boot 图在启动时固化，而 `/plugins/*/client.js` 路由每次请求都从磁盘现读，旧图配新 bundle 时，消费新供给行(新增或修改了 `dsh.client.external` 模块请求)的包在加载期报"模块表缺失"，浏览器端呈现 "Failed to load plugins" 失败页；该报错文案中的 "build-time externals drift" 措辞有误导性——实际是进程比磁盘产物旧，与构建配置无关；排查：用 netstat 定位监听目标端口的 PID 并核对其启动时间是否早于本次改动，是则停掉旧进程重启。
 
-## Upstream 同步基线（2026-08-22 已核实）
+## Upstream 同步基线（2026-08-23 已核实）
 
-- 当前基线：`upstream/master` = `b150a551b8`（tag `dsh-v0.1.1-rc.2`），fork 落后 0 提交、领先 36 提交；`99f6f02fec`（rc.7）是其祖先——上游自 rc.7 起 fast-forward +743 提交，master 历史从未重写；fork 对上游的净差为 146 文件、+8,466/-71。
+- 当前基线：`upstream/master` = `b150a551b8`（tag `dsh-v0.1.1-rc.2`），fork 落后 0 提交、领先 60 提交；`99f6f02fec`（rc.7）是其祖先——上游自 rc.7 起 fast-forward +743 提交，master 历史从未重写；fork 对上游的净差为 207 文件、+13,012/-72。快照语义：本节计数是审计时点快照，随每次交付自然漂移；稳定锚点是 merge-base 与 tag，计数由每次全量审计刷新，日常不做逐提交核对。
+- 2026-08-23 全量审计（只读）：双红发现均为未登记文档漂移，已补登入「已知本地补丁」；上游零演进；lint 金丝雀绿。
 - 2026-08-22 审计的「上游谱系漂移」（中等风险）已核实关闭：假象来自本地 upstream 引用过期叠加 raw.githubusercontent CDN 缓存返回 rc.7 时代的文件内容，与 git 对象证据矛盾。
 - 教训：判断上游状态一律以 `git fetch` 之后的本地 git 对象为准，禁止依赖 raw/CDN 网页内容下结论。
 
@@ -66,6 +67,7 @@
 - **交付汇总披露纪律**：交付汇总必须披露三类偏离，缺一即视为验收未完成：计数偏离（提交数/断言数与规格不符）；分支证据（预授权是否按授权范围执行）；duplication 判定（克隆检测命中及豁免理由）（交付记录）。
 - **实施期修正并入未推送提交**：主序列尚未推送时，实现级修正 amend 进对应主提交，保持提交分界与规格段落一致；已推送后一律新起提交。唯一改写已推送历史的例外是接手他人未收尾的 WIP 检查点（见三轮演进 draft-keeper 条），且必须走侧枝备份 + 强推。
 - **门修复独立成笔**：验收阶段暴露的门失败，修复独立成提交、不折进主序列——先例 `134593bd79`（oxlint）、`c9cfc288be`（gate suite）、`2baed59f30`（slot-catalog 再生成）。
+- **演示媒体入册 demo-assets 孤儿分支**：演示 GIF/截图一律提交到 `demo-assets` 孤儿分支（不带主历史），不留本机路径——媒体产物不进 git 则跨机即蒸发；展示帖引用该分支上的 raw URL。
 
 ### 跨机协作惯例（2026-08-23 新增先例）
 
@@ -79,6 +81,8 @@
 - **InputBar 稳定选择器**：`packages/client/ui-conversation/src/client/skeleton/InputBar.tsx` 的 `data-dsh-composer=""` 单行注入（`global-paste`、`text-file-cards`、`input-history-recall` 经 `textarea[data-dsh-composer]` 定位 composer）。当前与上游的净差仅此 1 行；状态：已上报 Discussions [#3981](https://github.com/deepseek-ai/deepseek-harness/discussions/3981) 请求官方稳定 composer 标记或公开定位 API；采纳前维持单行注入并按上方合并收尾清单必查。
 - **web e2e scaffold Windows 修复**：`apps/web/tests/scaffold.ts` 的 `jsonLiteral` 占位符替换（Windows 反斜杠 cwd 裸拼接产生非法 JSON 转义，曾致 25 个 e2e 整文件失败；POSIX 上为恒等变换）；状态：已上报 Discussions [#3983](https://github.com/deepseek-ai/deepseek-harness/discussions/3983)（修复分支 `upstream-pr/windows-e2e-json-escape` 已推送 origin）。
 - **slot-catalog 再生成**：`packages/extensions/cordis-client-runner/src/client/slot-catalog.ts` 是脚本再生成产物而非手工补丁，与上游的冲突以重新生成解决（见上方同步操作纪律）。
+- **AGENTS.md 布局树对齐**（commits `f5b2450a1e` + `fade335c87`，净差 +53/-36）：`AGENTS.md`——`f5b2450a1e` 加一行「Fork 专属约束见根目录 FORK_NOTES.md」指针；`fade335c87` 把 Repository layout 的 packages 清单重写为实际包组（上游 tip 的 AGENTS.md 自身为旧布局，漏 goal/、schedule/、feedback/、host/、client/、session-query/ 等已存在包组，含「Package groups and their roles」措辞行）；其余 +1/-1 来自 `853af3552e` 合并解决。性质：fork 侧修正上游过期文档，无行为改动。状态：未上报——纯文档修补（上游 tip 的 AGENTS.md 自身为旧布局），fork 侧自用修正，无上报价值。
+- **上游包文档补缺**（commit `ab92e78ac8`）：`packages/README.md`（+3/-1）、`packages/README.zh.md`（+3/-1）、`packages/README.i18n.yaml`（+2/-2）各补 mcp 与 runtime-diagnostics 两行组表行（上游组表漏自家两包）；新建 `packages/runtime-diagnostics/README.md`（+9）、`packages/runtime-diagnostics/README.zh.md`（+9）、`packages/runtime-diagnostics/README.i18n.yaml`（+6）三文件（该上游包原无 README）。性质：满足 doc/pairing 门对全部包的枚举要求，无行为改动。状态：未上报——纯文档修补，fork 侧自用修正，无上报价值。
 
 ## 上游 FR 与 endorsement 登记（fork 发起的上游互动，2026-08-23 立册）
 
