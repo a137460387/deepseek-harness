@@ -1,0 +1,20 @@
+/* The draft-budget readout: a muted small line in the composer dock, shaped
+   like the stats line's joined groups. */
+
+.readout {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.tokens {
+  font-variant-numeric: tabular-nums;
+}
+
+.afterSend {
+  color: var(--dsw-alias-label-dimmed);
+}

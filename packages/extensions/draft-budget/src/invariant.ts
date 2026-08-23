@@ -18,10 +18,10 @@ export const inject = ['invariants']
 /**
  * No runtime invariant: every observable the readout consumes arrives as
  * slot props (the dock's InputZone share and the session projection hook),
- * so the plugin registers no listener, observer, or subscription — its two
- * ctx.effect registrations (dictionaries and the dock entry) both return
- * their disposers and nothing else outlives the plugin fiber. An explained
- * empty companion is the correct shape here.
+ * so the plugin registers no listener, observer, or subscription — the
+ * dictionary effect returns its disposer and the dock entry rides a
+ * declaration-bound slots injection whose controller belongs to this
+ * plugin's fiber. An explained empty companion is the correct shape here.
  */
 const install: InvariantInstaller = () => {}
 
