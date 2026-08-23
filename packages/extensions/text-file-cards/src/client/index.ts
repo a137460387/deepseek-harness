@@ -157,7 +157,18 @@ export function apply(ctx: ClientContext): void {
         const input = ctx.conversation.input.for(actx)
         const before = input.state.getSnapshot()
         if (before.phase === 'adjudicating' || before.phase === 'submitting') return
-        const content = await entry.file.text()
+        let content: string
+        try {
+          content = await entry.file.text()
+        } catch {
+        // The staged file's read rejected (its OS file vanished since the
+        // drop, or the browser revoked the blob). Nothing else can reach
+        // here — the read is the only throwing step. Fail soft the way
+        // global-paste's image forward does: the card stays staged so the
+        // user can retry or remove it, and the slot inject path must not
+        // throw through the dock's click handler.
+          return
+        }
         // Re-check after the async read: a submit may have started while the
         // file was being read, and the session-level locks may have turned
         // (removal, a lost parent).

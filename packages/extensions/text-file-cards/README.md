@@ -23,7 +23,7 @@ Because the takeover stops the drop from reaching the composer's own handler and
 
 ## Staging model
 
-A staged file is held WHOLE (the `File` object, not its content), keyed by session id in a registrant-owned snapshot store that rides the dock registration's `hooks` compartment. The content is read only when the user expands a card; the read re-checks the input machine and the session-level locks afterwards and abandons the expansion if a submit began or a lock turned (removal, a lost parent) meanwhile. Additions prune entries of sessions that no longer exist.
+A staged file is held WHOLE (the `File` object, not its content), keyed by session id in a registrant-owned snapshot store that rides the dock registration's `hooks` compartment. The content is read only when the user expands a card; the read re-checks the input machine and the session-level locks afterwards and abandons the expansion if a submit began or a lock turned (removal, a lost parent) meanwhile. A read that rejects (the OS file vanished or the browser revoked the blob) fails soft: the card stays staged for a retry or removal, and the click path never throws. Additions prune entries of sessions that no longer exist.
 
 ## Model Experience
 
