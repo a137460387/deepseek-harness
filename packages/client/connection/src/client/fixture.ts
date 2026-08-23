@@ -862,8 +862,16 @@ function summaryUsageOf(event: SessionEvent): TokenUsage | undefined {
   return event.type === 'compaction/summary' ? event.data.usage : undefined
 }
 
-/** Fixture parallel of token-meter's last-sample-replacing usage projection. */
-function tokenUsageOf(log: readonly SessionEvent[]): FixtureTokenUsageProjection {
+/**
+ * Fixture parallel of token-meter's last-sample-replacing usage projection
+ * (exported for the usage-mirror contract spec, which folds the same corpus
+ * through the real `tokenUsageProjectionDefinition` and refuses drift —
+ * most importantly the compaction-summary full-amount branch both sides
+ * carry).
+ * @param log - the whole session log to fold.
+ * @returns the four usage totals over the log.
+ */
+export function tokenUsageOf(log: readonly SessionEvent[]): FixtureTokenUsageProjection {
   const totals: FixtureTokenUsageProjection = {
     uncachedInputTokens: 0,
     outputTokens: 0,
