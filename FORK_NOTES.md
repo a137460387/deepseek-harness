@@ -37,6 +37,18 @@
 
 上游 CONTRIBUTING 声明当前不接受外部 PR；外部贡献走 GitHub Discussions（bug 上报/特性请求）与社区插件生态，修复以 fork 分支链接的形式附在帖子中。因此本文件的本地补丁登记是当前政策下的稳态实践而非过渡措施——每条补丁的上报状态登记在「已知本地补丁」条目内，上游若在 master 落地对应修复，按同步纪律合并后撤本地补丁。
 
+## Fork 扩展交付流程（七步，2026-08-23 沉淀）
+
+从 draft-keeper（[#3999](https://github.com/deepseek-ai/deepseek-harness/discussions/3999)）、find-in-chat（[#4029](https://github.com/deepseek-ai/deepseek-harness/discussions/4029)）、draft-budget（[#4138](https://github.com/deepseek-ai/deepseek-harness/discussions/4138)）三次完整交付沉淀；每步裁决的理由归各特性 Agent Note，本节只立流程规则。
+
+1. **调研（双源查重）**：选题先在两个源上查重——上游面（最新 release 与 master 是否已提供该表面：slot、公开服务、设置项）与社区面（官方 Discussions "Show Your Plugins!" 语料与 awesome 类清单）。双源皆空才立项；调研结论与复查日期记入特性 Agent Note 的 Problem 段（先例：draft-budget Note 的 top-2 gap 评分）。
+2. **技术核实**：确认需求只走官方缝隙即可实现（先例：input-state store 与 `setDraft`、`conversation.composer.dock` 座位、document 捕获监听器）；任何触碰包私有实现的路线（如 `InputMachine`）触发上方禁改条款，改走 `patches/` 或上游提案，不得默默改核心。
+3. **规格展开**：动工前把决策写成完整规格——包名与档位（纯浏览器包/双面包/库供给行）、缝隙与注册形状（slot id、order、locale 字典）、行为边界与降级路径、测试计划（单测 + 真浏览器 e2e + invariant 伴生）、双语 README。
+4. **人工批复**：规格须经维护者批复后才动工——单人维护加 agent 执行的流程里，这是实施前唯一的人工决策点；未批复的规格不进入提交。
+5. **实施（四笔主提交 + 门修复）**：按 scaffold → feat(core) → test → docs 四笔主提交推进；门修复与 slot-catalog 再生成各自独立成提交（先例：`134593bd79`、`c9cfc288be`、`2baed59f30`），不折进主提交。全程纪律：零 `any`、零 skip 测试、零新增外部依赖、注册一律 `ctx.effect` 带 teardown。
+6. **验收（逐门真实退出码 + 基线失败文件集对照）**：每个门单独执行并记录真实退出码，禁止管道吞码。Windows 本机已知失败白名单仅三类：symlink EPERM（本机无 symlink 权限）、POSIX 信号/进程树语义失败、负载抖动（隔离重跑可绿）；对照法：把当前失败文件集与白名单基线比对，白名单外的失败文件必须先归因才能收尾。doc-sync 唯一许可残留是 doc-site 门的 symlink EPERM 环境项。
+7. **发布（展示帖 + GIF）**：成品按上方贡献政策以官方 Discussions "Show Your Plugins!" 类目展示帖发布，附演示 GIF，发布后把帖子 URL 追加进本节开头的先例列表。上游若原生落地同类功能，对应插件退役而非竞争（draft-keeper 与 draft-budget 两篇 Note 的 Consequences 均载此原则）。
+
 ## 已知本地补丁（fork 对上游文件的直接修改）
 
 - **token-meter compaction 用量修复**（commit `016d287703`）：`packages/llm/token-meter/src/usage-projection.ts`（tokenUsage `stateVersion` 1→2、`compaction/summary` 用量全额累计分支）+ 同包 `token-usage-projection.spec.ts` + token-meter README×3 + `packages/client/connection/src/client/fixture.ts` 镜像分支。已核实 `b150a551b8` 不含此修复；状态：已上报 Discussions [#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886)（评论 [discussioncomment-18113603](https://github.com/deepseek-ai/deepseek-harness/discussions/1886#discussioncomment-18113603)，与既有 fork 实现 63688b0 语义对比一并附上；修复分支 `upstream-pr/token-meter-compaction-usage` 已推送 origin）。上游若自行修复，diff 语义等价后撤本地补丁。fixture.ts 在 fork master 上另含 `9dbb6f2f66` 的类型窄化足迹（`dsh-compaction/types` type-only 导入、connection 的 peer+dev 依赖声明、`tsconfig.client.json` 工程引用、lockfile importer 记录）——均为 fork 侧写法偏好，不随上报内容提交（上报内容的 fixture.ts 保留 `as unknown as` 断言，与文件内 `usageSampleOf` 惯用法一致）。
