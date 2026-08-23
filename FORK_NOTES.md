@@ -86,10 +86,11 @@
 
 ## 上游 FR 与 endorsement 登记（fork 发起的上游互动，2026-08-23 立册）
 
-登记格式沿用「已知本地补丁」的上报状态条款；区别在于这些是 fork 主动发起的上游请求，不附本地修改。路线图「两个上游 FR」当日双双落地（其一因查重改为 endorsement 形态）。
+登记格式沿用「已知本地补丁」的上报状态条款；区别在于这些是 fork 主动发起的上游请求或对上游线程的应答，不附本地修改。路线图「两个上游 FR」当日双双落地（其一因查重改为 endorsement 形态）。
 
 - **jobs remove FR（「两个上游 FR」之一）**：请求 `jobs.remove` 式 API（host + client 面）删除终态作业记录（store 与 UI 列表），运行中作业的 remove 语义（拒绝或隐式 cancel-then-remove）留作帖内开放讨论；帖子合并两笔痛点载体——#1204（UI 侧删除缺失）与 #3994（store 侧回收缺失、O(n) 扫描），并显式划界 cancel 不在范围（producer 层 `cancel()` 已存在，#4109 是该路径的 bug，#1517 是 managed jobs 讨论）。前置查重零等价命中：issues/PR 六组词全零（jobs cancel / jobs remove / kill job / abort job / stop job / cancel run），Discussions 无等价 FR；状态：已提交 Discussions [#4165](https://github.com/deepseek-ai/deepseek-harness/discussions/4165)（Ideas 类目，2026-08-23，Title「An API to remove terminal job records (distinct from cancel)」）。上游提供 jobs.remove 后，jobs cancel 与 host 双面档规划获得 API 前置。
 - **session unarchive endorsement（「两个上游 FR」之二，形态因查重改为 endorsement）**：查重发现该方向已有四个等价 open FR（#3892/#2613/#1147/#1991），按查重纪律不另提新帖，改在证据最全的 #3892 下增量评论——此为「双源查重 → 分支策略（新帖 vs endorsement）」的分叉先例；状态：已评论 [discussioncomment-18122034](https://github.com/deepseek-ai/deepseek-harness/discussions/3892#discussioncomment-18122034)（2026-08-23，+1 并附三点合并信号：四帖重复请求宜合并跟踪；社区补位插件 #2076 archive-manager、#2221/#2223 dsh-archived-chats、#2010 dsh-shelf 证明真实需求；#1147 引上游代码注释说明 unarchive 属既定方向）。上游 `unarchiveSession` 落地后会话恢复规划解锁、社区 shim 可退役。
+- **1886 合成 fixture 对拍应答**：应答 lizhuojunx86 8/23 roll-up 的对拍提议（共享合成 fixture、不用私人语料），交付线程内首份实现侧 fixture 数字。要点：compaction 桶增量 +31/+9/+37/+6 与 seq14 一条 `compaction/summary.usage` 精确一致（roll-up 点名「须与 63688b0 严格一致」的桶）；child owned 逐桶精确一致（41/10/43/7）；parent/aggregate 差值恰为声明不做的 retry 维度（7/2/5/1，机制已 stepwise trace：seq4 累入、seq8 替换、seq10 等值去重）；child 全量折叠 141/22/63/10 量化 fork-seed 维度（raw−owned = 100/12/20/3 = turn1，即 inherited seed 重复计费）。方法：fixture 为最小投影输入、不可过 `SessionStore.append`，直接对 `tokenUsageProjectionDefinition` 做 init/apply 折叠；child 按 README rule 4 于输入侧切分（`seq >= seedLength`）；Node v24.14.1。状态：已评论 [#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886)（[discussioncomment-18122813](https://github.com/deepseek-ai/deepseek-harness/discussions/1886#discussioncomment-18122813)，含完整数字表与可证伪预测：retry-aware 折叠应精确落在 expected 的 parent/aggregate）。后续条件：上游采纳任一含 compaction 全额折叠的修复 → `upstream-pr/token-meter-compaction-usage` 分支退役（与「已知本地补丁」①的退役条款同型）；PR 通道开放且我方实现被点名 → 提 PR；跟踪评论后续回应，含 63688b0 侧 fixture 数字是否落地。
 
 ## Fork 课题待办
 
