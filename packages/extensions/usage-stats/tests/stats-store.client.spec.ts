@@ -29,6 +29,8 @@ function fakeApi(options: {
   rows: Row[]
   historyValues?: Record<string, Record<string, unknown>>
   historyThrow?: string[]
+  /** Refuse the history call for these sessions with a server error. */
+  historyError?: string[]
   /** Throw on the first history call per session only, then succeed. */
   historyFlaky?: string[]
   listError?: string
@@ -56,6 +58,9 @@ function fakeApi(options: {
       await new Promise(resolve => setTimeout(resolve, 0))
       inFlight -= 1
       if (options.historyThrow?.includes(payload.sessionId)) throw new Error('history failed')
+      if (options.historyError?.includes(payload.sessionId)) {
+        return { rpcId: 'r', result: { ok: false as const, error: { code: 'internal', message: 'history refused', details: {} } } }
+      }
       if (flakyRemaining.has(payload.sessionId)) {
         flakyRemaining.delete(payload.sessionId)
         throw new Error('history failed')
@@ -129,6 +134,53 @@ describe('UsageStatsController', () => {
     expect(state.values.b).toEqual(VALUE)
     expect(state.failedCount).toBe(1)
     expect(state.absentCount).toBe(0)
+  })
+
+  it('counts a refused history backfill as failed, not absent', async () => {
+    const { api } = fakeApi({
+      rows: [{ sessionId: 'a', projections: { asOfSeq: 1, values: {} } }],
+      historyError: ['a'],
+    })
+    const controller = new UsageStatsController(api)
+    await controller.load()
+    const state = controller.store.getSnapshot()
+    expect(state.status).toBe('ready')
+    expect(state.absentCount).toBe(0)
+    expect(state.failedCount).toBe(1)
+    expect(state.values.a).toEqual({ quarters: {} })
+  })
+
+  it('keeps the hint input empty when every backfill errored', async () => {
+    const { api } = fakeApi({
+      rows: [
+        { sessionId: 'a', projections: { asOfSeq: 1, values: {} } },
+        { sessionId: 'b', projections: { asOfSeq: 1, values: {} } },
+      ],
+      historyThrow: ['a'],
+      historyError: ['b'],
+    })
+    const controller = new UsageStatsController(api)
+    await controller.load()
+    const state = controller.store.getSnapshot()
+    // Two unknowns, zero confirmations: absentCount === sessionCount (the
+    // section's unregistered-hint predicate) cannot hold on errors alone.
+    expect(state.sessionCount).toBe(2)
+    expect(state.absentCount).toBe(0)
+    expect(state.failedCount).toBe(2)
+  })
+
+  it('re-backfills a confirmed-absent session on the next load instead of caching it', async () => {
+    const { api, historyCalls } = fakeApi({
+      rows: [{ sessionId: 'a', projections: { asOfSeq: 1, values: {} } }],
+      historyValues: { a: {} },
+    })
+    const controller = new UsageStatsController(api)
+    await controller.load()
+    await controller.load()
+    // Absence is a per-composition fact, not a value to reuse: every load
+    // re-checks it, so a unit registered after the first open is seen.
+    expect(historyCalls()).toEqual(['a', 'a'])
+    expect(controller.store.getSnapshot().absentCount).toBe(1)
   })
 
   it('bounds the history backfill in-flight count', async () => {
