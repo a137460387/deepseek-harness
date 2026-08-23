@@ -80,6 +80,13 @@
 - **web e2e scaffold Windows 修复**：`apps/web/tests/scaffold.ts` 的 `jsonLiteral` 占位符替换（Windows 反斜杠 cwd 裸拼接产生非法 JSON 转义，曾致 25 个 e2e 整文件失败；POSIX 上为恒等变换）；状态：已上报 Discussions [#3983](https://github.com/deepseek-ai/deepseek-harness/discussions/3983)（修复分支 `upstream-pr/windows-e2e-json-escape` 已推送 origin）。
 - **slot-catalog 再生成**：`packages/extensions/cordis-client-runner/src/client/slot-catalog.ts` 是脚本再生成产物而非手工补丁，与上游的冲突以重新生成解决（见上方同步操作纪律）。
 
+## 上游 FR 与 endorsement 登记（fork 发起的上游互动，2026-08-23 立册）
+
+登记格式沿用「已知本地补丁」的上报状态条款；区别在于这些是 fork 主动发起的上游请求，不附本地修改。路线图「两个上游 FR」当日双双落地（其一因查重改为 endorsement 形态）。
+
+- **jobs remove FR（「两个上游 FR」之一）**：请求 `jobs.remove` 式 API（host + client 面）删除终态作业记录（store 与 UI 列表），运行中作业的 remove 语义（拒绝或隐式 cancel-then-remove）留作帖内开放讨论；帖子合并两笔痛点载体——#1204（UI 侧删除缺失）与 #3994（store 侧回收缺失、O(n) 扫描），并显式划界 cancel 不在范围（producer 层 `cancel()` 已存在，#4109 是该路径的 bug，#1517 是 managed jobs 讨论）。前置查重零等价命中：issues/PR 六组词全零（jobs cancel / jobs remove / kill job / abort job / stop job / cancel run），Discussions 无等价 FR；状态：已提交 Discussions [#4165](https://github.com/deepseek-ai/deepseek-harness/discussions/4165)（Ideas 类目，2026-08-23，Title「An API to remove terminal job records (distinct from cancel)」）。上游提供 jobs.remove 后，jobs cancel 与 host 双面档规划获得 API 前置。
+- **session unarchive endorsement（「两个上游 FR」之二，形态因查重改为 endorsement）**：查重发现该方向已有四个等价 open FR（#3892/#2613/#1147/#1991），按查重纪律不另提新帖，改在证据最全的 #3892 下增量评论——此为「双源查重 → 分支策略（新帖 vs endorsement）」的分叉先例；状态：已评论 [discussioncomment-18122034](https://github.com/deepseek-ai/deepseek-harness/discussions/3892#discussioncomment-18122034)（2026-08-23，+1 并附三点合并信号：四帖重复请求宜合并跟踪；社区补位插件 #2076 archive-manager、#2221/#2223 dsh-archived-chats、#2010 dsh-shelf 证明真实需求；#1147 引上游代码注释说明 unarchive 属既定方向）。上游 `unarchiveSession` 落地后会话恢复规划解锁、社区 shim 可退役。
+
 ## Fork 课题待办
 
 ### UI 插件开关(2026-08-18 评估，暂不启动)
