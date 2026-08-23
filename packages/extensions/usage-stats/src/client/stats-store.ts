@@ -27,11 +27,17 @@ export interface UsageStatsSectionState {
   /** Sessions the last load observed. */
   sessionCount: number
   /**
-   * Sessions where even the history backfill served no `usageStats` key —
-   * the host composition does not register the unit when this equals
-   * `sessionCount`.
+   * Sessions the history backfill CONFIRMED without the `usageStats` key (an
+   * ok tail page folds every registered unit) — the host composition does not
+   * register the unit when this equals `sessionCount`.
    */
   absentCount: number
+  /**
+   * Sessions whose history backfill errored instead (a refused call or a
+   * transport throw): their registration status is unknown, they never enter
+   * the backfill cache, and a later load retries them.
+   */
+  failedCount: number
 }
 
 const INITIAL: UsageStatsSectionState = {
@@ -40,6 +46,7 @@ const INITIAL: UsageStatsSectionState = {
   values: {},
   sessionCount: 0,
   absentCount: 0,
+  failedCount: 0,
 }
 
 /**
@@ -136,11 +143,14 @@ export class UsageStatsController {
   /**
    * Gather every session's usage value: the list baseline first, then a
    * bounded-concurrency history backfill for sessions whose baseline lacked
-   * the key and no completed backfill is cached. A backfill that also lacks
-   * the key counts toward `absentCount` — the host folds every registered
-   * unit into the tail page, so an absent key there means the unit is not
-   * composed. A single unreadable session contributes an empty value instead
-   * of failing the page.
+   * the key and no completed backfill is cached. An ok backfill that still
+   * lacks the key counts toward `absentCount` — the host folds every
+   * registered unit into the tail page, so an absent key there means the unit
+   * is not composed. An errored backfill (a refused call or a transport
+   * throw) counts toward `failedCount` instead: its registration status is
+   * unknown, so it must not feed the unregistered hint, and it is retried on
+   * the next load. A single unreadable session contributes an empty value
+   * instead of failing the page.
    */
   async load(): Promise<void> {
     if (this.running) return
@@ -162,22 +172,32 @@ export class UsageStatsController {
         else missing.push(item.sessionId)
       }
       let absentCount = 0
+      let failedCount = 0
       await pool(missing, BACKFILL_CONCURRENCY, async (sessionId) => {
         try {
           const history = await this.api.history({ sessionId })
-          const value = history.result.ok ? history.result.value.projections?.values.usageStats : undefined
+          if (!history.result.ok) {
+            // A refused call says nothing about registration; keep it out of
+            // absentCount so the unregistered hint cannot fire on errors.
+            values[sessionId] = { quarters: {} }
+            failedCount += 1
+            return
+          }
+          const value = history.result.value.projections?.values.usageStats
           if (isUsageStats(value)) {
             // Only the load's own generation may repopulate the cache reset()
             // cleared; after a reset the entry belongs to the dead connection.
             if (this.generation === generation) this.backfilled.set(sessionId, value)
             values[sessionId] = value
           } else {
+            // An ok tail page folds every registered unit, so a missing key
+            // there means the unit is not composed for the session.
             values[sessionId] = { quarters: {} }
             absentCount += 1
           }
         } catch {
           values[sessionId] = { quarters: {} }
-          absentCount += 1
+          failedCount += 1
         }
       })
       // A reset landed while this load was in flight: its result belongs to
@@ -193,6 +213,7 @@ export class UsageStatsController {
         values,
         sessionCount: items.length,
         absentCount,
+        failedCount,
       })
     } catch (error) {
       // A stale load reports nothing: the reset already owns the snapshot.
@@ -203,6 +224,7 @@ export class UsageStatsController {
         values: previous.values,
         sessionCount: previous.sessionCount,
         absentCount: previous.absentCount,
+        failedCount: previous.failedCount,
       })
     } finally {
       // A stale load must not release a newer load's running flag.

@@ -2,11 +2,12 @@
  * The section controller: the list baseline is the fast path, sessions whose
  * baseline predates the unit are backfilled through the history tail page at
  * a bounded in-flight cap, completed backfills are reused on later loads
- * while the baseline still lacks the key (failures are retried instead), an
- * absent key even there counts toward the composition hint, single-session
- * failures degrade to empty values instead of failing the page, list
- * failures surface as the error status, overlapping loads collapse to
- * one run, and a load that completes after a reset is discarded.
+ * while the baseline still lacks the key, an ok backfill still lacking the
+ * key counts toward the composition hint while an errored backfill (refused
+ * call or transport throw) stays out of it and is retried instead,
+ * single-session failures degrade to empty values instead of failing the
+ * page, list failures surface as the error status, overlapping loads
+ * collapse to one run, and a load that completes after a reset is discarded.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -107,6 +108,7 @@ describe('UsageStatsController', () => {
     const state = controller.store.getSnapshot()
     expect(state.status).toBe('ready')
     expect(state.absentCount).toBe(1)
+    expect(state.failedCount).toBe(0)
     expect(state.values.a).toEqual({ quarters: {} })
   })
 
@@ -125,6 +127,8 @@ describe('UsageStatsController', () => {
     expect(state.status).toBe('ready')
     expect(state.values.a).toEqual({ quarters: {} })
     expect(state.values.b).toEqual(VALUE)
+    expect(state.failedCount).toBe(1)
+    expect(state.absentCount).toBe(0)
   })
 
   it('bounds the history backfill in-flight count', async () => {
@@ -206,6 +210,7 @@ describe('UsageStatsController', () => {
       values: {},
       sessionCount: 0,
       absentCount: 0,
+      failedCount: 0,
     })
     await controller.load()
     expect(historyCalls()).toEqual(['a', 'a'])
@@ -237,6 +242,7 @@ describe('UsageStatsController', () => {
       values: {},
       sessionCount: 0,
       absentCount: 0,
+      failedCount: 0,
     })
   })
 

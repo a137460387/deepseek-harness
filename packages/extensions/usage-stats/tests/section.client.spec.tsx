@@ -71,6 +71,7 @@ describe('UsageStatsSection', () => {
       values: { session: valueAt(today, 'deepseek', 'deepseek-chat', 1_000) },
       sessionCount: 1,
       absentCount: 0,
+      failedCount: 0,
     })
 
     // buckets(1000) sums to 2000 tokens per sample; the figure surfaces on
@@ -95,6 +96,7 @@ describe('UsageStatsSection', () => {
       values: { session: valueAt(todayUtc(), 'deepseek', 'deepseek-chat', 100) },
       sessionCount: 1,
       absentCount: 0,
+      failedCount: 0,
     })
 
     const daily = screen.getByRole('button', { name: '每日' })
@@ -126,6 +128,7 @@ describe('UsageStatsSection', () => {
       values: {},
       sessionCount: 0,
       absentCount: 0,
+      failedCount: 0,
     })
     expect(screen.getByText('读取用量失败：boom')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '重试' }))
@@ -139,6 +142,7 @@ describe('UsageStatsSection', () => {
       values: { session: { quarters: {} } },
       sessionCount: 1,
       absentCount: 1,
+      failedCount: 0,
     })
     expect(screen.getByText(/当前组合未注册 usageStats/)).toBeTruthy()
   })
@@ -150,6 +154,7 @@ describe('UsageStatsSection', () => {
       values: {},
       sessionCount: 0,
       absentCount: 0,
+      failedCount: 0,
     })
     const placeholders = screen.getAllByText('还没有任何用量记录。')
     expect(placeholders.length).toBeGreaterThanOrEqual(2)
@@ -163,6 +168,7 @@ describe('UsageStatsSection', () => {
       values: {},
       sessionCount: 0,
       absentCount: 0,
+      failedCount: 0,
     })
     expect(load).toHaveBeenCalledTimes(1)
   })
