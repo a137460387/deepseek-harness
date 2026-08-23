@@ -153,4 +153,18 @@ describe('web e2e: text-file drop staging cards', () => {
     expect(await page.getByText(IMAGE_TOAST).count()).toBe(0)
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
+
+  it('stages a text file dropped on the composer card itself, not just the conversation area', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-text-cards-card-drop'))
+    const before = await page.locator('textarea[data-dsh-composer]').inputValue()
+    // The card is the drop target users aim at most; the takeover must own it
+    // exactly like a drop on the conversation area (whole-window zone). Runs
+    // last because the staged card outlives the scenario by design.
+    const flags = await dropFile(page, '[data-composer-card]', { name: 'card.md', content: 'dropped on the card', type: 'text/markdown' })
+    expect(flags.dropPrevented).toBe(true)
+    await page.getByRole('button', { name: 'Insert file card.md into the draft' }).waitFor({ timeout: 5_000 })
+    expect(await page.locator('textarea[data-dsh-composer]').inputValue()).toBe(before)
+    expect(await page.getByText(IMAGE_TOAST).count()).toBe(0)
+    expect(tripwire.pageErrors).toEqual([])
+  }, 60_000)
 })

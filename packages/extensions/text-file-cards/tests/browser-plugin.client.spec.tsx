@@ -4,10 +4,14 @@
  * conversation faces and the real SlotRegistry/LocaleRuntime: the drop
  * listener stages pure text-file batches as card state (never the draft),
  * applies the size/batch ceilings with input notices, leaves images, mixed
- * batches, busy machines, masked composers, removed sessions, and offline
- * continuable children to native handling, and the dock's inject face expands
- * a card into the draft or unstages it (a rejected read fails soft with the
- * card kept). The dock component renders the staged
+ * batches, busy machines, masked composers, removed sessions, offline
+ * continuable children, a null dataTransfer, and an empty batch to native
+ * handling, and the dock's inject face expands a card into the draft or
+ * unstages it (a rejected read fails soft with the card kept; a machine that
+ * turns busy during the read abandons the expansion; a composer unmounted
+ * during the read still gets the draft edit without the focus; an
+ * empty-content file expands to a header-only block). The dock component
+ * renders the staged
  * row (empty renders nothing). Registration disposal rides the plugin fiber
  * (HMR safety). The node half and the invariant companion are exercised over
  * the same Context.
@@ -273,6 +277,26 @@ describe('text-file-cards drop takeover', () => {
     await b.fiber.dispose()
   })
 
+  it('ignores a drop that carries no dataTransfer', async () => {
+    const b = await bench()
+    const drop = new Event('drop', { bubbles: true, cancelable: true })
+    Object.defineProperty(drop, 'dataTransfer', { value: null, configurable: true })
+    document.body.dispatchEvent(drop)
+    expect(drop.defaultPrevented).toBe(false)
+    await settle()
+    expect(b.stagedState().bySession).toEqual({})
+    await b.fiber.dispose()
+  })
+
+  it('leaves an empty-batch drop to native handling', async () => {
+    const b = await bench()
+    const event = dispatchDrop([], document.body)
+    expect(event.defaultPrevented).toBe(false)
+    await settle()
+    expect(b.stagedState().bySession).toEqual({})
+    await b.fiber.dispose()
+  })
+
   it('leaves a drop through when the session is removed', async () => {
     const b = await bench({ removed: true })
     const event = dispatchDrop([new File(['hi'], 'a.txt', { type: 'text/plain' })], document.body)
@@ -376,6 +400,60 @@ describe('text-file-cards inject face', () => {
     await expect(b.face().expand(entry.id)).resolves.toBeUndefined()
     expect(b.input.setDraft).not.toHaveBeenCalled()
     expect(b.stagedState().bySession[SESSION]?.length).toBe(1)
+    await b.fiber.dispose()
+  })
+
+  it('abandons an expand when the machine turns busy during the read', async () => {
+    const b = await bench()
+    const file = new File(['world'], 'note.txt', { type: 'text/plain' })
+    let release!: (text: string) => void
+    file.text = () => new Promise((resolve) => { release = resolve })
+    dispatchDrop([file], document.body)
+    await settle()
+    const entry = b.stagedState().bySession[SESSION]?.[0]
+    if (entry === undefined) throw new Error('staging failed')
+    const pending = b.face().expand(entry.id)
+    // The pre-read checks passed while plain; the machine flips to submitting
+    // before the read settles — the post-read recheck must bail, and the
+    // card must survive for a retry once the machine is plain again.
+    b.input.state.set({ draft: '', phase: 'submitting' })
+    release('world')
+    await pending
+    expect(b.input.setDraft).not.toHaveBeenCalled()
+    expect(b.stagedState().bySession[SESSION]?.length).toBe(1)
+    await b.fiber.dispose()
+  })
+
+  it('still expands but skips focus when the composer unmounts during the read', async () => {
+    const b = await bench()
+    const file = new File(['hi'], 'note.txt', { type: 'text/plain' })
+    let release!: (text: string) => void
+    file.text = () => new Promise((resolve) => { release = resolve })
+    dispatchDrop([file], document.body)
+    await settle()
+    const entry = b.stagedState().bySession[SESSION]?.[0]
+    if (entry === undefined) throw new Error('staging failed')
+    const pending = b.face().expand(entry.id)
+    b.composer?.remove()
+    release('hi')
+    await pending
+    expect(b.input.setDraft).toHaveBeenCalledOnce()
+    expect(b.input.setDraft).toHaveBeenCalledWith('# note.txt\nhi')
+    expect(b.stagedState().bySession).toEqual({})
+    expect(document.activeElement).not.toBe(b.composer)
+    await b.fiber.dispose()
+  })
+
+  it('stages an empty-content text file and expands it to a header-only block', async () => {
+    const b = await bench({ draft: '' })
+    dispatchDrop([new File([''], 'empty.txt', { type: 'text/plain' })], document.body)
+    await settle()
+    const entry = b.stagedState().bySession[SESSION]?.[0]
+    if (entry === undefined) throw new Error('staging failed')
+    expect(entry.size).toBe(0)
+    await b.face().expand(entry.id)
+    expect(b.input.setDraft).toHaveBeenCalledWith('# empty.txt\n')
+    expect(b.stagedState().bySession).toEqual({})
     await b.fiber.dispose()
   })
 

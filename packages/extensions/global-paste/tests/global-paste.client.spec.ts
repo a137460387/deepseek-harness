@@ -8,7 +8,8 @@
  * A browser whose synthetic clipboard constructors throw fails soft: text
  * routing survives a mixed paste and an image-only paste falls to native
  * handling. Text-file drops are owned by the companion text-file-cards plugin
- * and tested there.
+ * and tested there; the drop-passthrough pin here proves this plugin mounts
+ * no drop listener of its own.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -327,6 +328,19 @@ describe('global-paste browser half', () => {
     expect(document.activeElement).not.toBe(composer)
     dispatchPaste('text')
     expect(document.activeElement).toBe(composer)
+  })
+
+  it('leaves text-file drops to the text-file-cards owner (no drop listener)', async () => {
+    const { input } = await bench({ draft: 'hello' })
+    // A pure text-file drop over the window: this plugin owns pastes only,
+    // so the event must reach whatever drop handling is composed (the
+    // text-file-cards plugin in the web bundle, native intake otherwise).
+    const dataTransfer = { files: [new File(['hi'], 'a.txt', { type: 'text/plain' })], types: ['Files'], dropEffect: 'none' }
+    const drop = new Event('drop', { bubbles: true, cancelable: true })
+    Object.defineProperty(drop, 'dataTransfer', { value: dataTransfer, configurable: true })
+    document.body.dispatchEvent(drop)
+    expect(drop.defaultPrevented).toBe(false)
+    expect(input.setDraft).not.toHaveBeenCalled()
   })
 
   it('fiber teardown removes the document listener (HMR safety)', async () => {
