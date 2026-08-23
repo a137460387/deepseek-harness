@@ -1,8 +1,9 @@
 /**
- * Pure types of the usage-stats domain: the ONE home of the `usageStats`
- * projection-key declaration, free of this package's host-side value imports
- * (cordis context, zod). Host consumers import `./types`; client aggregates
- * import `./client`, which re-exports this file with zero duplication.
+ * Pure types and the zod-free shape predicate of the usage-stats domain: the
+ * ONE home of the `usageStats` projection-key declaration, free of this
+ * package's host-side value imports (cordis context, zod). Host consumers
+ * import `./types`; client aggregates import `./client`, which re-exports
+ * this file with zero duplication.
  *
  * @module @deepseek-ai/dsh-client-usage-stats/types
  */
@@ -61,4 +62,42 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
     /** Route- and quarter-hour-split provider usage; see {@link UsageStatsProjection}. */
     usageStats: UsageStatsProjection
   }
+}
+
+/** Leaf check: all four buckets are non-negative integers. */
+function isBucket(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  const { uncachedInputTokens, outputTokens, cacheReadTokens, cacheWriteTokens } =
+    value as Record<string, unknown>
+  return [uncachedInputTokens, outputTokens, cacheReadTokens, cacheWriteTokens]
+    .every(field => typeof field === 'number' && Number.isSafeInteger(field) && field >= 0)
+}
+
+/**
+ * Narrow one wire-side projection value (exported for the shape-contract
+ * spec). The projections block is deliberately a wide record on the carrier
+ * (`values: z.unknown()`), so this is the boundary check that keeps a
+ * malformed value out of chart math. Deliberately zod-free — no client-facing
+ * source imports zod, and the browser bundle stays that way — which is why
+ * the shape lives here beside the projection's schemas; the contract spec
+ * keeps the copies honest. Lives in this shared module so the host-plane
+ * contract spec can reach it without crossing the package's host/client
+ * tsconfig faces.
+ * @param value - the raw block member.
+ * @returns whether the value carries the usageStats shape.
+ */
+export function isUsageStats(value: unknown): value is UsageStatsProjection {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  const quarters = (value as { quarters?: unknown }).quarters
+  if (typeof quarters !== 'object' || quarters === null || Array.isArray(quarters)) return false
+  for (const byProvider of Object.values(quarters as Record<string, unknown>)) {
+    if (typeof byProvider !== 'object' || byProvider === null || Array.isArray(byProvider)) return false
+    for (const byModel of Object.values(byProvider as Record<string, unknown>)) {
+      if (typeof byModel !== 'object' || byModel === null || Array.isArray(byModel)) return false
+      for (const bucket of Object.values(byModel as Record<string, unknown>)) {
+        if (!isBucket(bucket)) return false
+      }
+    }
+  }
+  return true
 }

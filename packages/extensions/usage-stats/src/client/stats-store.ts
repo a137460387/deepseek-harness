@@ -14,7 +14,7 @@
 
 import type { IApiClient, SessionId } from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import type { UsageStatsProjection } from '../types.ts'
+import { isUsageStats, type UsageStatsProjection } from '../types.ts'
 
 /** The section's whole view state. */
 export interface UsageStatsSectionState {
@@ -47,38 +47,6 @@ const INITIAL: UsageStatsSectionState = {
   sessionCount: 0,
   absentCount: 0,
   failedCount: 0,
-}
-
-/**
- * Narrow one wire-side projection value. The projections block is
- * deliberately a wide record on the carrier (`values: z.unknown()`), so this
- * is the boundary check that keeps a malformed value out of chart math.
- * @param value - the raw block member.
- * @returns whether the value carries the usageStats shape.
- */
-function isUsageStats(value: unknown): value is UsageStatsProjection {
-  if (typeof value !== 'object' || value === null) return false
-  const quarters = (value as { quarters?: unknown }).quarters
-  if (typeof quarters !== 'object' || quarters === null) return false
-  for (const byProvider of Object.values(quarters as Record<string, unknown>)) {
-    if (typeof byProvider !== 'object' || byProvider === null) return false
-    for (const byModel of Object.values(byProvider as Record<string, unknown>)) {
-      if (typeof byModel !== 'object' || byModel === null) return false
-      for (const bucket of Object.values(byModel as Record<string, unknown>)) {
-        if (!isBucket(bucket)) return false
-      }
-    }
-  }
-  return true
-}
-
-/** Leaf check: all four buckets are non-negative integers. */
-function isBucket(value: unknown): boolean {
-  if (typeof value !== 'object' || value === null) return false
-  const { uncachedInputTokens, outputTokens, cacheReadTokens, cacheWriteTokens } =
-    value as Record<string, unknown>
-  return [uncachedInputTokens, outputTokens, cacheReadTokens, cacheWriteTokens]
-    .every(field => typeof field === 'number' && Number.isSafeInteger(field) && field >= 0)
 }
 
 /**
