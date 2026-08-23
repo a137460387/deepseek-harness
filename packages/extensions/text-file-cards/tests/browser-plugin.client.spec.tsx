@@ -6,7 +6,8 @@
  * applies the size/batch ceilings with input notices, leaves images, mixed
  * batches, busy machines, masked composers, removed sessions, and offline
  * continuable children to native handling, and the dock's inject face expands
- * a card into the draft or unstages it. The dock component renders the staged
+ * a card into the draft or unstages it (a rejected read fails soft with the
+ * card kept). The dock component renders the staged
  * row (empty renders nothing). Registration disposal rides the plugin fiber
  * (HMR safety). The node half and the invariant companion are exercised over
  * the same Context.
@@ -359,6 +360,20 @@ describe('text-file-cards inject face', () => {
     // expand's pre-read check runs — the expansion must bail.
     b.input.state.set({ draft: '', phase: 'submitting' })
     await b.face().expand(entry.id)
+    expect(b.input.setDraft).not.toHaveBeenCalled()
+    expect(b.stagedState().bySession[SESSION]?.length).toBe(1)
+    await b.fiber.dispose()
+  })
+
+  it('fails soft when the expand read rejects: no throw, no draft edit, card kept', async () => {
+    const b = await bench({ draft: 'keep' })
+    const file = new File(['world'], 'note.txt', { type: 'text/plain' })
+    file.text = () => Promise.reject(new Error('blob revoked'))
+    dispatchDrop([file], document.body)
+    await settle()
+    const entry = b.stagedState().bySession[SESSION]?.[0]
+    if (entry === undefined) throw new Error('staging failed')
+    await expect(b.face().expand(entry.id)).resolves.toBeUndefined()
     expect(b.input.setDraft).not.toHaveBeenCalled()
     expect(b.stagedState().bySession[SESSION]?.length).toBe(1)
     await b.fiber.dispose()
