@@ -88,6 +88,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/extensions/input-history-recall': { kind: 'none', reason: 'Browser-side composer keydown recall over the public input service and the session snapshot; registers nothing model-facing.' },
   'packages/extensions/draft-keeper': { kind: 'none', reason: 'Browser-side draft mirror over the public input service into localStorage; registers nothing model-facing.' },
   'packages/extensions/find-in-chat': { kind: 'none', reason: 'Browser-side find bar reading the rendered conversation DOM with range highlights; registers nothing model-facing.' },
+  'packages/extensions/draft-budget': { kind: 'none', reason: 'Browser-side dock readout estimating the draft over slot props and a session projection; registers nothing model-facing.' },
   'packages/extensions/ui-cordis': { kind: 'indirect', reason: 'The definition card drives the host dynamic run/stop verbs that the model\'s cordis_run/cordis_stop tools also reach; the runner owns any model-visible effect.' },
   'packages/client/ui-permission-presets': { kind: 'indirect', reason: 'The picker submits the host /permission command; the knob events it appends own the model-visible effect through the sandbox/approval consumers.' },
   'packages/client/ui-settings-plugins': { kind: 'none', reason: 'Browser-side settings surface; registers no model surface.' },
