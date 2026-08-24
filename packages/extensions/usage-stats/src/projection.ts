@@ -23,12 +23,15 @@ import type { UsageBuckets, UsageStatsProjection } from './types.ts'
 /** Route attribution for samples that precede every `request/header`. */
 const UNKNOWN_ROUTE = { provider: 'unknown', model: 'unknown' } as const
 
+/* jscpd:ignore-start */
+// 有意镜像 token-meter 公式做契约对拍，勿去重（对拍防护见 tests/fold-contract.host.spec.ts）。
 const bucketsSchema = z.object({
   uncachedInputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
   cacheReadTokens: z.number().int().nonnegative(),
   cacheWriteTokens: z.number().int().nonnegative(),
 }).strict()
+/* jscpd:ignore-end */
 
 const usageStatsSchema = z.object({
   quarters: z.record(z.string(), z.record(z.string(), z.record(z.string(), bucketsSchema))),
@@ -163,6 +166,8 @@ export const usageStatsProjectionDefinition = {
       }
     }
 
+    /* jscpd:ignore-start */
+    // 有意镜像 token-meter 公式做契约对拍，勿去重（对拍防护见 tests/fold-contract.host.spec.ts）。
     let turn: number
     let step: number
     let usage: TokenUsage
@@ -174,6 +179,7 @@ export const usageStatsProjectionDefinition = {
     } else {
       return state
     }
+    /* jscpd:ignore-end */
 
     const route = state.route ?? UNKNOWN_ROUTE
     const quarter = Math.floor(event.time / QUARTER_MS)

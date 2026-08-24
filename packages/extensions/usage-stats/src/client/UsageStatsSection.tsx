@@ -143,6 +143,23 @@ export function UsageStatsSection(props: UsageStatsSectionProps): ReactNode {
     && state.sessionCount > 0
     && state.absentCount === state.sessionCount
 
+  // The trend block and the donut block share one dimension toggle.
+  const dimensionToggle = (ariaLabel: string): ReactNode => (
+    <div className={css.toggle} role="group" aria-label={ariaLabel}>
+      {DIMENSION_OPTIONS.map(option => (
+        <button
+          key={option.value}
+          type="button"
+          className={dimension === option.value ? css.toggleOn : css.toggleOff}
+          aria-pressed={dimension === option.value}
+          onClick={() => { setDimension(option.value) }}
+        >
+          {t(option.key)}
+        </button>
+      ))}
+    </div>
+  )
+
   return (
     <div className={css.section}>
       <div className={css.head}>
@@ -229,19 +246,7 @@ export function UsageStatsSection(props: UsageStatsSectionProps): ReactNode {
             <div className={css.blockHead}>
               <h3 className={css.blockTitle}>{t('trend.title')}</h3>
               <div className={css.controls}>
-                <div className={css.toggle} role="group" aria-label={t('trend.title')}>
-                  {DIMENSION_OPTIONS.map(option => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={dimension === option.value ? css.toggleOn : css.toggleOff}
-                      aria-pressed={dimension === option.value}
-                      onClick={() => { setDimension(option.value) }}
-                    >
-                      {t(option.key)}
-                    </button>
-                  ))}
-                </div>
+                {dimensionToggle(t('trend.title'))}
                 <div className={css.toggle} role="group" aria-label={t('range.all')}>
                   {RANGE_OPTIONS.map(option => (
                     <button
@@ -287,19 +292,7 @@ export function UsageStatsSection(props: UsageStatsSectionProps): ReactNode {
           <section className={css.block}>
             <div className={css.blockHead}>
               <h3 className={css.blockTitle}>{t('donut.title')}</h3>
-              <div className={css.toggle} role="group" aria-label={t('donut.title')}>
-                {DIMENSION_OPTIONS.map(option => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={dimension === option.value ? css.toggleOn : css.toggleOff}
-                    aria-pressed={dimension === option.value}
-                    onClick={() => { setDimension(option.value) }}
-                  >
-                    {t(option.key)}
-                  </button>
-                ))}
-              </div>
+              {dimensionToggle(t('donut.title'))}
             </div>
             {shares.length === 0
               ? <p className={css.placeholder}>{t('empty')}</p>
