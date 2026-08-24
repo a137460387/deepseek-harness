@@ -87,6 +87,11 @@
 - **上游包文档补缺**（commit `ab92e78ac8`）：`packages/README.md`（+3/-1）、`packages/README.zh.md`（+3/-1）、`packages/README.i18n.yaml`（+2/-2）各补 mcp 与 runtime-diagnostics 两行组表行（上游组表漏自家两包）；新建 `packages/runtime-diagnostics/README.md`（+9）、`packages/runtime-diagnostics/README.zh.md`（+9）、`packages/runtime-diagnostics/README.i18n.yaml`（+6）三文件（该上游包原无 README）。性质：满足 doc/pairing 门对全部包的枚举要求，无行为改动。状态：未上报——纯文档修补，fork 侧自用修正，无上报价值。
 - **rescope 注册表对账**（commit `dd30b8509e`）：`scripts/rescope-vendor.ts` 的 EXACT_EDITS 两条登记与宿主漂移对齐——删除 `knip-logger-console`（持有 `@cordisjs/plugin-logger-console` ignore 块的 knip workspace 条目已被上游 `50c22ee472` 整段删除，upstream 现零 `@cordisjs` 残留，改写无对象、两形态永不复现）；`vendoring-cookbook-name-invariant-zh` 的 replace 链接由 `../rescope.md` 同步为 `../rescope.zh.md`（上游 `8d3674695b` 对 zh 内链的本地化，补丁本体早已应用）。两处漂移均为上游提交、经 `f0ee6ab99c` 合并进来，fork 无责。该脚本为上游文件，此改动属上游直接改动：每次涉 `scripts/rescope-vendor.ts` 的合并后若 rescope-vendor:check 再报 exact edit 失配，按同法逐条对账（宿主在=更新快照，宿主亡=删登记）。状态：未上报——对上游同样成立的注册表对账修正，低优先级可选上报。
 
+## CI 与门控豁免账本（2026-08-24 立册）
+
+- **CI/Actions 豁免**：`E2E (real DeepSeek API)` 与 `CI master` 均已 `disabled_manually`——前者 fork 缺 real API secret，后者 fork 缺 self-hosted runner 池（`serial-linux` 需 `[self-hosted, linux, x64, vm-backup]`，`serial-windows` 需 `[self-hosted, dsh-win-ci, windows]`），均结构性不可跑；两个永久僵尸 run（32628954931 / 32674480671）已一并手动取消。`Sandbox` 保持启用：macOS leg（seatbelt）为已知红（上游 pwsh 持久化栈 3 个单测失败，归因 `47f9438..b150a551` 区间、上游零 CI 验证），Linux 3 leg 为活体哨兵、变红才是新信号；此后每次 push 预期恰好一封 Sandbox 失败邮件（macOS leg）。
+- **duplication 门处置**：usage-stats ↔ token-meter 两克隆裁决为有意镜像（`projection.ts` 模块头自声明镜像 `tokenUsage` 的 scope，折叠语义必须与其保持一致）；字面消除不可行——token-meter 的 schema 与事件分解块为模块私有，导出它们需扩展上游文件补丁面，与禁改条款冲突，且跨单元共享 schema 会耦合两个独立投影的 wire 契约。处置按「契约测试防漂移」条款与 connection fixture 先例形态：保留镜像，在 `packages/extensions/usage-stats/src/projection.ts` 两处镜像块加 `/* jscpd:ignore-start */` 内联豁免（不改上游根配置 `.jscpd.json`）；补上此前缺失的对拍防护——`packages/extensions/usage-stats/tests/fold-contract.host.spec.ts` 经 `./src/*` 子路径静态导入真实 `tokenUsageProjectionDefinition`，以代表性语料钉死两折叠桶量在每个前缀相等（上游改 intake 语义下次同步即红；usage-stats 为此新增 dsh-token-meter devDependency，同 connection 先例）；`UsageStatsSection.tsx` 文内自重复（趋势与环形区块共用的维度切换按钮组）抽 `dimensionToggle` helper 消除，行为不变。
+
 ## 上游 FR 与 endorsement 登记（fork 发起的上游互动，2026-08-23 立册）
 
 登记格式沿用「已知本地补丁」的上报状态条款；区别在于这些是 fork 主动发起的上游请求或对上游线程的应答，不附本地修改。路线图「两个上游 FR」当日双双落地（其一因查重改为 endorsement 形态）。
