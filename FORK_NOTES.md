@@ -96,6 +96,8 @@
 
 - **usage-stats 数据面深化**（commits `82ecf8ecb1` feat + `1a9411be1c` test + `88c591dca8` note）：两个纯增量功能，均只在浏览器半侧、建在本包既有纯聚合之上——月度明细块（全量历史经 `monthlyStats` 折叠，环形图后以「月份 → 总量」列表呈现、最新月在前，`monthlyStats` 从此有了界面座位，导语「按天与按月聚合」完全成立）；CSV 导出（`dailyStatsToCsv` RFC 4180 渲染当前范围日行，头部「导出 CSV」按钮、无可见日行时禁用，下载 `dsh-usage-<today>.csv` 后即回收对象 URL）。决策记录见 [数据面深化 Agent Note](.agents/notes/implemented/feature/2026-08-25-usage-stats-data-surface.md)。不变量：未触碰 `.github/` 与任何上游文件，零新依赖、零组合面变化；测试新增 6 例（CSV 渲染 3 + 界面路径 3），包套件 66/66。
 
+- **健壮性收口三缺口**（commits `622cb35dc3` fix + `85d8de79b5` test）：2026-08-25 只读健壮性盘点的三个值得修缺口一并收口——① draft-keeper 配额闩锁后的删除丢弃（可致重载复活已清除文本、违反核心契约）：闩锁分支补 best-effort 清除（缩小重写或整键删除，配额失败下通常仍可用），读失败闩锁不触碰不可读记录；② usage-stats CSV 导出裸链路：整体 try/catch，失败经区块既有错误行惯用法呈现（`export.error` 语言键 + `role="alert"`）；③ find-in-chat 逐键全量重扫：查询研究 200ms 防抖（输入即时显示、扫描跟随末次击键），导航（step/Enter）前按需冲洗保证步进作用于当前查询，close/dispose 清理定时器。七处既有即时读取钉死改为防抖外围 `vi.waitFor`，钉死内容不变；新增钉死 8 例（含端到端「先存储→配额失败→清除→重载不复活」），三套件 155/155。决策记录见 [健壮性收口 Agent Note](.agents/notes/implemented/bug-fix/2026-08-25-fork-robustness-hardening.md)。
+
 ## 上游 FR 与 endorsement 登记（fork 发起的上游互动，2026-08-23 立册）
 
 登记格式沿用「已知本地补丁」的上报状态条款；区别在于这些是 fork 主动发起的上游请求或对上游线程的应答，不附本地修改。路线图「两个上游 FR」当日双双落地（其一因查重改为 endorsement 形态）。
