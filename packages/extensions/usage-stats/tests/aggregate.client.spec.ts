@@ -1,15 +1,16 @@
 /**
  * Pure aggregation over `usageStats` values: merging sessions, route and
  * series splits, viewer-local day regrouping (including the half-hour
- * timezone offset that quarter buckets exist for), months, streaks, the peak
- * day, range starts, and the compact token formatter.
+ * timezone offset that quarter buckets exist for), months, the CSV rendering
+ * of day rows, streaks, the peak day, range starts, and the compact token
+ * formatter.
  */
 
 import { describe, expect, it } from 'vitest'
 import type { UsageBuckets, UsageStatsProjection } from '../src/types.ts'
 import {
-  combineProjections, dailyStats, formatTokens, monthlyStats, mondayIndex, peakDay,
-  rangeStartDay, routeTotals, seriesTotals, shiftDay, usageStreaks,
+  combineProjections, dailyStats, dailyStatsToCsv, formatTokens, monthlyStats, mondayIndex,
+  peakDay, rangeStartDay, routeTotals, seriesTotals, shiftDay, usageStreaks,
 } from '../src/client/aggregate.ts'
 import { QUARTER_MS } from '../src/quarter.ts'
 
@@ -128,6 +129,25 @@ describe('monthlyStats', () => {
       { month: '2026-07', total: 3 },
       { month: '2026-08', total: 9 },
     ])
+  })
+})
+
+describe('dailyStatsToCsv', () => {
+  const row = (day: string, total: number) => ({ day, total, bySeries: new Map<string, number>() })
+
+  it('renders the header and one row per entry in input order', () => {
+    expect(dailyStatsToCsv([row('2026-08-01', 10), row('2026-08-02', 20)]))
+      .toBe('day,total\r\n2026-08-01,10\r\n2026-08-02,20\r\n')
+  })
+
+  it('keeps the header alone for an empty range', () => {
+    expect(dailyStatsToCsv([])).toBe('day,total\r\n')
+  })
+
+  it('quotes fields carrying a comma, quote, or line break with doubled quotes', () => {
+    expect(dailyStatsToCsv([row('a,b', 1)])).toBe('day,total\r\n"a,b",1\r\n')
+    expect(dailyStatsToCsv([row('a"b', 1)])).toBe('day,total\r\n"a""b",1\r\n')
+    expect(dailyStatsToCsv([row('a\nb', 1)])).toBe('day,total\r\n"a\nb",1\r\n')
   })
 })
 

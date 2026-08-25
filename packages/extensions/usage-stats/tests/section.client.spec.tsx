@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
 /**
  * The usage statistics section on direct props: a ready store renders the
- * headline cards, the activity calendar, the trend legend, and the donut
- * shares; the mode/dimension/range toggles move their aria-pressed seats; an
- * error status renders the failure row with a retry; the absent composition
- * surfaces its hint; and an empty history renders the empty placeholders.
- * Sample times sit at 12:00 UTC so every timezone offset within ±12 hours
- * maps them onto the same calendar date the assertions rely on.
+ * headline cards, the activity calendar, the trend legend, the donut
+ * shares, and the monthly breakdown (newest month first); the
+ * mode/dimension/range toggles move their aria-pressed seats; the CSV
+ * export downloads the visible day rows and stays disabled without rows;
+ * an error status renders the failure row with a retry; the absent
+ * composition surfaces its hint; and an empty history renders the empty
+ * placeholders. Sample times sit at 12:00 UTC so every timezone offset
+ * within ±12 hours maps them onto the same calendar date the assertions
+ * rely on.
  */
 import { useSyncExternalStore } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -159,6 +162,70 @@ describe('UsageStatsSection', () => {
     const placeholders = screen.getAllByText('还没有任何用量记录。')
     expect(placeholders.length).toBeGreaterThanOrEqual(2)
     expect(screen.getByText('—')).toBeTruthy()
+  })
+
+  it('lists the monthly breakdown newest month first over the whole history', () => {
+    mount({
+      status: 'ready',
+      error: null,
+      values: {
+        session: {
+          quarters: {
+            ...valueAt('2026-01-10', 'deepseek', 'deepseek-chat', 100).quarters,
+            ...valueAt('2026-02-10', 'deepseek', 'deepseek-chat', 100).quarters,
+          },
+        },
+      },
+      sessionCount: 1,
+      absentCount: 0,
+      failedCount: 0,
+    })
+    expect(screen.getByText('月度明细')).toBeTruthy()
+    const months = screen.getAllByText(/^2026-0[12]$/)
+    expect(months.map(node => node.textContent)).toEqual(['2026-02', '2026-01'])
+  })
+
+  it('exports the visible day rows as a CSV download', async () => {
+    let captured: Blob | undefined
+    const create = vi.fn((blob: Blob): string => {
+      captured = blob
+      return 'blob:mock'
+    })
+    const revoke = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', { value: create, configurable: true })
+    Object.defineProperty(URL, 'revokeObjectURL', { value: revoke, configurable: true })
+    const downloads: string[] = []
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click')
+    click.mockImplementation(function (this: HTMLAnchorElement) {
+      downloads.push(this.download)
+    })
+
+    mount({
+      status: 'ready',
+      error: null,
+      values: { session: valueAt(todayUtc(), 'deepseek', 'deepseek-chat', 1_000) },
+      sessionCount: 1,
+      absentCount: 0,
+      failedCount: 0,
+    })
+    fireEvent.click(screen.getByRole('button', { name: '导出 CSV' }))
+
+    expect(downloads).toEqual([`dsh-usage-${todayUtc()}.csv`])
+    expect(await captured?.text()).toBe(`day,total\r\n${todayUtc()},2000\r\n`)
+    expect(revoke).toHaveBeenCalledWith('blob:mock')
+    click.mockRestore()
+  })
+
+  it('disables the export button when no day rows are visible', () => {
+    mount({
+      status: 'ready',
+      error: null,
+      values: {},
+      sessionCount: 0,
+      absentCount: 0,
+      failedCount: 0,
+    })
+    expect(screen.getByRole('button', { name: '导出 CSV' }).hasAttribute('disabled')).toBe(true)
   })
 
   it('calls load once on mount', () => {
