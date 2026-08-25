@@ -2,7 +2,9 @@
  * The find bar's controller: a UI-framework-agnostic state machine that
  * owns every listener (the document-capture Ctrl/Cmd+F interception, the
  * find input's Enter/Escape family, the body MutationObserver, and the
- * session-list subscription), the CSS Custom Highlight painting, and the
+ * session-list subscription), the CSS Custom Highlight painting, the
+ * debounced query research (the input shows at once; the scan trails the
+ * last keystroke, and a navigation flush runs it on demand), and the
  * center-scroll navigation. The React bar is a thin view over
  * `subscribe`/`getSnapshot`; it registers its input element so the
  * controller can gate the Enter family to it and restore focus on close.
@@ -23,6 +25,9 @@ const HIGHLIGHT_ACTIVE = 'dsh-find-in-chat-active'
 
 /** Mutation-rescan debounce, in milliseconds. */
 const RESCAN_DEBOUNCE_MS = 200
+
+/** Query-research debounce, in milliseconds; a navigation flushes it. */
+const QUERY_DEBOUNCE_MS = 200
 
 /** The stylesheet for the two highlight pseudo-elements above. */
 const HIGHLIGHT_CSS = [
@@ -102,6 +107,7 @@ export function createFindController(deps: FindControllerDeps): FindController {
   let input: HTMLElement | null = null
   let restoreFocus: HTMLElement | null = null
   let rescanTimer: ReturnType<typeof setTimeout> | undefined
+  let queryTimer: ReturnType<typeof setTimeout> | undefined
 
   const notify = (): void => {
     for (const listener of listeners) listener()
@@ -204,6 +210,32 @@ export function createFindController(deps: FindControllerDeps): FindController {
     paint()
   }
 
+  /**
+   * Run the pending query research now. The timer path scrolls the fresh head
+   * match into view (the immediate-research behavior the debounce replaced);
+   * a navigation flush suppresses that scroll so the step's own centering
+   * stays the only one.
+   * @param scroll - whether the fresh head match scrolls into view.
+   */
+  const runPendingResearch = (scroll: boolean): void => {
+    if (queryTimer === undefined) return
+    clearTimeout(queryTimer)
+    queryTimer = undefined
+    if (!state.open) return
+    research('reset')
+    if (scroll) scrollToActive()
+  }
+
+  /** Step the current match, flushing a pending research first. */
+  const step = (delta: 1 | -1): void => {
+    if (!state.open) return
+    runPendingResearch(false)
+    if (matches.length === 0) return
+    patch({ index: (state.index + delta + matches.length) % matches.length })
+    paint()
+    scrollToActive()
+  }
+
   const open = (): void => {
     if (state.open) {
       patch({ revision: state.revision + 1 })
@@ -217,6 +249,10 @@ export function createFindController(deps: FindControllerDeps): FindController {
 
   const close = (): void => {
     if (!state.open) return
+    if (queryTimer !== undefined) {
+      clearTimeout(queryTimer)
+      queryTimer = undefined
+    }
     matches = []
     state = { ...CLOSED_STATE }
     paint()
@@ -244,10 +280,7 @@ export function createFindController(deps: FindControllerDeps): FindController {
     }
     if (event.key === 'Enter') {
       event.preventDefault()
-      if (matches.length === 0) return
-      patch({ index: (state.index + (event.shiftKey ? -1 : 1) + matches.length) % matches.length })
-      paint()
-      scrollToActive()
+      step(event.shiftKey ? -1 : 1)
     }
   }
 
@@ -299,20 +332,19 @@ export function createFindController(deps: FindControllerDeps): FindController {
     setQuery(query) {
       if (!state.open || query === state.query) return
       patch({ query })
-      research('reset')
-      scrollToActive()
+      if (queryTimer !== undefined) clearTimeout(queryTimer)
+      queryTimer = setTimeout(() => { runPendingResearch(true) }, QUERY_DEBOUNCE_MS)
     },
-    step(delta) {
-      if (!state.open || matches.length === 0) return
-      patch({ index: (state.index + delta + matches.length) % matches.length })
-      paint()
-      scrollToActive()
-    },
+    step,
     close,
     dispose() {
       if (rescanTimer !== undefined) {
         clearTimeout(rescanTimer)
         rescanTimer = undefined
+      }
+      if (queryTimer !== undefined) {
+        clearTimeout(queryTimer)
+        queryTimer = undefined
       }
       document.removeEventListener('keydown', onKeyDown, true)
       observer?.disconnect()

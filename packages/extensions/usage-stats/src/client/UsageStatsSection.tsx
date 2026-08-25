@@ -75,6 +75,7 @@ export function UsageStatsSection(props: UsageStatsSectionProps): ReactNode {
   const [range, setRange] = useState<StatsRange>('week')
   const [dimension, setDimension] = useState<RouteDimension>('model')
   const [mode, setMode] = useState<HeatmapMode>('daily')
+  const [exportError, setExportError] = useState<string | null>(null)
 
   useEffect(() => {
     void load()
@@ -148,15 +149,23 @@ export function UsageStatsSection(props: UsageStatsSectionProps): ReactNode {
 
   /** Download the range's visible day rows as one CSV file. */
   const exportCsv = (): void => {
-    const blob = new Blob([dailyStatsToCsv(visible)], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `dsh-usage-${today}.csv`
-    document.body.append(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
+    try {
+      const blob = new Blob([dailyStatsToCsv(visible)], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `dsh-usage-${today}.csv`
+      document.body.append(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      setExportError(null)
+    } catch (error) {
+      // A blocked object URL (hardened privacy mode, an extension policy) or
+      // a missing blob API must not leave the click silent; the error-row
+      // idiom surfaces it the same way a failed load does.
+      setExportError(error instanceof Error ? error.message : String(error))
+    }
   }
 
   // The trend block and the donut block share one dimension toggle.
@@ -200,6 +209,9 @@ export function UsageStatsSection(props: UsageStatsSectionProps): ReactNode {
 
       {state.error === null ? null : (
         <p className={css.error} role="alert">{t('error', { message: state.error })}</p>
+      )}
+      {exportError === null ? null : (
+        <p className={css.error} role="alert">{t('export.error', { message: exportError })}</p>
       )}
       {state.status === 'loading' && Object.keys(state.values).length === 0
         ? <p className={css.placeholder}>{t('loading')}</p>

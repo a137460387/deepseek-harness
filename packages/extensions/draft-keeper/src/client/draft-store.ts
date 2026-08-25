@@ -6,7 +6,11 @@
  * and owns its own transition). Any storage failure (quota exhaustion,
  * private mode, storage disabled) latches the store off for its lifetime:
  * persistence disables silently and never breaks the composer, the same
- * contract the client runtime's own persistence follows.
+ * contract the client runtime's own persistence follows. The latch keeps one
+ * duty: a clearing write still retries once against storage, because a
+ * quota-blocked `setItem` usually leaves the shrinking rewrite (or the key
+ * removal) working, and a cleared draft resurrecting on reload is the one
+ * breach the silent latch must not cause.
  * @module @deepseek-ai/dsh-client-draft-keeper/client/draft-store
  */
 
@@ -90,6 +94,7 @@ export function createDraftStore(storage: DraftStorage | undefined, key: string)
   }
 
   let disabled = false
+  let readFailed = false
   let loaded = false
   let drafts = new Map<string, string>()
 
@@ -105,6 +110,7 @@ export function createDraftStore(storage: DraftStorage | undefined, key: string)
       // latches off silently for this store's lifetime. Nothing else can
       // reach here — load runs the store's first and only read.
       disabled = true
+      readFailed = true
     }
   }
 
@@ -128,7 +134,15 @@ export function createDraftStore(storage: DraftStorage | undefined, key: string)
       return drafts.get(sessionId)
     },
     set(sessionId, text) {
-      if (disabled) return
+      if (disabled) {
+        // Latched off: growth writes stay dead, but a clearing write gets one
+        // best effort (usually a shrinking rewrite or key removal the quota
+        // failure still allows) so a cleared draft cannot resurrect on
+        // reload. Only a map read cleanly from storage is safe to rewrite —
+        // a read-failed latch holds nothing and leaves the record untouched.
+        if (text === '' && !readFailed && drafts.delete(sessionId)) persist()
+        return
+      }
       load()
       if (text === '') {
         if (!drafts.delete(sessionId)) return
@@ -140,7 +154,11 @@ export function createDraftStore(storage: DraftStorage | undefined, key: string)
       persist()
     },
     remove(sessionId) {
-      if (disabled) return
+      if (disabled) {
+        // The latch's one kept duty; see the set branch for the contract.
+        if (!readFailed && drafts.delete(sessionId)) persist()
+        return
+      }
       load()
       if (!drafts.delete(sessionId)) return
       persist()
