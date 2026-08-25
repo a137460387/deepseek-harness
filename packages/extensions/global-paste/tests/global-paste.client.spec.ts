@@ -4,7 +4,10 @@
  * listener against faked sessions/conversation services (with fiber teardown
  * proving removal — HMR safety), the inert node entry, and the invariant
  * companion's ownership reservation. Locked sessions (removed, an offline
- * continuable parent) ignore pastes like the composer's own read-only states.
+ * continuable parent) ignore pastes like the composer's own read-only states;
+ * the remaining guard leaves pin the whole matrix too — no clipboard data, no
+ * mounted composer, a takeover overlay masking the composer, and a focused
+ * contenteditable region all leave the paste to native handling.
  * A browser whose synthetic clipboard constructors throw fails soft: text
  * routing survives a mixed paste and an image-only paste falls to native
  * handling. Text-file drops are owned by the companion text-file-cards plugin
@@ -100,6 +103,10 @@ interface BenchOptions {
   readonly noSession?: boolean
   readonly removed?: boolean
   readonly parentOffline?: boolean
+  /** Mask the composer behind a takeover overlay so the visibility probe rejects it. */
+  readonly occluded?: boolean
+  /** Leave the composer textarea unmounted (a view without an InputBar). */
+  readonly noComposer?: boolean
 }
 
 /** Mutable fake of the session-level lock facts the plugin's alignment reads. */
@@ -160,9 +167,13 @@ async function bench(over: BenchOptions = {}): Promise<Bench> {
   })
   card.appendChild(composer)
   document.body.appendChild(card)
-  // jsdom does not implement elementFromPoint; define it to return the composer
-  // (visible, not occluded) so the plugin's visibility probe passes.
-  document.elementFromPoint = () => composer
+  if (over.noComposer === true) composer.remove()
+  // jsdom does not implement elementFromPoint; define the visibility probe's
+  // answer: the composer itself (visible, not occluded), or a masking overlay
+  // sibling standing in for a takeover panel over the composer card.
+  const overlay = document.createElement('div')
+  if (over.occluded === true) document.body.appendChild(overlay)
+  document.elementFromPoint = () => over.occluded === true ? overlay : composer
 
   const bench: Bench = { ctx, fiber, input, composer }
   activeBench = bench
@@ -317,6 +328,43 @@ describe('global-paste browser half', () => {
     const other = document.createElement('input')
     document.body.appendChild(other)
     other.focus()
+    const event = dispatchPaste('text')
+    expect(event.defaultPrevented).toBe(false)
+    expect(input.setDraft).not.toHaveBeenCalled()
+  })
+
+  it('leaves paste to a focused contenteditable region', async () => {
+    const { input } = await bench({ draft: 'hello' })
+    const region = document.createElement('div')
+    region.setAttribute('contenteditable', 'true')
+    // jsdom leaves isContentEditable unimplemented; stub the platform fact.
+    Object.defineProperty(region, 'isContentEditable', { value: true, configurable: true })
+    document.body.appendChild(region)
+    region.focus()
+    const event = dispatchPaste('text')
+    expect(event.defaultPrevented).toBe(false)
+    expect(input.setDraft).not.toHaveBeenCalled()
+  })
+
+  it('ignores a paste event carrying no clipboard data', async () => {
+    const { input } = await bench({ draft: 'hello' })
+    // A real browser reports a missing clipboard as null (not undefined).
+    const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent
+    Object.defineProperty(event, 'clipboardData', { value: null, configurable: true })
+    document.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+    expect(input.setDraft).not.toHaveBeenCalled()
+  })
+
+  it('ignores paste when no composer is mounted', async () => {
+    const { input } = await bench({ draft: 'hello', noComposer: true })
+    const event = dispatchPaste('text')
+    expect(event.defaultPrevented).toBe(false)
+    expect(input.setDraft).not.toHaveBeenCalled()
+  })
+
+  it('ignores paste while a takeover overlay masks the composer', async () => {
+    const { input } = await bench({ draft: 'hello', occluded: true })
     const event = dispatchPaste('text')
     expect(event.defaultPrevented).toBe(false)
     expect(input.setDraft).not.toHaveBeenCalled()

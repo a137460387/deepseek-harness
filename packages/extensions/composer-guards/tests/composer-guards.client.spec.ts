@@ -123,6 +123,17 @@ describe('composerVisible', () => {
     expect(composerVisible(composer)).toBe(false)
   })
 
+  it('rejects a composer whose center is above the viewport', () => {
+    const composer = mountComposer({ top: -40, y: -40, bottom: -10 }, () => composer)
+    expect(composerVisible(composer)).toBe(false)
+  })
+
+  it('rejects a composer whose center is right of the viewport', () => {
+    const left = window.innerWidth + 10
+    const composer = mountComposer({ left, x: left, right: left + 100 }, () => composer)
+    expect(composerVisible(composer)).toBe(false)
+  })
+
   it('rejects a composer whose center probe hits nothing', () => {
     const composer = mountComposer({}, () => null)
     expect(composerVisible(composer)).toBe(false)
