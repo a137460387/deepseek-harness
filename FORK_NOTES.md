@@ -92,6 +92,10 @@
 - **CI/Actions 豁免**：`E2E (real DeepSeek API)` 与 `CI master` 均已 `disabled_manually`——前者 fork 缺 real API secret，后者 fork 缺 self-hosted runner 池（`serial-linux` 需 `[self-hosted, linux, x64, vm-backup]`，`serial-windows` 需 `[self-hosted, dsh-win-ci, windows]`），均结构性不可跑；两个永久僵尸 run（32628954931 / 32674480671）已一并手动取消。`Sandbox` 保持启用：macOS leg（seatbelt）为已知红（上游 pwsh 持久化栈 3 个单测失败，归因 `47f9438..b150a551` 区间、上游零 CI 验证），Linux 3 leg 为活体哨兵、变红才是新信号；此后每次 push 预期恰好一封 Sandbox 失败邮件（macOS leg）。
 - **duplication 门处置**：usage-stats ↔ token-meter 两克隆裁决为有意镜像（`projection.ts` 模块头自声明镜像 `tokenUsage` 的 scope，折叠语义必须与其保持一致）；字面消除不可行——token-meter 的 schema 与事件分解块为模块私有，导出它们需扩展上游文件补丁面，与禁改条款冲突，且跨单元共享 schema 会耦合两个独立投影的 wire 契约。处置按「契约测试防漂移」条款与 connection fixture 先例形态：保留镜像，在 `packages/extensions/usage-stats/src/projection.ts` 两处镜像块加 `/* jscpd:ignore-start */` 内联豁免（不改上游根配置 `.jscpd.json`）；补上此前缺失的对拍防护——`packages/extensions/usage-stats/tests/fold-contract.host.spec.ts` 经 `./src/*` 子路径静态导入真实 `tokenUsageProjectionDefinition`，以代表性语料钉死两折叠桶量在每个前缀相等（上游改 intake 语义下次同步即红；usage-stats 为此新增 dsh-token-meter devDependency，同 connection 先例）；`UsageStatsSection.tsx` 文内自重复（趋势与环形区块共用的维度切换按钮组）抽 `dimensionToggle` helper 消除，行为不变。
 
+## Fork 功能深化账本（2026-08-25 立册）
+
+- **usage-stats 数据面深化**（commits `82ecf8ecb1` feat + `1a9411be1c` test + `88c591dca8` note）：两个纯增量功能，均只在浏览器半侧、建在本包既有纯聚合之上——月度明细块（全量历史经 `monthlyStats` 折叠，环形图后以「月份 → 总量」列表呈现、最新月在前，`monthlyStats` 从此有了界面座位，导语「按天与按月聚合」完全成立）；CSV 导出（`dailyStatsToCsv` RFC 4180 渲染当前范围日行，头部「导出 CSV」按钮、无可见日行时禁用，下载 `dsh-usage-<today>.csv` 后即回收对象 URL）。决策记录见 [数据面深化 Agent Note](.agents/notes/implemented/feature/2026-08-25-usage-stats-data-surface.md)。不变量：未触碰 `.github/` 与任何上游文件，零新依赖、零组合面变化；测试新增 6 例（CSV 渲染 3 + 界面路径 3），包套件 66/66。
+
 ## 上游 FR 与 endorsement 登记（fork 发起的上游互动，2026-08-23 立册）
 
 登记格式沿用「已知本地补丁」的上报状态条款；区别在于这些是 fork 主动发起的上游请求或对上游线程的应答，不附本地修改。路线图「两个上游 FR」当日双双落地（其一因查重改为 endorsement 形态）。

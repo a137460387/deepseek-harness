@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Usage statistics for the Web UI, as a settings tab: token totals split by provider and model, aggregated per day and per month, with headline cards (total, peak day, current and longest streaks), a GitHub-style activity calendar, a range-scoped trend chart, and a route-share donut. Token counts only — no pricing, ever (provider billing varies; this surface never converts tokens into money).
+Usage statistics for the Web UI, as a settings tab: token totals split by provider and model, aggregated per day and per month, with headline cards (total, peak day, current and longest streaks), a GitHub-style activity calendar, a range-scoped trend chart, a route-share donut, a monthly breakdown list, and a CSV export of the ranged daily rows. Token counts only — no pricing, ever (provider billing varies; this surface never converts tokens into money).
 
 ## Data flow
 
@@ -29,6 +29,7 @@ None; the package never assembles or sends provider requests.
 - **No live streaming into the tab** — the controller gathers values when the section opens and on Refresh; usage accrued while the tab stays open appears only after a refresh. The dominant content is historical totals, so the staleness is cosmetic.
 - **Counts inherit the `tokenUsage` scope** — main-loop requests and compaction summarizer calls; auxiliary title generation (`session-title-llm`) logs no usage and stays uncounted (see the token-meter README's limitation).
 - **The donut is whole-history** — the range selector scopes the trend chart only; the share view answers "which route dominates overall".
+- **The CSV export covers the ranged day totals only** — the download carries one `day,total` row per visible day; the per-route split stays in the tab.
 - **The activity calendar caps at 53 weeks** — usage older than a year still counts toward every headline figure; it just leaves the calendar grid.
 - **Backfill is bounded and cached** — sessions whose list baseline predates the unit are refolded through the history tail page at most eight calls in flight; a completed backfill is reused on later refreshes while the baseline still lacks the key (failed backfills are retried), so only the first open pays the fold cost.
 - **The composition hint is exact on confirmed absences only** — the absent hint fires when every observed session's history tail returned ok and also lacked the key, which is precisely "the host composition does not register the unit"; an errored backfill (refused call or transport throw) leaves the session's status unknown and never feeds the hint.
