@@ -14,8 +14,8 @@ import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { HeatmapMode, RouteDimension, StatsRange } from './aggregate.ts'
 import {
-  combineProjections, dailyStats, formatTokens, peakDay, rangeStartDay, seriesTotals, todayKey,
-  usageStreaks,
+  combineProjections, dailyStats, dailyStatsToCsv, formatTokens, monthlyStats, peakDay,
+  rangeStartDay, seriesTotals, todayKey, usageStreaks,
 } from './aggregate.ts'
 import type { UsageStatsSectionState } from './stats-store.ts'
 import { HeatmapCalendar } from './charts/HeatmapCalendar.tsx'
@@ -143,6 +143,22 @@ export function UsageStatsSection(props: UsageStatsSectionProps): ReactNode {
     && state.sessionCount > 0
     && state.absentCount === state.sessionCount
 
+  // The monthly breakdown folds the whole history; newest month first.
+  const monthly = useMemo(() => monthlyStats(daily).reverse(), [daily])
+
+  /** Download the range's visible day rows as one CSV file. */
+  const exportCsv = (): void => {
+    const blob = new Blob([dailyStatsToCsv(visible)], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `dsh-usage-${today}.csv`
+    document.body.append(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
   // The trend block and the donut block share one dimension toggle.
   const dimensionToggle = (ariaLabel: string): ReactNode => (
     <div className={css.toggle} role="group" aria-label={ariaLabel}>
@@ -167,9 +183,19 @@ export function UsageStatsSection(props: UsageStatsSectionProps): ReactNode {
           <h2 className={css.title}>{t('title')}</h2>
           <p className={css.intro}>{t('intro')}</p>
         </div>
-        <button type="button" className={css.refresh} onClick={() => { void load() }}>
-          {t('refresh')}
-        </button>
+        <div className={css.controls}>
+          <button type="button" className={css.refresh} onClick={() => { void load() }}>
+            {t('refresh')}
+          </button>
+          <button
+            type="button"
+            className={css.refresh}
+            disabled={visible.length === 0}
+            onClick={exportCsv}
+          >
+            {t('export')}
+          </button>
+        </div>
       </div>
 
       {state.error === null ? null : (
@@ -304,6 +330,24 @@ export function UsageStatsSection(props: UsageStatsSectionProps): ReactNode {
                     ariaLabel={t('donut.title')}
                   />
                 </div>
+              )}
+          </section>
+
+          <section className={css.block}>
+            <div className={css.blockHead}>
+              <h3 className={css.blockTitle}>{t('monthly.title')}</h3>
+            </div>
+            {monthly.length === 0
+              ? <p className={css.placeholder}>{t('empty')}</p>
+              : (
+                <ul className={css.monthList}>
+                  {monthly.map(entry => (
+                    <li key={entry.month} className={css.monthRow}>
+                      <span>{entry.month}</span>
+                      <span className={css.monthValue}>{formatTokens(entry.total)}</span>
+                    </li>
+                  ))}
+                </ul>
               )}
           </section>
         </>

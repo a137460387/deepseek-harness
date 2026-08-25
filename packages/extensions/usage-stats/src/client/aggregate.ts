@@ -178,6 +178,21 @@ export function monthlyStats(daily: readonly DailyStats[]): MonthlyStats[] {
 }
 
 /**
+ * Render daily entries as RFC 4180 CSV: one `day,total` header row plus one
+ * row per entry in input order. A field carrying a comma, quote, or line
+ * break is quoted with inner quotes doubled; day keys and totals never do,
+ * but the escaping is total so the text stays valid under any later column.
+ * @param daily - the daily entries to render.
+ * @returns the CSV text, every row terminated with CRLF.
+ */
+export function dailyStatsToCsv(daily: readonly DailyStats[]): string {
+  const escape = (field: string): string =>
+    /[",\n\r]/.test(field) ? `"${field.replaceAll('"', '""')}"` : field
+  const rows = daily.map(entry => `${escape(entry.day)},${entry.total}`)
+  return `${['day,total', ...rows].join('\r\n')}\r\n`
+}
+
+/**
  * Current and longest usage streaks over the active days.
  *
  * The current streak counts back from `today`; a today without usage yet
