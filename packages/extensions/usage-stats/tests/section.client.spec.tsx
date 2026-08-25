@@ -4,8 +4,8 @@
  * headline cards, the activity calendar, the trend legend, the donut
  * shares, and the monthly breakdown (newest month first); the
  * mode/dimension/range toggles move their aria-pressed seats; the CSV
- * export downloads the visible day rows and stays disabled without rows;
- * an error status renders the failure row with a retry; the absent
+ * export downloads the visible day rows, stays disabled without rows, and
+ * surfaces the error-row idiom when object URL creation throws; an error status renders the failure row with a retry; the absent
  * composition surfaces its hint; and an empty history renders the empty
  * placeholders. Sample times sit at 12:00 UTC so every timezone offset
  * within ±12 hours maps them onto the same calendar date the assertions
@@ -214,6 +214,26 @@ describe('UsageStatsSection', () => {
     expect(await captured?.text()).toBe(`day,total\r\n${todayUtc()},2000\r\n`)
     expect(revoke).toHaveBeenCalledWith('blob:mock')
     click.mockRestore()
+  })
+
+  it('surfaces the failure when object URL creation throws on export', () => {
+    Object.defineProperty(URL, 'createObjectURL', {
+      value: vi.fn((): string => {
+        throw new DOMException('blocked', 'SecurityError')
+      }),
+      configurable: true,
+    })
+    mount({
+      status: 'ready',
+      error: null,
+      values: { session: valueAt(todayUtc(), 'deepseek', 'deepseek-chat', 1_000) },
+      sessionCount: 1,
+      absentCount: 0,
+      failedCount: 0,
+    })
+    fireEvent.click(screen.getByRole('button', { name: '导出 CSV' }))
+    expect(screen.getByText(/导出用量失败：/)).toBeTruthy()
+    expect(screen.getByRole('alert').textContent).toContain('blocked')
   })
 
   it('disables the export button when no day rows are visible', () => {

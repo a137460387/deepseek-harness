@@ -4,7 +4,9 @@
  * immediate entry deletion on empty text and full-record removal when the
  * last entry goes, live-list pruning, and the silent-disable latch — any
  * storage failure (quota, private mode) or a missing localStorage turns every
- * later operation into a no-op without throwing.
+ * later growth write into a no-op without throwing, while a clearing write
+ * keeps one best effort against storage so a cleared draft cannot resurrect
+ * on reload.
  */
 
 import { describe, expect, it, vi } from 'vitest'
@@ -101,21 +103,48 @@ describe('createDraftStore', () => {
     expect(readRecord(storage).drafts).toEqual({ s1: 'live' })
   })
 
-  it('latches off silently when a write fails and never throws again', () => {
+  it('latches growth writes off when a write fails but keeps one clearing effort', () => {
     const storage = new MemoryStorage()
     const store = createDraftStore(storage, 'dsh.draft-keeper')
     store.set('s1', 'first')
     storage.setItem.mockImplementation(() => { throw new DOMException('quota', 'QuotaExceededError') })
     expect(() => { store.set('s1', 'second') }).not.toThrow()
     expect(storage.map.get('dsh.draft-keeper')).toBe(JSON.stringify({ version: 1, drafts: { s1: 'first' } }))
-    // The latch is permanent: later reads see the last good record only.
+    // The latch is permanent for growth writes: later sets never reach storage.
     storage.setItem.mockImplementation((key: string, value: string) => { storage.map.set(key, value) })
     store.set('s2', 'never written')
     expect(readRecord(storage).drafts).toEqual({ s1: 'first' })
+    // A clearing still gets its best effort — the quota failure usually
+    // leaves the shrinking rewrite or key removal working, and a cleared
+    // draft resurrecting on reload is the breach this duty prevents.
     expect(() => { store.remove('s1') }).not.toThrow()
-    expect(readRecord(storage).drafts).toEqual({ s1: 'first' })
+    expect(storage.map.has('dsh.draft-keeper')).toBe(false)
     expect(() => { store.prune([]) }).not.toThrow()
-    expect(readRecord(storage).drafts).toEqual({ s1: 'first' })
+  })
+
+  it('shrinks the record best-effort when a clearing follows a write-failure latch', () => {
+    const storage = new MemoryStorage()
+    const store = createDraftStore(storage, 'dsh.draft-keeper')
+    store.set('s1', 'one')
+    store.set('s2', 'two')
+    storage.setItem.mockImplementation(() => { throw new DOMException('quota', 'QuotaExceededError') })
+    expect(() => { store.set('s1', 'a longer text that fails to persist') }).not.toThrow()
+    storage.setItem.mockImplementation((key: string, value: string) => { storage.map.set(key, value) })
+    store.set('s1', '')
+    expect(readRecord(storage).drafts).toEqual({ s2: 'two' })
+  })
+
+  it('leaves the record untouched when the latch came from a failed read', () => {
+    const storage = new MemoryStorage()
+    storage.map.set('dsh.draft-keeper', JSON.stringify({ version: 1, drafts: { s1: 'unread' } }))
+    storage.getItem.mockImplementation(() => { throw new DOMException('unavailable', 'SecurityError') })
+    const store = createDraftStore(storage, 'dsh.draft-keeper')
+    store.get('s1')
+    expect(() => { store.remove('s1') }).not.toThrow()
+    expect(() => { store.set('s1', '') }).not.toThrow()
+    // The map never loaded cleanly, so the unreadable record is not guessed at.
+    expect(storage.setItem).not.toHaveBeenCalled()
+    expect(storage.removeItem).not.toHaveBeenCalled()
   })
 
   it('latches off when the first read fails (private mode)', () => {

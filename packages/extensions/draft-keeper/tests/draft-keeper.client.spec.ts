@@ -9,9 +9,11 @@
  * queue, stored draft) and its one-time guard, the steering-queue hold, the
  * live-list prune, the coexistence with input-history-recall's traversal (a
  * non-empty live draft is saved, never overwritten), HMR teardown (pending
- * write flushed, restored set rebuilt, storage crossing the reload), and the
- * silent degradation when localStorage fails or does not exist. Plus the
- * inert node entry and the invariant companion's ownership reservation.
+ * write flushed, restored set rebuilt, storage crossing the reload), the
+ * silent degradation when localStorage fails or does not exist, and the
+ * best-effort clearing that keeps a quota-latched mirror from resurrecting
+ * a draft the user watched disappear. Plus the inert node entry and the
+ * invariant companion's ownership reservation.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -379,6 +381,33 @@ describe('draft-keeper browser half', () => {
     expect(storedDrafts()).toEqual({})
     expect(() => { setDraftOf(b, 's1', '') }).not.toThrow()
     setItem.mockRestore()
+  })
+
+  it('still clears a stored draft after a quota latch so a reload resurrects nothing', async () => {
+    const b = await bench()
+    setDraftOf(b, 's1', 'stored before the failure')
+    await runDebounce()
+    expect(storedDrafts()).toEqual({ s1: 'stored before the failure' })
+    // Quota failure shape: the growth write fails; the clearing path needs
+    // only the key removal, which a quota-blocked storage still allows.
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError')
+    })
+    setDraftOf(b, 's1', 'a longer draft that fails to persist')
+    await runDebounce()
+    expect(storedDrafts()).toEqual({ s1: 'stored before the failure' })
+    // The user clears (or sends): the latch must not swallow the deletion.
+    setDraftOf(b, 's1', '')
+    expect(storedDrafts()).toEqual({})
+    setItem.mockRestore()
+    // Simulated reload: a fresh lifetime over the same storage restores nothing.
+    await b.fiber.dispose()
+    const input = b.input('s1' as SessionId)
+    input.state.set({ ...input.state.getSnapshot(), draft: '' })
+    const fiber2 = b.ctx.plugin({ inject: [...inject], apply })
+    await fiber2.await()
+    expect(input.setDraft).not.toHaveBeenCalled()
+    await fiber2.dispose()
   })
 
   it('degrades to a no-op without localStorage', async () => {

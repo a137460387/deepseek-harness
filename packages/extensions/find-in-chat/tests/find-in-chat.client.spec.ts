@@ -23,6 +23,8 @@ import * as FindInChatInvariant from '../src/invariant.ts'
 /** The two highlight registry names the controller paints. */
 const HIGHLIGHT_ALL = 'dsh-find-in-chat-all'
 const HIGHLIGHT_ACTIVE = 'dsh-find-in-chat-active'
+/** The query-research debounce, mirrored from the controller for timer math. */
+const QUERY_DEBOUNCE_MS = 200
 
 /** One row of chat prose appended to the flow. */
 function addRow(flow: HTMLElement, text: string, key = text): HTMLElement {
@@ -180,7 +182,7 @@ describe('find controller interception', () => {
 })
 
 describe('find controller search and stepping', () => {
-  it('researches on query changes and reports counts and coverage', () => {
+  it('researches on query changes and reports counts and coverage', async () => {
     const b = bench()
     const older = document.createElement('div')
     const button = document.createElement('button')
@@ -193,6 +195,9 @@ describe('find controller search and stepping', () => {
     addRow(b.flow, 'needle two', 'row-3')
     key('f', { ctrl: true })
     b.controller.setQuery('needle')
+    await vi.waitFor(() => {
+      expect(b.controller.getSnapshot().total).toBe(2)
+    })
     const state = b.controller.getSnapshot()
     expect(state.total).toBe(2)
     expect(state.index).toBe(0)
@@ -254,12 +259,15 @@ describe('find controller search and stepping', () => {
     b.controller.dispose()
   })
 
-  it('gates the Enter/Escape family to the bound input', () => {
+  it('gates the Enter/Escape family to the bound input', async () => {
     const b = bench()
     addRow(b.flow, 'needle a', 'row-1')
     addRow(b.flow, 'needle b', 'row-2')
     key('f', { ctrl: true })
     b.controller.setQuery('needle')
+    await vi.waitFor(() => {
+      expect(b.controller.getSnapshot().index).toBe(0)
+    })
     key('Enter')
     expect(b.controller.getSnapshot().index).toBe(0)
     key('Escape')
@@ -330,17 +338,80 @@ describe('find controller search and stepping', () => {
     b.controller.dispose()
   })
 
-  it('reports an empty window when the flow disappears mid-search', () => {
+  it('reports an empty window when the flow disappears mid-search', async () => {
     const b = bench()
     addRow(b.flow, 'needle')
     key('f', { ctrl: true })
     b.controller.setQuery('needle')
     b.flow.remove()
     b.controller.setQuery('needle two')
+    await vi.waitFor(() => {
+      expect(b.controller.getSnapshot().searchedRows).toBe(0)
+    })
     const state = b.controller.getSnapshot()
     expect(state.total).toBe(0)
     expect(state.searchedRows).toBe(0)
     b.controller.dispose()
+  })
+
+  it('debounces rapid query changes into one research', () => {
+    vi.useFakeTimers()
+    try {
+      const b = bench()
+      addRow(b.flow, 'alpha one', 'row-1')
+      addRow(b.flow, 'alphabet', 'row-2')
+      key('f', { ctrl: true })
+      b.controller.setQuery('alph')
+      b.controller.setQuery('alphabet')
+      // The input shows at once; the scan trails the last keystroke only.
+      expect(b.controller.getSnapshot().query).toBe('alphabet')
+      expect(b.controller.getSnapshot().total).toBe(0)
+      vi.advanceTimersByTime(QUERY_DEBOUNCE_MS)
+      expect(b.controller.getSnapshot().total).toBe(1)
+      // One research ran: the intermediate query never hit the flow.
+      expect(b.states.some(state => state.total === 2)).toBe(false)
+      b.controller.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('flushes the pending research before stepping navigates', () => {
+    vi.useFakeTimers()
+    try {
+      const b = bench()
+      addRow(b.flow, 'needle a', 'row-1')
+      addRow(b.flow, 'needle b', 'row-2')
+      key('f', { ctrl: true })
+      b.controller.setQuery('needle')
+      expect(b.controller.getSnapshot().total).toBe(0)
+      b.controller.step(1)
+      const state = b.controller.getSnapshot()
+      expect(state.total).toBe(2)
+      expect(state.index).toBe(1)
+      vi.advanceTimersByTime(QUERY_DEBOUNCE_MS)
+      // The flush consumed the timer: no lingering rescan patches the state.
+      expect(b.controller.getSnapshot()).toBe(state)
+      b.controller.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('never runs a pending research after close', () => {
+    vi.useFakeTimers()
+    try {
+      const b = bench()
+      addRow(b.flow, 'needle')
+      key('f', { ctrl: true })
+      b.controller.setQuery('needle')
+      b.controller.close()
+      vi.advanceTimersByTime(QUERY_DEBOUNCE_MS)
+      expect(b.controller.getSnapshot().total).toBe(0)
+      b.controller.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
@@ -369,7 +440,9 @@ describe('find controller session and mutation wiring', () => {
     addRow(b.flow, 'needle a', 'row-1')
     key('f', { ctrl: true })
     b.controller.setQuery('needle')
-    expect(b.controller.getSnapshot().total).toBe(1)
+    await vi.waitFor(() => {
+      expect(b.controller.getSnapshot().total).toBe(1)
+    })
     b.controller.step(1)
     expect(b.controller.getSnapshot().index).toBe(0)
     addRow(b.flow, 'needle b', 'row-2')
@@ -419,26 +492,30 @@ describe('find controller session and mutation wiring', () => {
     b.controller.dispose()
   })
 
-  it('works without a MutationObserver on the platform', () => {
+  it('works without a MutationObserver on the platform', async () => {
     vi.stubGlobal('MutationObserver', undefined)
     const b = bench()
     addRow(b.flow, 'needle')
     key('f', { ctrl: true })
     b.controller.setQuery('needle')
-    expect(b.controller.getSnapshot().total).toBe(1)
+    await vi.waitFor(() => {
+      expect(b.controller.getSnapshot().total).toBe(1)
+    })
     b.controller.dispose()
   })
 })
 
 describe('find controller highlight painting', () => {
-  it('paints all and active registers through the platform API', () => {
+  it('paints all and active registers through the platform API', async () => {
     const registry = stubHighlightApi()
     const b = bench()
     addRow(b.flow, 'needle a', 'row-1')
     addRow(b.flow, 'needle b', 'row-2')
     key('f', { ctrl: true })
     b.controller.setQuery('needle')
-    expect(registry.get(HIGHLIGHT_ALL)?.ranges).toHaveLength(2)
+    await vi.waitFor(() => {
+      expect(registry.get(HIGHLIGHT_ALL)?.ranges).toHaveLength(2)
+    })
     expect(registry.get(HIGHLIGHT_ACTIVE)?.ranges).toHaveLength(1)
     b.input.focus()
     key('Enter')
@@ -448,13 +525,15 @@ describe('find controller highlight painting', () => {
     expect(registry.has(HIGHLIGHT_ACTIVE)).toBe(false)
   })
 
-  it('clears both registers on close', () => {
+  it('clears both registers on close', async () => {
     const registry = stubHighlightApi()
     const b = bench()
     addRow(b.flow, 'needle')
     key('f', { ctrl: true })
     b.controller.setQuery('needle')
-    expect(registry.has(HIGHLIGHT_ALL)).toBe(true)
+    await vi.waitFor(() => {
+      expect(registry.has(HIGHLIGHT_ALL)).toBe(true)
+    })
     b.controller.close()
     expect(registry.has(HIGHLIGHT_ALL)).toBe(false)
     expect(registry.has(HIGHLIGHT_ACTIVE)).toBe(false)
