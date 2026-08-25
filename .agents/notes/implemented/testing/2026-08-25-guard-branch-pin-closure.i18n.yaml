@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-08-25-guard-branch-pin-closure.md
+2026-08-25-guard-branch-pin-closure.md: 9074a7c15b317b7739f2c3dbb802e6f5b46a5aac
+2026-08-25-guard-branch-pin-closure.zh.md: 6a4ff5586b36b07f2ff291b784ba9effda7829a7
