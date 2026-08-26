@@ -90,6 +90,28 @@
 ## CI 与门控豁免账本（2026-08-24 立册）
 
 - **CI/Actions 豁免**：`E2E (real DeepSeek API)` 与 `CI master` 均已 `disabled_manually`——前者 fork 缺 real API secret，后者 fork 缺 self-hosted runner 池（`serial-linux` 需 `[self-hosted, linux, x64, vm-backup]`，`serial-windows` 需 `[self-hosted, dsh-win-ci, windows]`），均结构性不可跑；两个永久僵尸 run（32628954931 / 32674480671）已一并手动取消。`Sandbox` 保持启用：macOS leg（seatbelt）为已知红（上游 pwsh 持久化栈 3 个单测失败，归因 `47f9438..b150a551` 区间、上游零 CI 验证），Linux 3 leg 为活体哨兵、变红才是新信号；此后每次 push 预期恰好一封 Sandbox 失败邮件（macOS leg）。
+  - **Sandbox macOS seatbelt 已知红·上游查证结果（2026-08-27）**：结论「未报」，无需等上游修复，fork 哨兵形态自持。三重证据：① 检索面全零——upstream issues 对 `seatbelt` / `pwsh` / `scrollback` / `stdin_read` / `loader-composition` / `terminal-bash` 及特征串 `__DSH_PERSISTENT_PWSH_START`、`inferred_idle` 全部零命中；discussions 仅邻近议题而非本红（[#4314](https://github.com/deepseek-ai/deepseek-harness/discussions/4314) 是 Seatbelt profile 安全纵深诉求、[#4102](https://github.com/deepseek-ai/deepseek-harness/discussions/4102) 是 prompt 形态早完成行为 bug，均未涉及 CI 红本身）。② 上游对嫌疑区间零覆盖——master HEAD=`b150a551`（2026-08-21），Sandbox 全库仅 [run 31701562202](https://github.com/deepseek-ai/deepseek-harness/actions/runs/31701562202) 一跑且停在区间起点 `47f9438`（2026-08-13 全绿），其后 854 笔再无任何 Sandbox run：pwsh 持久化栈经 [PR #2300](https://github.com/deepseek-ai/deepseek-harness/pull/2300)（merge `e7d24de36c`）落地全程未被上游验证，「上游零 CI 验证」由推断升级为实况。③ 引入点坐实——三个失败测试在区间起点均不存在（`packages/shell/tool-pwsh-persistent/tests/` 整目录缺席、`local.spec.ts` 的 `pwsh real shell` 套件零处）；上游绿跑与 fork 红跑同为镜像 `macos-26-arm64 20260728.0273`，镜像漂移排除。补充定性修正：失败位于该 leg 的「Unit tests (darwin parity)」步（裸 `pnpm run test`，非沙箱限制内拒绝），job 在此步中止，故 macOS 的 seatbelt 限制证明步当前两侧均无在跑信号；断言细节显示 pwsh 命令本身 exit 0、败在其捕获面（scrollback 回卷吞掉期望载荷、waitReason 判定 `inferred_idle` ≠ `stdin_read`、UTF-8 pin 输出未被观测到视口）。
+
+    <details>
+    <summary>报上游素材包（完整文本，挂账待发——仅当用户明确触发上报时使用，不随自动流程外发）</summary>
+
+    **Draft title**: `CI: Sandbox macOS leg red since the persistent-pwsh stack landed (PR #2300 range) — 3 tests fail in the darwin-parity unit suite`
+
+    **现象**：`.github/workflows/sandbox.yml` 的 `sandbox e2e (seatbelt, macos-latest)` job 自 pwsh 持久化栈合入起持续红于其「Unit tests (darwin parity)」步（`pnpm run test`），3 个测试稳定失败、每轮同形：
+
+    1. `packages/shell/tool-pwsh-persistent/tests/loader-composition.spec.ts:142` — `AssertionError: expected '<response clipped><NOTE>The beginning of this command output was dropped by the terminal scrollback limit...' to contain 'cwd=/var/folders/.../nested keep=loader'`；Received 内容显示被包装命令本身 exit 0（`__DSH_PERSISTENT_PWSH_END_*:0`），败因是命令回显撑爆 scrollback 后期望载荷被裁剪标记顶出保留区。
+    2. `packages/terminal/terminal-bash/tests/local.spec.ts:299` — `AssertionError: expected 'inferred_idle' to be 'stdin_read'`（persistent pwsh 等待态判定提前收敛到 idle）。
+    3. `packages/terminal/terminal-bash/tests/local.spec.ts:333` — `AssertionError: expected '' to contain 'console=utf-8 out=utf-8'`（UTF-8 编码钉死脚本的输出从未进入视口）。
+
+    本轮汇总口径：`Test Files 2 failed | 882 passed | 8 skipped`，`Tests 3 failed | 14948 passed | 68 skipped`。
+
+    **复现实况**（fork 持续验证，形状稳定）：[run 32878949070 / job 97903549227](https://github.com/a137460387/deepseek-harness/actions/runs/32878949070/job/97903549227)（HEAD 含上游 `b150a551` 全量）；fork 侧 Sandbox 全史 19 跑全红、首跑即红（[run 32467442537](https://github.com/a137460387/deepseek-harness/actions/runs/32467442537)，2026-08-21）。最小复现：任一含该栈的树在 `macos-latest` runner 上 `pnpm install --frozen-lockfile && pnpm run test`；或开启 sandbox.yml 于 master push 观察。
+
+    **区间与引入**：嫌疑区间 `47f9438..b150a551`（854 笔）。区间起点 `47f9438`（2026-08-13）恰为上游唯一一次 Sandbox 全绿；随后 pwsh 持久化栈经 PR #2300 落地（代表笔 `0441312768` feat(pty): persistent pwsh tool 引入全部三个失败测试、`06b766711c` fix(pty): pin UTF-8 output encodings、`a8dc6f9776` fix(pty): keep the controlled prompt、`2f759a6b65` fix(shell): preserve prompt-like PowerShell output）。同域后续修正：#2417（pwsh-terminal-overlay-dup）、#2517（node-pty 1.2 beta）。上游侧自 `47f9438` 后再无 Sandbox run，问题不可见于上游自身流水线。
+
+    **影响面**：仅 macOS leg；Windows 不在该 matrix；Linux 三 leg（bwrap ×1 + landlock ×2）逐轮全绿不受影响；无 branch protection required checks，不阻塞 merge/push。附带信号缺口：job 在单测步中止使 macOS 侧 `sandbox-exec` 限制证明步（seatbelt.e2e）同样无法在跑，修复前两侧的 macOS 限制证明都只能离线补证。
+
+    </details>
 - **duplication 门处置**：usage-stats ↔ token-meter 两克隆裁决为有意镜像（`projection.ts` 模块头自声明镜像 `tokenUsage` 的 scope，折叠语义必须与其保持一致）；字面消除不可行——token-meter 的 schema 与事件分解块为模块私有，导出它们需扩展上游文件补丁面，与禁改条款冲突，且跨单元共享 schema 会耦合两个独立投影的 wire 契约。处置按「契约测试防漂移」条款与 connection fixture 先例形态：保留镜像，在 `packages/extensions/usage-stats/src/projection.ts` 两处镜像块加 `/* jscpd:ignore-start */` 内联豁免（不改上游根配置 `.jscpd.json`）；补上此前缺失的对拍防护——`packages/extensions/usage-stats/tests/fold-contract.host.spec.ts` 经 `./src/*` 子路径静态导入真实 `tokenUsageProjectionDefinition`，以代表性语料钉死两折叠桶量在每个前缀相等（上游改 intake 语义下次同步即红；usage-stats 为此新增 dsh-token-meter devDependency，同 connection 先例）；`UsageStatsSection.tsx` 文内自重复（趋势与环形区块共用的维度切换按钮组）抽 `dimensionToggle` helper 消除，行为不变。
 
 ## Fork 功能深化账本（2026-08-25 立册）
