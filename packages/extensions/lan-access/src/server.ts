@@ -6,13 +6,19 @@
  * loudly when it is missing, and otherwise re-wraps the bound `http.Server`'s
  * `request` and `upgrade` dispatch so every path — static assets and
  * `index.html` included — passes the gate before any registered handler runs.
- * The composition's web-app runtime derives the LAN trust fence from the real
- * bind (`resolveLanTrust`), so this package never fakes Host or Origin.
+ * Setting `DSH_LAN_TRUST_LOCALHOST=1` additionally exempts requests whose TCP
+ * peer and Host header are both loopback from the token judgment; the peer
+ * check reads the socket's real remote address, never forwarded headers, so a
+ * public hostname riding a loopback peer (the reverse-tunnel shape) stays
+ * gated. The composition's web-app runtime derives the LAN trust fence from
+ * the real bind (`resolveLanTrust`), so this package never fakes Host or
+ * Origin.
  * @module @deepseek-ai/dsh-host-lan-access
  */
 
 import { createHash, timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { isIPv4 } from 'node:net'
 import type { Duplex } from 'node:stream'
 import { Service } from '@deepseek-ai/cordis'
 import { Config as BaseConfig, WebServer } from '@deepseek-ai/dsh-host-webserver'
@@ -21,6 +27,8 @@ import { Config as BaseConfig, WebServer } from '@deepseek-ai/dsh-host-webserver
 const DSH_LAN_ENABLED_ENV = 'DSH_LAN_ENABLED'
 /** Shared-secret environment variable; required once the switch is on. */
 const DSH_LAN_TOKEN_ENV = 'DSH_LAN_TOKEN'
+/** Opt-in localhost exemption switch; only `1`/`true` (case-insensitive) enable it. */
+const DSH_LAN_TRUST_LOCALHOST_ENV = 'DSH_LAN_TRUST_LOCALHOST'
 /** Cookie carrying the shared secret, set by the `?token=` entry redirect and the /auth-set handshake. */
 const DSH_LAN_COOKIE = 'dsh-lan-token'
 /** Name the /auth-set handshake redirects back to. */
@@ -67,6 +75,63 @@ function tokenMatches(presented: string, expectedDigest: Buffer): boolean {
   return digest.length === expectedDigest.length && timingSafeEqual(digest, expectedDigest)
 }
 
+/**
+ * Whether a TCP peer address is loopback: `127.0.0.0/8`, `::1`, or an
+ * IPv4-mapped `::ffff:127.x.x.x` normalized to its IPv4 form. Anything else —
+ * LAN addresses included — is not.
+ * @param address The socket's real remote address; never a forwarded header value.
+ * @returns Whether the address names the local machine's loopback interface.
+ */
+export function isLoopbackTcpPeer(address: string): boolean {
+  const normalized = address.toLowerCase().startsWith('::ffff:') ? address.slice('::ffff:'.length) : address
+  if (normalized === '::1') return true
+  return isIPv4(normalized) && normalized.split('.')[0] === '127'
+}
+
+/**
+ * Whether a Host header names loopback: `localhost`, an IPv4 address in
+ * `127.0.0.0/8`, or bracketed `::1`, each optionally carrying a port. A public
+ * hostname over a loopback TCP peer (the reverse-tunnel shape) fails here and
+ * the token judgment stays in force.
+ * @param host The raw Host header value, port included.
+ * @returns Whether the header's host part names loopback.
+ */
+export function isLoopbackHostHeader(host: string): boolean {
+  if (host.startsWith('[')) {
+    const close = host.indexOf(']')
+    if (close === -1) return false
+    return host.slice(1, close).toLowerCase() === '::1'
+  }
+  const colon = host.lastIndexOf(':')
+  const port = colon === -1 ? '' : host.slice(colon + 1)
+  const name = port !== '' && /^\d+$/.test(port) ? host.slice(0, colon) : host
+  if (name.toLowerCase() === 'localhost') return true
+  return isIPv4(name) && name.split('.')[0] === '127'
+}
+
+/**
+ * Whether both halves of the opt-in localhost exemption hold for a request:
+ * the socket's real TCP peer is loopback and the Host header names loopback.
+ * Forwarded-for headers never enter the decision — only the socket address
+ * does — so they cannot manufacture an exemption.
+ * @param req The request under judgment.
+ * @returns Whether the request qualifies for the `DSH_LAN_TRUST_LOCALHOST` exemption.
+ */
+function requestIsLocalLoopback(req: IncomingMessage): boolean {
+  const remoteAddress = req.socket.remoteAddress
+  const host = req.headers.host
+  return remoteAddress !== undefined && isLoopbackTcpPeer(remoteAddress)
+    && host !== undefined && isLoopbackHostHeader(host)
+}
+
+/** Whether `DSH_LAN_TRUST_LOCALHOST` is set to the one enabling value pair. */
+function localhostBypassEnabled(): boolean {
+  const value = process.env[DSH_LAN_TRUST_LOCALHOST_ENV]
+  if (value === undefined) return false
+  const normalized = value.toLowerCase()
+  return normalized === '1' || normalized === 'true'
+}
+
 /** Minimal 401 page: no script, no asset references, no dist path leaks. */
 function unauthorizedPage(reason: string): string {
   const body = reason === 'invalid-token'
@@ -102,6 +167,9 @@ export class LanAccessWebServer extends WebServer {
   /** Digest of the configured token; set once, before any request is served. */
   private tokenDigest: Buffer | undefined
 
+  /** Whether the opt-in localhost exemption (`DSH_LAN_TRUST_LOCALHOST`) is active. */
+  private trustLocalhost = false
+
   /** Whether this instance has wrapped the base dispatch. */
   private gateInstalled = false
 
@@ -121,6 +189,7 @@ export class LanAccessWebServer extends WebServer {
       throw new Error(`${DSH_LAN_TOKEN_ENV} is required when ${DSH_LAN_ENABLED_ENV} is set; refusing to bind all interfaces without an access token`)
     }
     this.tokenDigest = createHash('sha256').update(token).digest()
+    this.trustLocalhost = localhostBypassEnabled()
     await super[Service.init]()
     this.installGate()
   }
@@ -174,7 +243,13 @@ export class LanAccessWebServer extends WebServer {
           deny(res, 'invalid-token')
           return
         }
-        if (!requestCarriesToken(req, digest)) {
+        // The opt-in localhost exemption skips only this judgment: both the
+        // TCP peer and the Host header must be loopback, so the reverse-tunnel
+        // shape (loopback peer, public Host) and the LAN shape stay gated. The
+        // cookie-entry flows above and the base handlers' Host fence stay in
+        // force.
+        const localhostExempt = this.trustLocalhost && requestIsLocalLoopback(req)
+        if (!localhostExempt && !requestCarriesToken(req, digest)) {
           deny(res, 'no-token')
           return
         }
@@ -187,7 +262,8 @@ export class LanAccessWebServer extends WebServer {
     })
     server.on('upgrade', (req, socket, head) => {
       const digest = this.tokenDigest
-      if (digest === undefined || !requestCarriesToken(req, digest)) {
+      const localhostExempt = this.trustLocalhost && requestIsLocalLoopback(req)
+      if (digest === undefined || (!localhostExempt && !requestCarriesToken(req, digest))) {
         // Reject before any protocol negotiation: an unauthenticated socket
         // never reaches the registered upgrade handler.
         socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n')

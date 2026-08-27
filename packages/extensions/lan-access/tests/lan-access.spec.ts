@@ -3,14 +3,17 @@
  * /api and the static fallback), the websocket handshake rejection, the
  * /auth-set cookie handshake, the `?token=` entry cookie exchange, the
  * placeholder 401 page's opacity, the disabled-mode byte-for-byte
- * equivalence with the stock server, the fail-loud missing-token boot, and
- * the no-token-in-logs guarantee.
+ * equivalence with the stock server, the fail-loud missing-token boot, the
+ * no-token-in-logs guarantee, and the opt-in localhost exemption
+ * (`DSH_LAN_TRUST_LOCALHOST`): its loopback peer + loopback Host halves, the
+ * reverse-tunnel and LAN shapes that must stay gated, its env parsing, and
+ * the loopback classification predicates.
  */
 
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { once } from 'node:events'
 import { connect } from 'node:net'
-import { tmpdir } from 'node:os'
+import { networkInterfaces, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -18,7 +21,7 @@ import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import HttpServer from '@deepseek-ai/dsh-host-webserver'
-import { LanAccessWebServer } from '../src/server.ts'
+import { isLoopbackHostHeader, isLoopbackTcpPeer, LanAccessWebServer } from '../src/server.ts'
 import * as LanAccessInvariant from '../src/invariant.ts'
 import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 
@@ -33,6 +36,26 @@ function setLanEnv(enabled: string | undefined, token: string | undefined): void
   else vi.stubEnv('DSH_LAN_ENABLED', enabled)
   if (token === undefined) vi.stubEnv('DSH_LAN_TOKEN', '')
   else vi.stubEnv('DSH_LAN_TOKEN', token)
+}
+
+/** Pin the localhost-exemption switch for one test; undefined deletes it (unset). */
+function setTrustLocalhost(value: string | undefined): void {
+  vi.stubEnv('DSH_LAN_TRUST_LOCALHOST', value)
+}
+
+/** The machine's first non-internal IPv4; the LAN-peer test fails loudly on a host with none. */
+function lanIpv4(): string {
+  const entry = Object.values(networkInterfaces()).flat().find(info => info !== undefined && !info.internal && info.family === 'IPv4')
+  if (entry === undefined) throw new Error('no non-loopback IPv4 interface on this host: cannot pin the LAN-peer denial')
+  return entry.address
+}
+
+/** Dispose the module-level context and temp root; safe to call between sequential boots in one test. */
+async function disposeCurrent(): Promise<void> {
+  await context?.fiber.dispose()
+  context = undefined
+  if (root !== undefined) await rm(root, { recursive: true, force: true })
+  root = undefined
 }
 
 beforeEach(() => {
@@ -110,13 +133,13 @@ async function request(port: number, path: string, init?: RequestInit): Promise<
 }
 
 /** Open one raw upgrade request; resolves with the first response bytes. */
-async function rawUpgrade(port: number, path: string, extra: string[] = []): Promise<{ data: string; closed: Promise<unknown> }> {
+async function rawUpgrade(port: number, path: string, extra: string[] = [], host = `127.0.0.1:${String(port)}`): Promise<{ data: string; closed: Promise<unknown> }> {
   const socket = connect(port, '127.0.0.1')
   await once(socket, 'connect')
   const response = once(socket, 'data')
   socket.write([
     `GET ${path} HTTP/1.1`,
-    `Host: 127.0.0.1:${String(port)}`,
+    `Host: ${host}`,
     'Connection: Upgrade',
     'Upgrade: websocket',
     'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
@@ -127,6 +150,38 @@ async function rawUpgrade(port: number, path: string, extra: string[] = []): Pro
   ].join('\r\n'))
   const [data] = await response as [Buffer]
   return { data: String(data), closed: once(socket, 'close') }
+}
+
+/**
+ * One raw HTTP/1.1 GET with full control of the connect target and the Host
+ * header (fetch cannot set Host — a spec-forbidden header). The socket asks
+ * for `Connection: close`, so the full response arrives before `end`.
+ */
+async function rawRequest(
+  port: number,
+  connectHost: string,
+  hostHeader: string,
+  path: string,
+  extra: string[] = [],
+): Promise<{ status: number; headers: string; body: string }> {
+  const socket = connect(port, connectHost)
+  await once(socket, 'connect')
+  const chunks: Buffer[] = []
+  socket.on('data', (chunk: Buffer) => { chunks.push(chunk) })
+  socket.write([
+    `GET ${path} HTTP/1.1`,
+    `Host: ${hostHeader}`,
+    ...extra,
+    'Connection: close',
+    '',
+    '',
+  ].join('\r\n'))
+  await once(socket, 'end')
+  const raw = Buffer.concat(chunks).toString('utf8')
+  const split = raw.indexOf('\r\n\r\n')
+  const head = split === -1 ? raw : raw.slice(0, split)
+  const body = split === -1 ? '' : raw.slice(split + 4)
+  return { status: Number(head.split('\r\n')[0]?.split(' ')[1]), headers: head, body }
 }
 
 describe('LAN token gate', () => {
@@ -382,6 +437,162 @@ describe('log hygiene', () => {
     expect(consoleText).not.toContain(TOKEN)
     logSpy.mockRestore()
     warnSpy.mockRestore()
+  })
+})
+
+describe('opt-in localhost exemption (DSH_LAN_TRUST_LOCALHOST)', () => {
+  it('exempts loopback-peer requests with loopback Host headers on pages and websocket upgrades, keeping the cookie entry intact', { timeout: 60_000 }, async () => {
+    setLanEnv('true', TOKEN)
+    setTrustLocalhost('1')
+    const loaded = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts')
+    const server = loaded.webServer
+    let upgradeReached = false
+    server.registerUpgrade({
+      path: '/events',
+      handler: (_req, socket) => {
+        upgradeReached = true
+        socket.write('HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n')
+      },
+    })
+    server.registerFallback((_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/html' })
+      res.end('<html><body>shell</body></html>')
+    })
+
+    // No token, loopback TCP peer, Host localhost → the real page, not 401.
+    const page = await rawRequest(server.port, '127.0.0.1', 'localhost:3080', '/')
+    expect(page.status).toBe(200)
+    expect(page.body).toContain('shell')
+
+    // The IPv4 and bracketed IPv6 Host forms qualify identically (the IPv6
+    // peer itself is unreachable through the two-literal bind schema; the
+    // predicate suite below pins that half).
+    const ipv4Form = await rawRequest(server.port, '127.0.0.1', `127.0.0.1:${String(server.port)}`, '/')
+    expect(ipv4Form.status).toBe(200)
+    const bracketForm = await rawRequest(server.port, '127.0.0.1', '[::1]:3080', '/')
+    expect(bracketForm.status).toBe(200)
+
+    // The websocket handshake takes the same exemption.
+    const upgraded = await rawUpgrade(server.port, '/events', [], 'localhost:3080')
+    expect(upgraded.data).toContain('101 Switching Protocols')
+    expect(upgradeReached).toBe(true)
+
+    // The /auth-set token exchange still validates and sets its cookie.
+    const authSet = await rawRequest(server.port, '127.0.0.1', 'localhost:3080', `/auth-set?token=${TOKEN}`)
+    expect(authSet.status).toBe(302)
+    expect(authSet.headers).toContain(`set-cookie: dsh-lan-token=${TOKEN}`)
+    const invalidAuthSet = await rawRequest(server.port, '127.0.0.1', 'localhost:3080', '/auth-set?token=wrong')
+    expect(invalidAuthSet.status).toBe(401)
+  })
+
+  it('keeps the gate on for the reverse-tunnel shape: loopback peer, public Host, forged X-Forwarded-For, websocket denial', { timeout: 60_000 }, async () => {
+    setLanEnv('true', TOKEN)
+    setTrustLocalhost('1')
+    const loaded = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts')
+    const server = loaded.webServer
+    let upgradeReached = false
+    server.registerUpgrade({
+      path: '/events',
+      handler: (_req, socket) => {
+        upgradeReached = true
+        socket.write('HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n')
+      },
+    })
+    server.registerFallback((_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/html' })
+      res.end('<html><body>shell</body></html>')
+    })
+
+    // The cloudflared shape: the TCP peer is 127.0.0.1 but the Host names
+    // the public domain — the exemption's Host half fails, so no token
+    // still means 401.
+    const denied = await rawRequest(server.port, '127.0.0.1', 'dsh.lgyu.cloud', '/')
+    expect(denied.status).toBe(401)
+
+    // A forged forwarded-for header cannot manufacture the missing half.
+    const forged = await rawRequest(server.port, '127.0.0.1', 'dsh.lgyu.cloud', '/', ['X-Forwarded-For: 127.0.0.1'])
+    expect(forged.status).toBe(401)
+
+    // A valid cookie still passes the gate exactly as before.
+    const authed = await rawRequest(server.port, '127.0.0.1', 'dsh.lgyu.cloud', '/', [`Cookie: dsh-lan-token=${TOKEN}`])
+    expect(authed.status).toBe(200)
+    expect(authed.body).toContain('shell')
+
+    // The websocket handshake keeps the same denial for the tunnel shape.
+    const deniedUpgrade = await rawUpgrade(server.port, '/events', [], 'dsh.lgyu.cloud')
+    expect(deniedUpgrade.data).toContain('401 Unauthorized')
+    expect(upgradeReached).toBe(false)
+    deniedUpgrade.closed.catch(() => {})
+  })
+
+  it('keeps the gate on for LAN peers even when the Host matches the LAN address', { timeout: 60_000 }, async () => {
+    setLanEnv('true', TOKEN)
+    setTrustLocalhost('1')
+    const lan = lanIpv4()
+    const loaded = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts', 0, '0.0.0.0')
+    const server = loaded.webServer
+    server.registerFallback((_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/html' })
+      res.end('<html><body>shell</body></html>')
+    })
+
+    // Positive control on the same server: loopback peer + loopback Host is
+    // exempt, so the 401 below is the LAN peer's doing, not a missing switch.
+    const control = await rawRequest(server.port, '127.0.0.1', 'localhost:3080', '/')
+    expect(control.status).toBe(200)
+
+    // A non-loopback TCP peer with its own address as Host stays gated.
+    const denied = await rawRequest(server.port, lan, `${lan}:${String(server.port)}`, '/')
+    expect(denied.status).toBe(401)
+  })
+
+  it('enables the exemption only for 1 and true (case-insensitive); unset, yes, and 2 leave the gate unchanged', { timeout: 240_000 }, async () => {
+    for (const value of [undefined, 'yes', '2'] as const) {
+      setLanEnv('true', TOKEN)
+      setTrustLocalhost(value)
+      const loaded = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts')
+      const server = loaded.webServer
+      server.registerFallback((_req, res) => {
+        res.writeHead(200, { 'content-type': 'text/html' })
+        res.end('<html><body>shell</body></html>')
+      })
+      const denied = await rawRequest(server.port, '127.0.0.1', 'localhost:3080', '/')
+      expect(denied.status, `DSH_LAN_TRUST_LOCALHOST=${value ?? 'unset'} must stay gated`).toBe(401)
+      await disposeCurrent()
+    }
+    for (const value of ['true', 'TRUE'] as const) {
+      setLanEnv('true', TOKEN)
+      setTrustLocalhost(value)
+      const loaded = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts')
+      const server = loaded.webServer
+      server.registerFallback((_req, res) => {
+        res.writeHead(200, { 'content-type': 'text/html' })
+        res.end('<html><body>shell</body></html>')
+      })
+      const allowed = await rawRequest(server.port, '127.0.0.1', 'localhost:3080', '/')
+      expect(allowed.status, `DSH_LAN_TRUST_LOCALHOST=${value} must exempt`).toBe(200)
+      await disposeCurrent()
+    }
+  })
+})
+
+describe('loopback classification predicates', () => {
+  it('isLoopbackTcpPeer accepts 127/8, ::1, and IPv4-mapped forms; rejects LAN, public, and link-local addresses', () => {
+    for (const address of ['127.0.0.1', '127.0.0.2', '127.255.255.254', '::1', '::ffff:127.0.0.1', '::FFFF:127.10.20.30']) {
+      expect(isLoopbackTcpPeer(address), address).toBe(true)
+    }
+    for (const address of ['192.168.31.64', '10.1.2.3', '8.8.8.8', 'fe80::1', '2001:db8::1', '::ffff:192.168.31.64', '::', 'not-an-ip', '']) {
+      expect(isLoopbackTcpPeer(address), address).toBe(false)
+    }
+  })
+
+  it('isLoopbackHostHeader accepts localhost, 127/8, and bracketed ::1 with optional ports; rejects public names, LAN addresses, and near-miss forms', () => {
+    for (const host of ['localhost', 'LOCALHOST', 'LocalHost:3080', '127.0.0.1', '127.0.0.1:3080', '127.199.9.9', '[::1]', '[::1]:3080']) {
+      expect(isLoopbackHostHeader(host), host).toBe(true)
+    }
+    for (const host of ['dsh.lgyu.cloud', 'dsh.lgyu.cloud:443', '192.168.31.64:3080', '10.0.0.5', 'sub.localhost', 'localhost.', '[2001:db8::1]', '[2001:db8::1]:80', 'localhost:3080x', '']) {
+      expect(isLoopbackHostHeader(host), host).toBe(false)
+    }
   })
 })
 

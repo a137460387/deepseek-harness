@@ -11,6 +11,7 @@
 | `DSH_LAN_ENABLED` | 未设（关） | 任意非空值开启 LAN 模式；`false`、空串、未设均为关。 |
 | `DSH_LAN_BIND` | `0.0.0.0` | 开启时的绑定地址。schema 只认 `127.0.0.1` 与 `0.0.0.0` 两个字面量；其他值回退 `0.0.0.0`。 |
 | `DSH_LAN_TOKEN` | — | 开启后必填的共享密钥。缺失时整个插件树 fail-loud 启动中止。 |
+| `DSH_LAN_TRUST_LOCALHOST` | 未设（关） | 可选的 localhost 免 token 豁免；仅 `1`/`true`（大小写不敏感）生效，其余值与未设同为关闭。开启后的边界与代价见「安全警示」。 |
 | `DSH_LAN_EXTRA_AUTHORITIES` | 未设 | 可选的逗号分隔 `host[:port]` 列表，追加到 `/api` 浏览器信任 fence 的 `trustedHosts`。 |
 
 LAN 模式关闭时，行的 `host` 表达式就是原版的 `ctx.webStartup.host ?? '127.0.0.1'`——`--host`/`--port` 旗标行为与从前完全一致。
@@ -23,6 +24,7 @@ LAN 模式关闭时，行的 `host` 表达式就是原版的 `ctx.webStartup.hos
 - 任意路径带 `?token=<secret>` → 校验通过后设置会话 cookie（属性同 `/auth-set`），302 到同路径并清除查询参数。
 - `/auth-set?token=<secret>` → 校验通过后设置 `dsh-lan-token=<secret>` cookie（`HttpOnly; SameSite=Lax; Path=/`，不加 `Secure`——明文 HTTP 场景），302 回 `/`。
 - 有效 cookie → 请求放行到原版分派。
+- `DSH_LAN_TRUST_LOCALHOST=1/true` 时，TCP 对端与 Host 头均为回环形态的请求跳过 token 判定直接放行（普通请求与 websocket 升级走同一判定点）；`/auth-set` 与 `?token=` 换取 cookie 的流程不变。
 - 无效 token → 401。
 - 无凭据的 websocket 握手在任何协议协商之前以 401 拒绝。
 
@@ -33,6 +35,7 @@ token 比较用 `crypto.timingSafeEqual` 比对 SHA-256 摘要，绝不比较明
 - **链路上全部明文。** 明文 HTTP 下，`?token=` 查询参数与 session cookie 均不加密传输；能嗅探局域网流量的人就能拿到 token。信任边界是局域网本身。
 - **跨不可信网络必须套隧道。** 经由非可信网络访问时，用 SSH 隧道（`ssh -L 3180:127.0.0.1:3180 <host>`）或 HTTPS 反向代理包裹连接；不要把端口直接暴露到公网。
 - **token 等于远程代码执行授权。** Web UI 可以创建运行 shell 命令的 agent 会话；请像对待这台机器的 SSH 私钥一样对待 token。
+- **localhost 豁免默认关闭，开启等于信任本机全部进程。** 显式启用 `DSH_LAN_TRUST_LOCALHOST=1/true` 后，TCP 对端与 Host 头均为回环形态（localhost / 127.0.0.0/8 / `[::1]`，均可带端口）的请求跳过 token 判定直接放行，普通请求与 websocket 升级同判。边界：判定只依据 socket 对端真实地址与 Host 头，不读 `X-Forwarded-For` 等任何可伪造的转发头，因此反向隧道形态（回环对端 + 公网 Host，如 cloudflared 入站）与 LAN 形态（非回环对端）都不在豁免之列。代价：本机任何能连上该端口的进程或本地用户都直接获得完整 agent 授权（等价于持有 token），故默认关闭。
 - 原版 `/api` 浏览器信任 fence（DNS rebinding 与跨站防御）完整保留；本包在其之上加鉴权，绝不替代它。
 
 ## `.ts` 源码直引的约束
@@ -52,7 +55,7 @@ DSH_LAN_ENABLED=true DSH_LAN_TOKEN=<random> pnpm dsh --profile web --port 3180 -
 - `http://<LAN-IP>:3180/?token=<random>` 应完整加载 UI（token 首次进入时换取 cookie 并清参）。
 - 无凭据的 `curl -i http://<LAN-IP>:3180/api/session/list` 应返回 `401`。
 
-测试：`packages/extensions/lan-access/tests/lan-access.spec.ts`（10 个用例：`/api` 门禁、websocket 拒绝、auth-set 链路、`?token=` 死循环闭环、占位页不泄露、disabled 模式与原版逐字节对照——未设与显式 `false` 两态——缺 token fail-loud、日志卫生）。
+测试：`packages/extensions/lan-access/tests/lan-access.spec.ts`（16 个用例：`/api` 门禁、websocket 拒绝、auth-set 链路、`?token=` 死循环闭环、占位页不泄露、disabled 模式与原版逐字节对照——未设与显式 `false` 两态——缺 token fail-loud、日志卫生、localhost 豁免的双条件与 websocket 升级、隧道与 LAN 形态的维持门禁、豁免开关取值解析、回环分类谓词）。
 
 ## 模型体验
 

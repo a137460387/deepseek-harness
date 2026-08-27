@@ -24,7 +24,7 @@ Status: implemented
 
 ## 测试
 
-`packages/extensions/lan-access/tests/lan-access.spec.ts`——10 个用例，走真实 vendored Loader（与 webserver 包自身 spec 相同的 boot 形状）：无 token 时 `/api` 401 且 handler 从未被调用（spy）、websocket 握手无 token 被拒有 token 完成、`?token=` → 302 → `/auth-set` → Set-Cookie → 已鉴权 API/页面全链路、`?token=` 死循环闭环、占位 401 页对四条路径的不泄露、disabled 模式逐字节对照（未设与显式 `false`）、缺 token 的 fail-loud 启动、完整门禁会话的日志卫生、invariant 伴生件注册。端到端用真实 profile 启动在 3180 端口验证三种模式：enabled（401 / 302 / cookie / 鉴权放行、打印 LAN URL）、disabled（原版行为、无 LAN 行）、enabled 无 token（exit 1 带标签诊断）。
+`packages/extensions/lan-access/tests/lan-access.spec.ts`——16 个用例（末 6 例钉死 opt-in localhost 豁免，见 [localhost 豁免 Agent Note](2026-08-27-lan-access-localhost-exemption.zh.md)），走真实 vendored Loader（与 webserver 包自身 spec 相同的 boot 形状）：无 token 时 `/api` 401 且 handler 从未被调用（spy）、websocket 握手无 token 被拒有 token 完成、`?token=` → 302 → `/auth-set` → Set-Cookie → 已鉴权 API/页面全链路、`?token=` 死循环闭环、占位 401 页对四条路径的不泄露、disabled 模式逐字节对照（未设与显式 `false`）、缺 token 的 fail-loud 启动、完整门禁会话的日志卫生、invariant 伴生件注册。端到端用真实 profile 启动在 3180 端口验证三种模式：enabled（401 / 302 / cookie / 鉴权放行、打印 LAN URL）、disabled（原版行为、无 LAN 行）、enabled 无 token（exit 1 带标签诊断）。
 
 ## 备选方案
 
