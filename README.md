@@ -1,3 +1,12 @@
+> [!NOTE]
+> **这是 deepseek-harness 的个人维护 fork**(pre-release,无兼容性承诺),非官方仓库。上游仓库与安装说明见 <https://github.com/deepseek-ai/deepseek-harness>。
+> 本 fork 的增量交付:
+> - [SECURITY_ADVISORY.md](SECURITY_ADVISORY.md) — QVD-2026-57410 安全通告(已修复)
+> - [DEPLOY_TUNNEL.md](DEPLOY_TUNNEL.md) — 公网部署配方(named tunnel + NSSM 服务化)
+> - [FORK_NOTES.md](FORK_NOTES.md) — fork 运维沉淀与本地补丁账本
+>
+> 以下为上游 README 原文,本 fork 未改动。
+
 # DeepSeek Harness
 
 English | [中文](README.zh.md)
