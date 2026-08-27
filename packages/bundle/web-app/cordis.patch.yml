@@ -118,11 +118,32 @@
     # Plain route-registration carrier; host and port come from the app's
     # webStartup provider, with these deployment fallbacks. The dist is served by
     # the web-runtime row below through the fallback seat.
+    # Fork: disabled in favor of lan-access-webserver below (same transport,
+    # optional token gate for all-interfaces binds). The row keeps its stock
+    # name and config so an overlay patch can swap the two rows back.
     - id: webserver
       name: '@deepseek-ai/dsh-host-webserver'
       inject: [webStartup]
+      disabled: true
       config:
         host: !!js ctx.webStartup.host ?? '127.0.0.1'
+        port: !!js ctx.webStartup.port ?? 3080
+
+    # Fork LAN-access webserver: a subclass of the plain webserver's plugin.
+    # DSH_LAN_ENABLED=false (or unset) leaves it byte-for-byte the stock
+    # server; DSH_LAN_ENABLED=true requires DSH_LAN_TOKEN and binds
+    # DSH_LAN_BIND (default 0.0.0.0) with every path behind the token gate.
+    # Config field-by-field against the base row it replaces:
+    #   host — base: ctx.webStartup.host ?? '127.0.0.1'; here: the same
+    #     expression, overridden to DSH_LAN_BIND ?? '0.0.0.0' while the LAN
+    #     switch is on (bind is what the switch controls).
+    #   port — unchanged: ctx.webStartup.port ?? 3080.
+    # No other config fields exist on the webserver schema (host, port only).
+    - id: lan-access-webserver
+      name: '@deepseek-ai/dsh-host-lan-access/src/server.ts'
+      inject: [webStartup]
+      config:
+        host: !!js "process.env.DSH_LAN_ENABLED ? (process.env.DSH_LAN_BIND === '127.0.0.1' || process.env.DSH_LAN_BIND === '0.0.0.0' ? process.env.DSH_LAN_BIND : '0.0.0.0') : (ctx.webStartup.host ?? '127.0.0.1')"
         port: !!js ctx.webStartup.port ?? 3080
 
     # Web glue owned by this bundle: resolves the built frontend dist (an
@@ -168,7 +189,9 @@
         # LAN literals derived from the active bind plus --trusted-host extras.
         # A deployment adding authorities keeps this expression and concatenates
         # its literals, for example: ['app.internal', ...ctx.webRuntime.trustedHosts].
-        trustedHosts: !!js ctx.webRuntime.trustedHosts
+        # Fork: DSH_LAN_EXTRA_AUTHORITIES (comma-separated host[:port]) appends
+        # extra fence authorities for the LAN-access deployment.
+        trustedHosts: !!js "[...(process.env.DSH_LAN_EXTRA_AUTHORITIES ?? '').split(',').map(s => s.trim()).filter(s => s !== ''), ...ctx.webRuntime.trustedHosts]"
 
     - id: api-remotes
       name: '@deepseek-ai/dsh-api-remotes'
