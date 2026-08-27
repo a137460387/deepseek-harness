@@ -40,6 +40,16 @@
 
 上游 CONTRIBUTING 声明当前不接受外部 PR；外部贡献走 GitHub Discussions（bug 上报/特性请求）与社区插件生态，修复以 fork 分支链接的形式附在帖子中。因此本文件的本地补丁登记是当前政策下的稳态实践而非过渡措施——每条补丁的上报状态登记在「已知本地补丁」条目内，上游若在 master 落地对应修复，按同步纪律合并后撤本地补丁。
 
+## 贡献政策（2026-08-27 立）
+
+本仓库是个人维护的 fork,处于 pre-release 阶段,一般不接受功能 PR;fork 增量交付按下方「Fork 工作流程」的七步流程自行推进。欢迎 Issue,仅限三类:
+
+- 事实性错误:文档、代码行为与描述不符;
+- 安全报告:走 [SECURITY.md](SECURITY.md) 的私有渠道,勿在公开 Issue 描述缺陷细节;
+- 文档改进建议。
+
+想贡献功能或上游修复,请向上游仓库提案:https://github.com/deepseek-ai/deepseek-harness ;本仓库的开发约定见 [AGENTS.md](AGENTS.md),上游自身的贡献姿态见上节。政策记于本文件而非根 CONTRIBUTING.md——后者是上游双语对文件(en↔zh,受 pairing 门管理),fork 改写即产生未登记的上游漂移;2026-08-27 曾误覆盖一次,已回滚。
+
 ## Fork 工作流程（2026-08-23 沉淀）
 
 三轮完整交付——draft-keeper（[#3999](https://github.com/deepseek-ai/deepseek-harness/discussions/3999)）、find-in-chat（[#4029](https://github.com/deepseek-ai/deepseek-harness/discussions/4029)）、draft-budget（[#4138](https://github.com/deepseek-ai/deepseek-harness/discussions/4138)）——沉淀的七步工作流程；新帖发布后把 URL 追加进本行。特性 Note 均在 `.agents/notes/implemented/feature/` 下，正文以 `文件名:行号` 引用；提交形状以 hash 引用；仓库无记录的会话级细节标注（交付记录），出处为历次交付汇总与交接提示词。
