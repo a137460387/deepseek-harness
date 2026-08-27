@@ -62,6 +62,8 @@ commit `c9cdd50356`(fix(fork): close the ?token= sign-in dead loop,2026-08-27 19
 
 "上游机制在该场景下已足够"的适用条件:仅当部署不声明公网 trusted-host、接受远程不可用时,上游 Host fence 独立阻断该攻击面。一旦为远程可用性显式信任公网域名,fence 不再构成屏障,防护依赖 `DSH_LAN_*` 门禁。此时门禁对缺陷本体(入口会话建立)已修复;对机制固有的 token 暴露面——URL 查询参数进入浏览器历史与访问日志、明文链路可嗅探、单一共享 token 无按设备吊销——仍是已知限制,既定缓解是:跨不可信网络的访问以 SSH 隧道或 HTTPS 反向代理包裹、token 取强随机值、轮换 `DSH_LAN_TOKEN` 即吊销(lan-access README 安全警示与 DEPLOY_TUNNEL.md 第 4 节)。
 
+覆盖的后续增量补充:显式启用 `DSH_LAN_TRUST_LOCALHOST`(值 `1`/`true`,默认关闭)时,回环对端且回环 Host 的请求免 token,隧道形态(回环对端 + 公网 Host)与 LAN 形态不在豁免之列;边界与代价见 [lan-access README.zh.md](packages/extensions/lan-access/README.zh.md) 安全警示节。
+
 ## 5. 时间线
 
 | 日期(2026) | 事件 | 证据 |

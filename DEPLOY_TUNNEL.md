@@ -91,7 +91,7 @@ Restart-Service cloudflared
 New-Item -ItemType Directory -Force -Path "<REPO_DIR>\.logs" | Out-Null
 ```
 
-第 2 步:安装服务并写入全部参数。`AppEnvironmentExtra` 是服务运行环境的唯一权威,四个变量缺一不可——**漏 `DSH_HOME` 会导致数据根漂移**(见下方说明)。
+第 2 步:安装服务并写入全部参数。`AppEnvironmentExtra` 是服务运行环境的唯一权威,四个变量缺一不可,另有可选的 `DSH_LAN_TRUST_LOCALHOST`(未设 = 关闭;本机部署不启用)——**漏 `DSH_HOME` 会导致数据根漂移**(见下方说明)。
 
 ```powershell
 $nssm = "<REPO_DIR>\tools\nssm.exe"
@@ -117,6 +117,8 @@ $node = "C:\Program Files\nodejs\node.exe"
 
 **DSH_HOME 说明(必读):** dsh 的数据根解析为 `DSH_HOME` 环境变量优先、缺省回退 `~/.dsh`(packages/util/home-paths)。NSSM 服务默认以 LocalSystem 运行,其 home 是 `C:\Windows\System32\config\systemprofile`,若不显式指定 `DSH_HOME`,服务会看到空数据根——历史 sessions、settings、`.credentials.yaml`(含 API key)全部"消失"。指定后既有数据完整可见(验收时 `session.list` 返回全部既有记录)。
 
+**DSH_LAN_TRUST_LOCALHOST 说明(可选,本部署不启用):** 该变量启用(值 `1`/`true`)后,本地验收判据随之变化——本机回环自测时,回环对端且回环 Host 的无凭据请求从 401 变为 200 直接放行;公网隧道形态(回环对端 + 公网 Host)与 LAN 形态不受影响,验收第 3 项仍预期 401。启用等于把完整 agent 授权交给本机全部进程,边界与代价见 lan-access README「安全警示」节;`AppEnvironmentExtra` 为整体覆盖语义,若曾启用,任何重设(如 token 轮换)必须一并重写该变量,漏写等于回到关闭。
+
 第 3 步:等待绑定并验证。源码启动(tsx)约需 1 分钟才绑定端口:
 
 ```powershell
@@ -127,7 +129,7 @@ $node = "C:\Program Files\nodejs\node.exe"
 
 - **权威来源是 NSSM 服务配置**(`dsh-web` 的 `AppEnvironmentExtra`)。用户级环境变量 `DSH_LAN_TOKEN` 仅是前台手动运行时的来源;两者不一致时,服务行为以 NSSM 配置为准。
 - token 校验为 SHA-256 摘要 + 常数时间比较;浏览器入口 `https://dsh.lgyu.cloud/?token=<TOKEN>`,302 应答种下 HttpOnly cookie,之后长期免登。
-- **轮换流程**(注意 `nssm set AppEnvironmentExtra` 为整体覆盖,必须重设全部四个变量,漏一个 `DSH_HOME` 就触发数据根漂移):
+- **轮换流程**(注意 `nssm set AppEnvironmentExtra` 为整体覆盖,必须重设全部四个变量——若启用了可选的 `DSH_LAN_TRUST_LOCALHOST` 须一并重写,漏写等于回到关闭;漏一个 `DSH_HOME` 就触发数据根漂移):
 
 ```powershell
 # 1. 生成新值
