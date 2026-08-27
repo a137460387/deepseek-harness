@@ -20,7 +20,7 @@ With LAN mode off, the row's `host` expression is the stock `ctx.webStartup.host
 Every request — static assets, `index.html`, `/api`, websocket upgrades — passes the token gate before any registered handler runs:
 
 - No credential → 401 with an inline placeholder page (no script, no asset path; the real dist is never named).
-- `?token=<secret>` on any path → 302 to the same path with the query cleared.
+- `?token=<secret>` on any path → validates, sets the session cookie (same attributes as `/auth-set`), 302 to the same path with the query cleared.
 - `/auth-set?token=<secret>` → validates, sets `dsh-lan-token=<secret>` cookie (`HttpOnly; SameSite=Lax; Path=/`, no `Secure` — plain HTTP), 302 to `/`.
 - Valid cookie → request passes through to the stock dispatch.
 - Invalid token → 401.
@@ -52,7 +52,7 @@ The startup line prints the LAN URL. From another device on the same LAN:
 - `http://<LAN-IP>:3180/?token=<random>` should load the full UI (the token is exchanged for a cookie on first entry and the query is cleared).
 - `curl -i http://<LAN-IP>:3180/api/session/list` without credentials should return `401`.
 
-Tests: `packages/extensions/lan-access/tests/lan-access.spec.ts` (9 cases: the gate over `/api`, websocket rejection, the auth-set chain, placeholder-page opacity, disabled-mode byte-for-byte equivalence against the stock server — unset and explicit `false` — fail-loud missing token, and log hygiene).
+Tests: `packages/extensions/lan-access/tests/lan-access.spec.ts` (10 cases: the gate over `/api`, websocket rejection, the auth-set chain, the `?token=` dead-loop closure, placeholder-page opacity, disabled-mode byte-for-byte equivalence against the stock server — unset and explicit `false` — fail-loud missing token, and log hygiene).
 
 ## Model Experience
 

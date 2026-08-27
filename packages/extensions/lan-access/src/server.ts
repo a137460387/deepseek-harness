@@ -21,7 +21,7 @@ import { Config as BaseConfig, WebServer } from '@deepseek-ai/dsh-host-webserver
 const DSH_LAN_ENABLED_ENV = 'DSH_LAN_ENABLED'
 /** Shared-secret environment variable; required once the switch is on. */
 const DSH_LAN_TOKEN_ENV = 'DSH_LAN_TOKEN'
-/** Cookie carrying the shared secret after the /auth-set handshake. */
+/** Cookie carrying the shared secret, set by the `?token=` entry redirect and the /auth-set handshake. */
 const DSH_LAN_COOKIE = 'dsh-lan-token'
 /** Name the /auth-set handshake redirects back to. */
 const ROOT_PATH = '/'
@@ -36,8 +36,9 @@ const lanAccessSchema = WebServer.Config
 
 /**
  * Whether the request already carries the valid secret: the cookie set by
- * {@link AUTH_SET_PATH}, or a `?token=` query on the entry path (the browser
- * handoff form). Both compare SHA-256 digests through `timingSafeEqual`.
+ * the `?token=` entry redirect or {@link AUTH_SET_PATH}, or a `?token=` query
+ * on the entry path (the browser handoff form). Both compare SHA-256 digests
+ * through `timingSafeEqual`.
  */
 function requestCarriesToken(req: IncomingMessage, expectedDigest: Buffer): boolean {
   const cookieHeader = req.headers.cookie
@@ -163,7 +164,10 @@ export class LanAccessWebServer extends WebServer {
           const presented = new URLSearchParams(url.slice(queryAt + 1)).get('token') ?? ''
           if (tokenMatches(presented, digest)) {
             const pathname = url.slice(0, queryAt)
-            res.writeHead(302, { location: pathname === '' ? ROOT_PATH : pathname })
+            res.writeHead(302, {
+              'set-cookie': `${DSH_LAN_COOKIE}=${presented}; HttpOnly; SameSite=Lax; Path=/`,
+              location: pathname === '' ? ROOT_PATH : pathname,
+            })
             res.end()
             return
           }

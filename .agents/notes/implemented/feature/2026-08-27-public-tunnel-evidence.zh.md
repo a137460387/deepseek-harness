@@ -48,5 +48,5 @@ Status: implemented
 ## 后果
 
 - stock 栈经 quick tunnel 确认为被拦但不可用(H1);fork 栈以 `--trusted-host` 加 token 门禁是受支持的公网隧道姿势,门禁先于 Host fence 应答(无凭据是 `401` 而非 `403`——门禁覆盖含静态资源与升级在内的隧道流量)。
-- 已知限制,记录而非绕过:(a) 特权域(`settings.*`、`credentials.*`)远程一律 `403`——特权 pin 设计上仅限回环,`--trusted-host` 不豁免;(b) quick tunnel 域名每次重启即变,`--trusted-host` 须随之重配;(c) `/?token=` 死循环——README 文案承诺了实现不执行的 cookie 交换;`/auth-set?token=` 是唯一可用入口,修复刻意延后为独立改动;(d) `crypto.randomUUID` 顾虑在隧道场景不成立(零报错,`getRandomValues` 实现),但纯 HTTP LAN 场景未测。
+- 已知限制,记录而非绕过:(a) 特权域(`settings.*`、`credentials.*`)远程一律 `403`——特权 pin 设计上仅限回环,`--trusted-host` 不豁免;(b) quick tunnel 域名每次重启即变,`--trusted-host` 须随之重配;(c) `/?token=` 死循环——README 文案承诺了实现不执行的 cookie 交换;`/auth-set?token=` 是唯一可用入口,修复刻意延后为独立改动——已于同日修复(见提交 `fix(fork): close the ?token= sign-in dead loop`):入口 302 现设置会话 cookie,`?token=` 链接可直接登录;(d) `crypto.randomUUID` 顾虑在隧道场景不成立(零报错,`getRandomValues` 实现),但纯 HTTP LAN 场景未测。
 - fork 栈公网 quick tunnel 的安全姿势:token 门禁单因素保护 + 特权 pin 纵深;本 Note 与存档探针记录中的全部 token 与 cookie 值均已脱敏——不记录任何明文秘密。

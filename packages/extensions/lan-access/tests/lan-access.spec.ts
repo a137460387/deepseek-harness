@@ -1,9 +1,10 @@
 /**
  * LAN-access webserver coverage: the token gate over every path (including
  * /api and the static fallback), the websocket handshake rejection, the
- * /auth-set cookie handshake, the placeholder 401 page's opacity, the
- * disabled-mode byte-for-byte equivalence with the stock server, the
- * fail-loud missing-token boot, and the no-token-in-logs guarantee.
+ * /auth-set cookie handshake, the `?token=` entry cookie exchange, the
+ * placeholder 401 page's opacity, the disabled-mode byte-for-byte
+ * equivalence with the stock server, the fail-loud missing-token boot, and
+ * the no-token-in-logs guarantee.
  */
 
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
@@ -193,11 +194,17 @@ describe('LAN token gate', () => {
       res.end('<html><body>shell</body></html>')
     })
 
-    // Entry with ?token= redirects to the same path with the query cleared
-    // (the wrapper-level redirect for non-/auth-set paths).
+    // Entry with ?token= sets the session cookie and redirects to the same
+    // path with the query cleared (the wrapper-level redirect for
+    // non-/auth-set paths).
     const entry = await request(server.port, `/?token=${TOKEN}`)
     expect(entry.status).toBe(302)
     expect(entry.location).toBe('/')
+    expect(entry.setCookie).toContain(`dsh-lan-token=${TOKEN}`)
+    expect(entry.setCookie).toContain('HttpOnly')
+    expect(entry.setCookie).toContain('SameSite=Lax')
+    expect(entry.setCookie).toContain('Path=/')
+    expect(entry.setCookie).not.toContain('Secure')
 
     // The /auth-set route validates and sets the cookie.
     const authSet = await request(server.port, `/auth-set?token=${TOKEN}`)
@@ -221,6 +228,30 @@ describe('LAN token gate', () => {
     const invalid = await request(server.port, '/auth-set?token=wrong')
     expect(invalid.status).toBe(401)
     expect(invalid.setCookie).toBeNull()
+  })
+
+  it('closes the ?token= sign-in dead loop: the entry cookie authenticates a clean / load', { timeout: 60_000 }, async () => {
+    setLanEnv('true', TOKEN)
+    const loaded = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts')
+    const server = loaded.webServer
+    server.registerFallback((_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/html' })
+      res.end('<html><body>shell</body></html>')
+    })
+
+    // Follow the 401 page's own instruction: append ?token= once. The browser
+    // stores the cookie pair (name=value) and drops the attributes.
+    const entry = await request(server.port, `/?token=${TOKEN}`)
+    expect(entry.status).toBe(302)
+    const setCookie = entry.setCookie ?? ''
+    const cookie = setCookie.split(';')[0] ?? ''
+    expect(cookie).toBe(`dsh-lan-token=${TOKEN}`)
+
+    // Landing on the clean URL with exactly that cookie must serve the real
+    // page (200), not the 401 placeholder — the loop is closed.
+    const landing = await request(server.port, '/', { headers: { cookie } })
+    expect(landing.status).toBe(200)
+    expect(landing.body).toContain('shell')
   })
 
   it('serves a placeholder 401 page that leaks no real dist path or asset name', { timeout: 60_000 }, async () => {

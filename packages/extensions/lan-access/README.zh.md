@@ -20,7 +20,7 @@ LAN 模式关闭时，行的 `host` 表达式就是原版的 `ctx.webStartup.hos
 每个请求——静态资源、`index.html`、`/api`、websocket 升级——都在任何已注册 handler 运行之前过 token 门禁：
 
 - 无凭据 → 401，返回内联占位页（无脚本、无资源路径；不暴露真实 dist 的任何路径）。
-- 任意路径带 `?token=<secret>` → 302 到同路径并清除查询参数。
+- 任意路径带 `?token=<secret>` → 校验通过后设置会话 cookie（属性同 `/auth-set`），302 到同路径并清除查询参数。
 - `/auth-set?token=<secret>` → 校验通过后设置 `dsh-lan-token=<secret>` cookie（`HttpOnly; SameSite=Lax; Path=/`，不加 `Secure`——明文 HTTP 场景），302 回 `/`。
 - 有效 cookie → 请求放行到原版分派。
 - 无效 token → 401。
@@ -52,7 +52,7 @@ DSH_LAN_ENABLED=true DSH_LAN_TOKEN=<random> pnpm dsh --profile web --port 3180 -
 - `http://<LAN-IP>:3180/?token=<random>` 应完整加载 UI（token 首次进入时换取 cookie 并清参）。
 - 无凭据的 `curl -i http://<LAN-IP>:3180/api/session/list` 应返回 `401`。
 
-测试：`packages/extensions/lan-access/tests/lan-access.spec.ts`（9 个用例：`/api` 门禁、websocket 拒绝、auth-set 链路、占位页不泄露、disabled 模式与原版逐字节对照——未设与显式 `false` 两态——缺 token fail-loud、日志卫生）。
+测试：`packages/extensions/lan-access/tests/lan-access.spec.ts`（10 个用例：`/api` 门禁、websocket 拒绝、auth-set 链路、`?token=` 死循环闭环、占位页不泄露、disabled 模式与原版逐字节对照——未设与显式 `false` 两态——缺 token fail-loud、日志卫生）。
 
 ## 模型体验
 
