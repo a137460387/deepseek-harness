@@ -20,3 +20,4 @@ agent 修改自身运行时：检查已加载的插件与服务接口、定义�
 | [`find-in-chat/`](find-in-chat/README.zh.md) | fork：会话内 Ctrl/Cmd+F 查找栏，搜索 chat 视图已加载窗口，回绕步进与 Range 高亮 | client 面；注册 shell.overlay 条目 |
 | [`draft-budget/`](draft-budget/README.zh.md) | fork：composer dock 读数，按 token-meter 启发式估算草稿 token 成本与发送后窗口占用 | client 面；注册 composer.dock 条目 |
 | [`composer-guards/`](composer-guards/README.zh.md) | fork：上方各输入插件以模块表行请求的共享 composer 谓词（可见性探测、会话锁、可编辑 input 解析） | client 面；经 `dsh.client.external` 的库行 |
+| [`lan-access/`](lan-access/README.zh.md) | fork：局域网访问 webserver——原版服务器的子类，`DSH_LAN_ENABLED` 置位时绑定全网卡并加 token 门禁，未置位时与原版逐字节一致 | host 面；替换 web-app bundle 的 `webserver` 行 |
