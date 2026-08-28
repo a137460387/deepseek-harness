@@ -147,7 +147,7 @@ Restart-Service dsh-web
 
 ## 5. 验收清单
 
-全部实测通过(2026-08-27,commit 87e72e4f9f 时点):
+全部实测通过(2026-08-27,commit 6c9c7690ad 时点):
 
 | # | 项 | 预期 | 实测 |
 |---|---|---|---|
@@ -156,7 +156,7 @@ Restart-Service dsh-web
 | 3 | `https://dsh.lgyu.cloud` 无 token | 401 | 401(门禁先于 Host 栅栏) |
 | 4 | token 入口后带 cookie `GET /` | 200 | 302 + Set-Cookie → 200(16,885 字节) |
 | 5 | `.logs\dsh-web-err.log` | 无致命报错 | 0 字节(另做 token 泄漏扫描:无) |
-| 6 | `.gitignore` 覆盖 `tools/`、`.logs/` | 已覆盖 | 已提交(87e72e4f9f) |
+| 6 | `.gitignore` 覆盖 `tools/`、`.logs/` | 已覆盖 | 已提交(6c9c7690ad) |
 | 7 | 强杀 node 子进程后 | NSSM 自动拉起(崩溃自愈) | 旧 PID 7348 被杀 → 服务保持 Running → 新 PID 28748 重新绑定 |
 | 8 | `session.list`(带 cookie) | 200 且含既有数据 | 200,70 条既有记录(DSH_HOME 生效) |
 | 9 | 重启电脑后 | `dsh-web` 与 `cloudflared` 均自动 Running | 两服务均 Automatic(下次重启自证) |
