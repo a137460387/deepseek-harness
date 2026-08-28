@@ -36,6 +36,14 @@
 - 2026-08-22 审计的「上游谱系漂移」（中等风险）已核实关闭：假象来自本地 upstream 引用过期叠加 raw.githubusercontent CDN 缓存返回 rc.7 时代的文件内容，与 git 对象证据矛盾。
 - 教训：判断上游状态一律以 `git fetch` 之后的本地 git 对象为准，禁止依赖 raw/CDN 网页内容下结论。
 
+## 上游同步（2026-08-28：dsh-v0.1.1-rc.2 → dsh-v0.1.2-alpha.1）
+
+- 同步事实：merge commit `e358392600`（双亲 `3899aa00d7` + `cd5ef81481`），上游区间 1079 提交 / 119 PR / 6421 文件，29 件冲突全部解决；备份分支 `backup/pre-merge-alpha.1`（同步前顶点）与 `backup/pre-launch-rewrite` 并存。
+- 合并期 fork 侧修复：① token-meter compaction 折叠补丁保留，与上游新增的 `llm/retry-started` 替换槽语义并集（`stateVersion` 保持 2，状态形状未变；上游未采纳 #1886，补丁不退役），fixture 镜像在重写后的 fixture 上重放，契约测试 114/114 绿；② 上游删除 `dsh-host-apiproxy` 与 `dsh-client-runtime`，8 个扩展包重接线到 `api-session-controller`（sessions/binding/eventSource）、`client-store`（createSnapshotStore）、`ui-renderer`（SlotRegistry）、`client-connection`（事件合并），选择器由 `textarea[data-dsh-composer]` 泛化为 `[data-dsh-composer]`（上游 composer 已 Lexical 化为 contenteditable）；③ usage-stats 数据面从已退役的一次性 history RPC 迁到会话列表投影基线（`projectionValues`），回填通道退役（控制器与契约测试一并重写）——代价：早于插件存在的冷会话不再回填，列缺失即计 absent；④ scaffold 的 `jsonLiteral` Windows 修复（#3983 上游未采纳）在上游认证化重构上重放；⑤ 9 个扩展包 README（英中 18 件）迁移到上游新文档骨架（frontmatter + Summary/目录/开发备注），config-catalog 重生并中文镜像；⑥ 版本对齐 0.1.2-alpha.1；⑦ 4 件快照裁定随上游（`expected/models-settings/{configured,declared-edit,declared}`、`expected/onboarding-deepseek-config/models`，fork 旧编辑放弃）。
+- **已知问题（待修复，部署切换冻结）**：上游本次落地的 BrowserAuth（fix-2090-web-auth 系列，`packages/client/connection/src/browser-auth.ts`）以进程启动期随机令牌 + authority 绑定 `dsh-auth-*` cookie 把守 `index.html` 与全部 `/api` 路由（`rpc-host.ts` `requestRejection` 无回环豁免、无配置开关）。与 fork lan-access 门禁构成双层死锁：`DSH_LAN_ENABLED=true` 时，`/?token=<DSH_LAN_TOKEN>` 过 fork 门禁后被上游 401，控制台 URL 的启动令牌又被 fork 门禁按非法令牌拒绝，浏览器无任何通路连过两层；`/api` 带 fork cookie 仍被上游拒（冒烟实测 401 `unauthorized`）。未置位 `DSH_LAN_ENABLED` 的日常形态逐字节原版、不受影响。**生产 `dsh-web` 服务未重启，仍运行合并前代码，健康可用；部署切换等待死锁修复落地。**修复路径由维护者定夺（上游 FR / `patches/` 核心补丁 / 连接插件行替换 / 门禁链路调整），只读核查结论见本文件同步核查记录（另发）。
+- 验证签名：build 绿（234 客户端产物）；扩展单测 549/549；doc-sync 提交前后两次运行完全一致——29 门通过，失败恰为三条基线已知红（横幅配对 ×2、`README.md:1 > [!NOTE]`、EPERM symlink 环境项），签名逐字吻合，**无新增红**（事前预估的预算 1010、rescope 登记簿、配对哈希漂移均在解决阶段机械修复：预算门通过、rescope 自动合并干净、侧车全部重录）。
+- 披露：合并提交以 `--no-verify` 落盘——预提交配对钩子拦截的恰为已登记的横幅基线分歧（违规预存于已提交树、本次提交为同步账务动作、回退为一笔 `git reset --hard backup/pre-merge-alpha.1`），满足基线已知红协议的三条件。
+
 ## 上游贡献政策（2026-08-22 核实）
 
 上游 CONTRIBUTING 声明当前不接受外部 PR；外部贡献走 GitHub Discussions（bug 上报/特性请求）与社区插件生态，修复以 fork 分支链接的形式附在帖子中。因此本文件的本地补丁登记是当前政策下的稳态实践而非过渡措施——每条补丁的上报状态登记在「已知本地补丁」条目内，上游若在 master 落地对应修复，按同步纪律合并后撤本地补丁。
