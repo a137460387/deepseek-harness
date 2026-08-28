@@ -15,8 +15,7 @@
 
 ## 报告渠道
 
-- GitHub 私有漏洞报告(优先):仓库页 Security → Report a vulnerability;
-- 邮箱(备用):<EMAIL>(占位符,维护者尚未公布邮箱,启用前以私有漏洞报告为唯一渠道)。
+- GitHub 私有漏洞报告:仓库页 Security → Report a vulnerability
 
 ## 报告前
 
