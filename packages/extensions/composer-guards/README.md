@@ -1,6 +1,12 @@
+---
+description: "Shared composer predicates (visibility probe, session locks, editable-input resolution) the input plugins request as a module-table row."
+kind: "package-reference"
+---
 # @deepseek-ai/dsh-client-composer-guards
 
 English | [中文](README.zh.md)
+
+## Summary
 
 Shared composer guards for the fork's browser input plugins (`global-paste`, `text-file-cards`, `input-history-recall`, `draft-keeper`): the three predicates each of them needs before a plugin-side write may reach the composer.
 
@@ -12,6 +18,15 @@ The package is a library row, not a feature plugin: both halves' `apply` are ine
 
 The helpers stay pure over public seams only: DOM probes and the `sessions` / `conversation` services every consumer already injects. The owner-prop composer lock reasons (the inert no-workspace hero, an owner block) have no public signal and stay out of reach, so every consumer keeps its own current-session guard around them.
 
+## Table of Contents
+
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package only supplies guard predicates to other browser-half plugins and registers nothing model-facing.
@@ -22,5 +37,19 @@ None; the package never assembles or sends provider requests.
 
 ## Known Limitations and Deferred Work
 
+<a id="known-limitations-and-deferred-work"></a>
+
 - **Roster coupling** — consumers reach this package through `dsh.client.external`, so a composition mounting any consumer must also mount this row. The web-app bundle mounts the five together; a custom composition omitting the supplier fails graph composition with a missing-request error rather than at runtime.
 - **Visibility probe precision** — the occluded check uses `elementFromPoint` at the composer's center. An overlay that covers the composer but leaves the center uncovered would not be detected; callers route into a partially-visible composer, which is harmless.
+
+-----
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

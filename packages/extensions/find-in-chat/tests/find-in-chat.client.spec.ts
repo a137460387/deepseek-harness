@@ -15,7 +15,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import InvariantRegistry from '@deepseek-ai/dsh-invariants'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { createFindController, type FindController, type FindState } from '../src/client/find-controller.ts'
 import { apply as applyNode } from '../src/index.ts'
 import * as FindInChatInvariant from '../src/invariant.ts'

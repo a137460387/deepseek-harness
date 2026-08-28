@@ -4,6 +4,7 @@
 
 import { z } from 'zod'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
+import type {} from '@deepseek-ai/dsh-llm-retry/types'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 // Type-only: the `compaction/summary` SessionEventMap merge (summarizer usage).
@@ -112,16 +113,16 @@ type ContextPressureState = z.infer<typeof contextPressureStateSchema>
  * Token-meter's session projection unit.
  *
  * Usage chunks provide an early sample that survives a later request failure;
- * an assistant message provides the final sample for the same turn/step. A
- * repeated sample replaces that step's earlier value instead of double
- * counting it. The single `last` slot relies on the session-log invariant
- * that usage reports for one turn/step are adjacent: once a later step begins,
- * a legal log never reports usage for an earlier step again.
+ * an assistant message provides the final sample for the same attempt. A
+ * repeated sample replaces that attempt's earlier value instead of double
+ * counting it, while `llm/retry-started` closes the replacement slot so the
+ * retried attempt adds to the total. The single `last` slot relies on the
+ * session-log invariant that usage reports for one attempt are adjacent.
  *
  * A `compaction/summary` event carries the summarizer call's own usage but no
- * turn/step, so it never enters the replacement logic: its buckets accumulate
- * in full, and a summary without `usage` (a template or remote summarizer
- * that reported none) contributes nothing.
+ * attempt identity, so it never enters the replacement logic: its buckets
+ * accumulate in full, and a summary without `usage` (a template or remote
+ * summarizer that reported none) contributes nothing.
  */
 export const tokenUsageProjectionDefinition = {
   key: 'tokenUsage',
@@ -133,6 +134,12 @@ export const tokenUsageProjectionDefinition = {
       const usage = event.data.usage
       if (usage === undefined) return state
       return { ...state, totals: addReplacing(state.totals, undefined, bucketsFrom(usage)) }
+    }
+
+    if (event.type === 'llm/retry-started') {
+      return state.last?.turn === event.data.turn && state.last.step === event.data.step
+        ? { ...state, last: null }
+        : state
     }
 
     let turn: number

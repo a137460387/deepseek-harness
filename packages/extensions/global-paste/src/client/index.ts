@@ -39,13 +39,13 @@
  * @module @deepseek-ai/dsh-client-global-paste/client
  */
 
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // Type-only: pulls the conversation service's Context merge (ctx.conversation).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { composerVisible, resolveEditableInput } from '@deepseek-ai/dsh-client-composer-guards/client'
 
 /** Selector for the composer textarea (marked by InputBar via data-dsh-composer). */
-const COMPOSER_SELECTOR = 'textarea[data-dsh-composer]'
+const COMPOSER_SELECTOR = '[data-dsh-composer]'
 
 /** Editable element tags whose own paste must not be hijacked. */
 const EDITABLE_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT'])
@@ -83,7 +83,7 @@ function isEditable(el: HTMLElement | null | undefined): boolean {
  * @param clipboardData - the original event's clipboardData to mirror.
  * @returns true when the forwarded paste was constructed and dispatched.
  */
-function forwardImagePaste(composer: HTMLTextAreaElement, clipboardData: DataTransfer): boolean {
+function forwardImagePaste(composer: HTMLElement, clipboardData: DataTransfer): boolean {
   try {
     dispatchForwardedPaste(composer, clipboardData)
     return true
@@ -103,7 +103,7 @@ function forwardImagePaste(composer: HTMLTextAreaElement, clipboardData: DataTra
  * @param composer - the composer textarea to target.
  * @param clipboardData - the original event's clipboardData to mirror.
  */
-function dispatchForwardedPaste(composer: HTMLTextAreaElement, clipboardData: DataTransfer): void {
+function dispatchForwardedPaste(composer: HTMLElement, clipboardData: DataTransfer): void {
   // Mirror the file items (images) onto a fresh DataTransfer. getData('text/plain')
   // is intentionally NOT copied: the composer's onPaste would otherwise also
   // append the text via pasteBegin, duplicating what the text branch already did
@@ -140,7 +140,7 @@ export function apply(ctx: ClientContext): void {
       if (resolved === undefined) return
       const { input, state } = resolved
 
-      const composer = document.querySelector<HTMLTextAreaElement>(COMPOSER_SELECTOR)
+      const composer = document.querySelector<HTMLElement>(COMPOSER_SELECTOR)
       if (composer === null) return
 
       const active = document.activeElement

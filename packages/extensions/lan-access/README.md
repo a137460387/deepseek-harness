@@ -1,8 +1,22 @@
+---
+description: "LAN-access webserver: the stock WebServer subclass that binds all interfaces behind a token gate when enabled and stays byte-for-byte stock otherwise."
+kind: "package-reference"
+---
 # @deepseek-ai/dsh-host-lan-access
 
 English | [中文](README.zh.md)
 
+## Summary
+
 LAN-access webserver: a subclass of the plain webserver plugin that binds all interfaces behind a token gate when `DSH_LAN_ENABLED` is set, and behaves byte-for-byte like the stock server otherwise. The `web-app` bundle's `cordis.patch.yml` replaces the stock `webserver` row with this package's row; the stock row stays present but disabled, so re-enabling it and disabling this row restores the stock server exactly.
+
+## Table of Contents
+
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
 
 ## Configuration
 
@@ -57,6 +71,7 @@ The startup line prints the LAN URL. From another device on the same LAN:
 
 Tests: `packages/extensions/lan-access/tests/lan-access.spec.ts` (16 cases: the gate over `/api`, websocket rejection, the auth-set chain, the `?token=` dead-loop closure, placeholder-page opacity, disabled-mode byte-for-byte equivalence against the stock server — unset and explicit `false` — fail-loud missing token, log hygiene, the localhost exemption's loopback peer + loopback Host double for pages and websocket upgrades, the reverse-tunnel and LAN shape denials, the exemption switch parsing, and the loopback classification predicates).
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package is a Web dispatch wrapper between the browser and the routes the stock server already carries; nothing here reaches a model request.
@@ -67,7 +82,21 @@ None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 
+<a id="known-limitations-and-deferred-work"></a>
+
 - **Plaintext transport** — the token query, the cookie, and all page traffic cross the LAN unencrypted; the token is recoverable by anyone who can sniff the segment. Crossing an untrusted network requires an SSH tunnel or an HTTPS reverse proxy (see Security warnings). A built-in TLS mode is deliberately out of scope for the fork.
 - **One shared token, no revocation list** — the token authorizes every device that holds it, and revocation is rotating `DSH_LAN_TOKEN` and restarting. Per-device credentials are deferred until a deployment needs them.
 - **No per-path policy** — the gate is all-or-nothing over every path. Restricting individual API methods to loopback while serving the UI to the LAN is the stock fence's job (privileged methods already stay loopback-only upstream), not this layer's.
 - **Source-plane row name** — the composition row mounts `…/src/server.ts` directly, which works under the tsx source launch and breaks if the composition ever runs from built artifacts only; that day the package gains a build step and the row moves to the bare package id.
+
+-----
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

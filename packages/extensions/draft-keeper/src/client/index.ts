@@ -38,7 +38,8 @@
  * @module @deepseek-ai/dsh-client-draft-keeper/client
  */
 
-import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 // Type-only: pulls the conversation service's Context merge (ctx.conversation)
 // and names the input facade contract the restore path writes through.
 import type { IConversation } from '@deepseek-ai/dsh-client-ui-conversation/client'

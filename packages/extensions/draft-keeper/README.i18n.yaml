@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/extensions/draft-keeper/README.md
-README.md: 586d753dcced30c14e0d14e5b66251ecc6e5b4a8
-README.zh.md: a38a598fb6e6c22b2d5bd3ada1399a3c6aff9dc1
+README.md: c6a0944b1967be1a24698ad1a3e3b401758a1ce3
+README.zh.md: da6334e59530af3af044f0dd48f725fa80a48da5

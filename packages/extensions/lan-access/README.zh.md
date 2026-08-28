@@ -1,8 +1,22 @@
+---
+description: "局域网访问 webserver：原版 WebServer 的子类，启用时绑定全网卡并加 token 门禁，未启用时与原版逐字节一致。"
+kind: "package-reference"
+---
 # @deepseek-ai/dsh-host-lan-access
 
 [English](README.md) | 中文
 
+## 概述
+
 局域网访问 webserver：普通 webserver 插件的子类。`DSH_LAN_ENABLED` 置位时绑定全网卡并在所有路径前加 token 门禁；未置位时与原版服务器逐字节一致。`web-app` bundle 的 `cordis.patch.yml` 用本包的行替换原版 `webserver` 行；原版行保留但禁用，反向切换（禁用本行、启用原版行）即可完整还原。
+
+## 目录
+
+- [模型体验](#model-experience)
+- [已知限制与延后工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
 
 ## 配置
 
@@ -57,6 +71,7 @@ DSH_LAN_ENABLED=true DSH_LAN_TOKEN=<random> pnpm dsh --profile web --port 3180 -
 
 测试：`packages/extensions/lan-access/tests/lan-access.spec.ts`（16 个用例：`/api` 门禁、websocket 拒绝、auth-set 链路、`?token=` 死循环闭环、占位页不泄露、disabled 模式与原版逐字节对照——未设与显式 `false` 两态——缺 token fail-loud、日志卫生、localhost 豁免的双条件与 websocket 升级、隧道与 LAN 形态的维持门禁、豁免开关取值解析、回环分类谓词）。
 
+<a id="model-experience"></a>
 ## 模型体验
 
 无，本包只是浏览器与原版服务器既有路由之间的 Web 分派包装器；没有任何内容到达模型请求。
@@ -67,7 +82,21 @@ DSH_LAN_ENABLED=true DSH_LAN_TOKEN=<random> pnpm dsh --profile web --port 3180 -
 
 ## 已知限制与延后工作
 
+<a id="known-limitations-and-deferred-work"></a>
+
 - **明文传输** — token 查询参数、cookie 与全部页面流量都以明文穿过局域网；能嗅探该网段的人就能拿到 token。跨不可信网络必须套 SSH 隧道或 HTTPS 反向代理（见安全警示）。内置 TLS 模式刻意不在 fork 范围内。
 - **单一共享 token、无吊销名单** — token 授权每一个持有它的设备，吊销即轮换 `DSH_LAN_TOKEN` 并重启。按设备发放凭据延后到有部署需要时再做。
 - **无按路径策略** — 门禁对全部路径一揽子开关。把个别 API 方法限制在回环、同时向 LAN 提供页面是原版 fence 的职责（特权方法上游已限回环），不是本层的。
 - **源码面行名** — 组合行直接挂载 `…/src/server.ts`，在 tsx 源码启动下可用，组合将来只从构建产物运行时会失效；届时本包增加构建步骤、行名改为裸包名。
+
+-----
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者工作上下文——点击展开</summary>
+
+无。
+
+</details>

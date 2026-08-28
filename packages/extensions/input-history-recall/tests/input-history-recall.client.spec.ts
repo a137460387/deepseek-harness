@@ -16,8 +16,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import InvariantRegistry from '@deepseek-ai/dsh-invariants'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import type { SessionId, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { apply, inject } from '../src/client/index.ts'
 import { apply as applyNode } from '../src/index.ts'
 import * as RecallInvariant from '../src/invariant.ts'
@@ -77,8 +78,8 @@ function listState(ids: readonly SessionId[], current: SessionId | undefined): S
 interface Bench {
   ctx: Context
   fiber: ReturnType<Context['plugin']>
-  /** The mounted composer textarea; null in noComposer benches (dispatch on document). */
-  composer: HTMLTextAreaElement | null
+  /** The mounted composer input surface; null in noComposer benches (dispatch on document). */
+  composer: HTMLElement | null
   /** Draft writes per session id (the stateful setDraft fake). */
   inputs: Map<SessionId, FakeInput>
   /** Mutable per-session snapshots (nodes, removed, subagent). */
@@ -93,8 +94,7 @@ interface BenchOptions {
   readonly draft?: string
   readonly phase?: Phase
   readonly noSession?: boolean
-  readonly scopeUndefined?: boolean
-  readonly sessionFaceUndefined?: boolean
+  readonly bindingUndefined?: boolean
   readonly removed?: boolean
   readonly parentOffline?: boolean
   readonly menuOpen?: boolean
@@ -148,12 +148,28 @@ async function bench(over: BenchOptions = {}): Promise<Bench> {
   const menu = createSnapshotStore<{ open: boolean }>({ open: over.menuOpen === true })
 
   const actxOf = (id: SessionId): { sessionId: SessionId } => ({ sessionId: id })
+  // Map the bench's node fixtures onto session-window entries: user and
+  // steering fixtures become user/message events (the recall feed), assistant
+  // fixtures become assistant/message events (skipped by the read).
+  const entriesOf = (nodesOf: readonly NodeLike[]) => nodesOf.map((node, index) => ({
+    type: 'event' as const,
+    event: {
+      type: node.kind === 'assistant' ? 'assistant/message' as const : 'user/message' as const,
+      seq: index,
+      data: { source: { kind: 'user' as const }, content: node.content },
+    },
+  }))
   const ctx = new Context()
   ctx.provide('sessions', {
     list,
-    scope: (id: SessionId) => over.scopeUndefined === true ? undefined : actxOf(id),
-    sessionOf: (actx: { sessionId: SessionId }) =>
-      over.sessionFaceUndefined === true ? undefined : { getSnapshot: () => snapshots.get(actx.sessionId) },
+    binding: (id: SessionId) => over.bindingUndefined === true
+      ? undefined
+      : {
+        sessionId: id,
+        session: { getSnapshot: () => snapshots.get(id) },
+        eventSource: { getSnapshot: () => ({ entries: entriesOf(snapshots.get(id)?.nodes ?? []) }) },
+        ctx: actxOf(id),
+      },
   } as never)
   ctx.provide('conversation', {
     input: { for: (actx: { sessionId: SessionId }) => inputs.get(actx.sessionId) },
@@ -167,17 +183,16 @@ async function bench(over: BenchOptions = {}): Promise<Bench> {
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
 
-  let composer: HTMLTextAreaElement | null = null
+  let composer: HTMLElement | null = null
   if (over.noComposer !== true) {
-    composer = document.createElement('textarea')
+    composer = document.createElement('div')
     composer.setAttribute('data-dsh-composer', '')
-    // The DOM value mirrors the starting draft so a nonzero caret can be
-    // placed (the engine clamps the selection to the value length); the
-    // plugin itself never reads the DOM value.
-    composer.value = draft
+    composer.setAttribute('contenteditable', 'true')
+    // The DOM text mirrors the starting draft so Selection probes can be
+    // placed inside it; the plugin itself never reads the DOM text.
+    composer.textContent = draft
     document.body.appendChild(composer)
     composer.focus()
-    composer.setSelectionRange(0, 0)
   }
 
   const theBench: Bench = {
@@ -255,7 +270,8 @@ describe('input-history-recall browser half', () => {
 
   it('ignores ArrowUp when the caret is not at offset 0', async () => {
     const { composer, inputs } = await bench({ draft: 'hello' })
-    composer!.setSelectionRange(2, 2)
+    const text = composer!.firstChild!
+    window.getSelection()!.setBaseAndExtent(text, 2, text, 2)
     const event = press(composer!, 'ArrowUp')
     expect(event.defaultPrevented).toBe(false)
     expect(inputs.get('a' as SessionId)!.setDraft).not.toHaveBeenCalled()
@@ -263,7 +279,8 @@ describe('input-history-recall browser half', () => {
 
   it('ignores ArrowUp when a selection is active', async () => {
     const { composer, inputs } = await bench({ draft: 'hello' })
-    composer!.setSelectionRange(0, 2)
+    const text = composer!.firstChild!
+    window.getSelection()!.setBaseAndExtent(text, 0, text, 2)
     const event = press(composer!, 'ArrowUp')
     expect(event.defaultPrevented).toBe(false)
     expect(inputs.get('a' as SessionId)!.setDraft).not.toHaveBeenCalled()
@@ -323,15 +340,8 @@ describe('input-history-recall browser half', () => {
     expect(inputs.get('a' as SessionId)!.setDraft).not.toHaveBeenCalled()
   })
 
-  it('ignores arrow keys when the scope does not resolve', async () => {
-    const { composer, inputs } = await bench({ draft: '', scopeUndefined: true })
-    const event = press(composer!, 'ArrowUp')
-    expect(event.defaultPrevented).toBe(false)
-    expect(inputs.get('a' as SessionId)!.setDraft).not.toHaveBeenCalled()
-  })
-
-  it('ignores arrow keys when the session face does not resolve', async () => {
-    const { composer, inputs } = await bench({ draft: '', sessionFaceUndefined: true })
+  it('ignores arrow keys when the session binding does not resolve', async () => {
+    const { composer, inputs } = await bench({ draft: '', bindingUndefined: true })
     const event = press(composer!, 'ArrowUp')
     expect(event.defaultPrevented).toBe(false)
     expect(inputs.get('a' as SessionId)!.setDraft).not.toHaveBeenCalled()

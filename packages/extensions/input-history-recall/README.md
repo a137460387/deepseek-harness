@@ -1,6 +1,12 @@
+---
+description: "Composer ArrowUp/ArrowDown recall of the current session's sent messages, restoring the pre-traversal draft on exit."
+kind: "package-reference"
+---
 # @deepseek-ai/dsh-client-input-history-recall
 
 English | [中文](README.zh.md)
+
+## Summary
 
 Composer history recall for the Web UI: with the caret at the very front of the composer (offset 0, no selection), pressing ArrowUp recalls the current session's most recently sent message into the draft; further presses walk older; ArrowDown walks forward, and walking past the newest entry restores the draft as it was before the traversal. Mirrors Claude.ai's composer behavior.
 
@@ -28,6 +34,15 @@ The guards, evaluated in order before a key is claimed:
 
 While a traversal is live, ArrowUp/ArrowDown skip the caret recheck (the draft rewrite leaves the caret wherever the engine puts it), so edits made mid-traversal keep the cursor position. Editing the recalled text itself, however, ends the traversal: the slot records what the plugin last wrote, and a draft that differs from it on the next keypress means the user has taken over — the traversal ends, that key passes through, and later arrows behave as if no traversal had been started (a later ArrowUp re-enters through the caret-at-0 gate). An edit reverted back to the exact written text keeps the traversal alive (plain string comparison). The input-trigger service is read optionally through `ctx.get`, so compositions without the slash pipeline still get history recall.
 
+## Table of Contents
+
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the browser-side plugin only reads the session snapshot and routes draft writes through the public `ctx.conversation.input` service; it registers nothing model-facing.
@@ -38,9 +53,23 @@ None; the package never assembles or sends provider requests.
 
 ## Known Limitations and Deferred Work
 
+<a id="known-limitations-and-deferred-work"></a>
+
 - **Serialization difference** — recalled text is the message's model-serialization form: inline references are already expanded to what the model saw, not the pre-send display draft. Acceptable per design; no display-form reconstruction exists.
 - **Current session only** — no cross-session history recall.
 - **Loaded window only** — messages outside the loaded event window (not yet pulled by `loadOlder`) are not recallable until loaded.
 - **Text only** — images and other non-text blocks are dropped from recalled messages.
 - **In-memory stash** — the stashed pre-traversal draft survives neither reload nor plugin fiber replacement; a reload while traversing leaves the recalled text as the persisted draft.
 - **No paste-upgrade** — like global-paste's text path, `setDraft` does not run the input machine's paste-upgrade, so recalled text stays plain text instead of becoming reference chips.
+
+-----
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

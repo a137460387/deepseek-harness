@@ -8,7 +8,7 @@
  * staged files in memory.
  */
 
-import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 
 /**
  * File extensions treated as plain text/code for drop intake. A dropped file is

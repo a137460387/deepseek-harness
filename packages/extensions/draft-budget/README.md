@@ -1,6 +1,12 @@
+---
+description: "Composer-dock readout estimating the draft's token cost under the token-meter heuristic plus the after-send window occupancy."
+kind: "package-reference"
+---
 # @deepseek-ai/dsh-client-draft-budget
 
 English | [中文](README.zh.md)
+
+## Summary
 
 Draft token budget for the Web UI: a muted readout under the composer estimating the current draft's token cost and, when the provider reports context figures, the after-send occupancy as a percentage of the context window. The estimate mirrors the token-meter's own heuristic, so the readout prices a draft at exactly what the meter will charge it when sent.
 
@@ -12,6 +18,15 @@ How the numbers work:
 - **After-send percent**: `(baseline + draft) / context window`, capped at 100%, baseline anchored on the provider-reported projection — the heuristic prices only the draft increment.
 - **Every figure carries `~`**: the heuristic underprices CJK text and JSON schemas and has measured tens-of-percent divergence from provider-reported usage in long sessions (see the upstream token-meter README and discussion #3514). Approximation is stated, never implied.
 
+## Table of Contents
+
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the browser-side plugin only reads slot props (the draft share and a session projection) and renders an estimate; it registers nothing model-facing.
@@ -22,7 +37,21 @@ None; the package never assembles or sends provider requests.
 
 ## Known Limitations and Deferred Work
 
+<a id="known-limitations-and-deferred-work"></a>
+
 - **The estimate is heuristic, not tokenized** — it inherits the meter's documented error band (CJK/JSON underpricing, tens-of-percent divergence possible). The displayed `~` and this note are the disclosure; the after-send baseline stays provider-anchored to keep the error out of the large number.
 - **Not counted**: slash-command claims and @ reference chips (machine state beside the draft string), queued steering rows, and draft images — sending costs at least the displayed figure, usually a little more.
 - **No per-tokenizer pricing** — the density constant is the meter's, not the active model's; a future meter with exact tokenization supersedes this mirror (the contract spec flags the drift).
 - **No toggle** — a zero-config readout; composing the plugin out of `cordis.patch.yml` removes it entirely.
+
+-----
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -17,7 +17,9 @@
  * @module @deepseek-ai/dsh-client-composer-guards/client
  */
 
-import type { ClientContext, SessionFace, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { SessionFace } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 // Type-only: pulls the conversation service's Context merge (ctx.conversation)
 // and names the input facade contract the resolution returns.
 import type { IConversation } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -29,17 +31,17 @@ import type { IConversation } from '@deepseek-ai/dsh-client-ui-conversation/clie
 export function apply(): void {}
 
 /**
- * Whether the composer textarea is currently visible and not covered by an
- * overlay (an approval/user-question takeover panel can keep the InputBar DOM
- * alive while visually masking it). Probes the composer's center with
+ * Whether the composer input surface is currently visible and not covered by
+ * an overlay (an approval/user-question takeover panel can keep the InputBar
+ * DOM alive while visually masking it). Probes the composer's center with
  * elementFromPoint: if the topmost element there is not the composer or a
  * descendant of the composer's owner, the composer is considered occluded and
  * the caller should leave the event to native handling rather than route it
  * into a hidden field.
- * @param composer - the composer textarea element.
+ * @param composer - the composer input element.
  * @returns true when the composer is visible to the user.
  */
-export function composerVisible(composer: HTMLTextAreaElement): boolean {
+export function composerVisible(composer: HTMLElement): boolean {
   const rect = composer.getBoundingClientRect()
   // A zero-size composer (collapsed dock) cannot receive an interaction.
   if (rect.width === 0 || rect.height === 0) return false
@@ -57,8 +59,10 @@ export function composerVisible(composer: HTMLTextAreaElement): boolean {
  * Whether the session still accepts draft edits under the composer's
  * observable lock conditions: the session is not removed, and a continuable
  * subagent child still has its exact parent available (the composer renders
- * read-only in both cases). The owner-prop lock reasons (the inert hero, an
- * owner block) have no public signal and stay out of reach.
+ * read-only in both cases; an unresolved parent catalog — `parentAvailable`
+ * absent — reads as unavailable, matching the InputBar offline gate). The
+ * owner-prop lock reasons (the inert hero, an owner block) have no public
+ * signal and stay out of reach.
  * @param session - the session face behind the current scope.
  * @returns true when every session-level composer lock stands open.
  */
@@ -66,7 +70,7 @@ export function sessionAcceptsEdits(session: SessionFace): boolean {
   const snapshot = session.getSnapshot()
   if (snapshot.removed) return false
   const subagent = snapshot.subagent
-  return subagent === null || subagent.address.mode !== 'continuable' || subagent.parentAvailable
+  return subagent === null || subagent.address.mode !== 'continuable' || subagent.parentAvailable === true
 }
 
 /** The per-session input facade the conversation service resolves for a scope. */

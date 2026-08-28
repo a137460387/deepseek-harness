@@ -12,7 +12,13 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../client/runtime"
+      "path": "../../api/session-controller/tsconfig.client.json"
+    },
+    {
+      "path": "../../client/store"
+    },
+    {
+      "path": "../../core/session"
     },
     {
       "path": "../../client/ui-conversation"

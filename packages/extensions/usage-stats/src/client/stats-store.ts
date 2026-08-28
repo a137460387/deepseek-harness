@@ -1,19 +1,21 @@
 /**
  * Usage-stats section controller: gathers every session's `usageStats`
  * projection value into one snapshot store. The session-list baseline is the
- * fast path (attached sessions read the live registry, cold sessions the
- * persisted projection cache); sessions whose baseline predates the unit —
- * recorded before the plugin existed, so no cache row carries the key — are
- * backfilled through the history tail page, whose `projections` block folds
- * the whole log through every registered unit, at a bounded in-flight cap,
- * and a completed backfill is reused on later refreshes while the baseline
- * still lacks the key.
+ * single read path — every row carries the host-computed projection cache
+ * (attached sessions read the live registry, cold sessions the persisted
+ * projection cache). Sessions whose cache predates the unit — recorded
+ * before the plugin existed, so no cache row carries the key — report an
+ * empty value and count toward `absentCount`. The pre-0.1.2-alpha.1
+ * controller additionally backfilled predating sessions through a one-shot
+ * history RPC; the Connection-owned transport retired that call surface, so
+ * the backfill lane retired with the sync (fork sync ledger records the
+ * disposition).
  *
  * @module @deepseek-ai/dsh-client-usage-stats/client/stats-store
  */
 
-import type { IApiClient, SessionId } from '@deepseek-ai/dsh-api-remotes/client'
-import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { isUsageStats, type UsageStatsProjection } from '../types.ts'
 
 /** The section's whole view state. */
@@ -27,15 +29,15 @@ export interface UsageStatsSectionState {
   /** Sessions the last load observed. */
   sessionCount: number
   /**
-   * Sessions the history backfill CONFIRMED without the `usageStats` key (an
-   * ok tail page folds every registered unit) — the host composition does not
-   * register the unit when this equals `sessionCount`.
+   * Sessions whose list baseline lacks the `usageStats` key (a cache row
+   * predating the unit, or a host composition that does not register it) —
+   * the unregistered hint fires when this equals `sessionCount`.
    */
   absentCount: number
   /**
-   * Sessions whose history backfill errored instead (a refused call or a
-   * transport throw): their registration status is unknown, they never enter
-   * the backfill cache, and a later load retries them.
+   * Per-session read failures. The list baseline is one synchronous snapshot
+   * read, so individual sessions cannot fail; the field stays for the
+   * section's hint contract and is always zero.
    */
   failedCount: number
 }
@@ -58,34 +60,8 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-/** History backfill calls allowed in flight at once. */
-const BACKFILL_CONCURRENCY = 8
-
 /**
- * Run one task per item with at most `limit` tasks in flight.
- * @param items - the work queue.
- * @param limit - the in-flight cap.
- * @param worker - one item's task.
- */
-async function pool<T>(
-  items: readonly T[],
-  limit: number,
-  worker: (item: T) => Promise<void>,
-): Promise<void> {
-  let next = 0
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
-    for (;;) {
-      const index = next
-      next += 1
-      const item = items[index]
-      if (item === undefined) return
-      await worker(item)
-    }
-  }))
-}
-
-/**
- * Section controller over the sessions wire face.
+ * Section controller over the sessions service face.
  */
 export class UsageStatsController {
   /** The section's snapshot store (the inject hooks compartment seat). */
@@ -94,31 +70,16 @@ export class UsageStatsController {
   /**
    * Connection-lifetime generation: reset() advances it, and a load that
    * completes on a stale generation discards its result instead of
-   * overwriting the reset snapshot, repopulating the cleared backfill cache,
-   * or releasing a newer load's running flag.
+   * overwriting the reset snapshot or releasing a newer load's running flag.
    */
   private generation = 0
-  /**
-   * Completed history backfills, keyed by session. A later load reuses one
-   * while the list baseline still lacks the key; a session absent from the
-   * list drops its entry. Failed backfills are not cached, so a refresh
-   * retries them.
-   */
-  private readonly backfilled = new Map<SessionId, UsageStatsProjection>()
 
-  constructor(private readonly api: Pick<IApiClient['sessions'], 'list' | 'history'>) {}
+  constructor(private readonly sessions: Pick<ISessions, 'list' | 'refresh'>) {}
 
   /**
-   * Gather every session's usage value: the list baseline first, then a
-   * bounded-concurrency history backfill for sessions whose baseline lacked
-   * the key and no completed backfill is cached. An ok backfill that still
-   * lacks the key counts toward `absentCount` — the host folds every
-   * registered unit into the tail page, so an absent key there means the unit
-   * is not composed. An errored backfill (a refused call or a transport
-   * throw) counts toward `failedCount` instead: its registration status is
-   * unknown, so it must not feed the unregistered hint, and it is retried on
-   * the next load. A single unreadable session contributes an empty value
-   * instead of failing the page.
+   * Gather every session's usage value from the refreshed host-authoritative
+   * list baseline. A reset landing while the refresh is in flight discards
+   * the stale result.
    */
   async load(): Promise<void> {
     if (this.running) return
@@ -127,61 +88,30 @@ export class UsageStatsController {
     const previous = this.store.getSnapshot()
     this.store.set({ ...previous, status: 'loading', error: null })
     try {
-      const list = await this.api.list({})
-      if (!list.result.ok) throw new Error(list.result.error.message)
-      const items = list.result.value.items
-      const values: Record<string, UsageStatsProjection> = {}
-      const missing: SessionId[] = []
-      for (const item of items) {
-        const value = item.projections?.values.usageStats
-        const cached = this.backfilled.get(item.sessionId)
-        if (isUsageStats(value)) values[item.sessionId] = value
-        else if (cached !== undefined) values[item.sessionId] = cached
-        else missing.push(item.sessionId)
-      }
-      let absentCount = 0
-      let failedCount = 0
-      await pool(missing, BACKFILL_CONCURRENCY, async (sessionId) => {
-        try {
-          const history = await this.api.history({ sessionId })
-          if (!history.result.ok) {
-            // A refused call says nothing about registration; keep it out of
-            // absentCount so the unregistered hint cannot fire on errors.
-            values[sessionId] = { quarters: {} }
-            failedCount += 1
-            return
-          }
-          const value = history.result.value.projections?.values.usageStats
-          if (isUsageStats(value)) {
-            // Only the load's own generation may repopulate the cache reset()
-            // cleared; after a reset the entry belongs to the dead connection.
-            if (this.generation === generation) this.backfilled.set(sessionId, value)
-            values[sessionId] = value
-          } else {
-            // An ok tail page folds every registered unit, so a missing key
-            // there means the unit is not composed for the session.
-            values[sessionId] = { quarters: {} }
-            absentCount += 1
-          }
-        } catch {
-          values[sessionId] = { quarters: {} }
-          failedCount += 1
-        }
-      })
-      // A reset landed while this load was in flight: its result belongs to
-      // the dead connection and must not overwrite the reset snapshot or
-      // prune the cache the reset cleared.
+      await this.sessions.refresh()
+      // A reset landed while the refresh was in flight: its result belongs
+      // to the dead connection and must not overwrite the reset snapshot.
       if (this.generation !== generation) return
-      for (const sessionId of [...this.backfilled.keys()]) {
-        if (!items.some(item => item.sessionId === sessionId)) this.backfilled.delete(sessionId)
+      const list = this.sessions.list.getSnapshot()
+      const values: Record<string, UsageStatsProjection> = {}
+      let absentCount = 0
+      for (const sessionId of list.ids) {
+        const value = list.byId[sessionId]?.projectionValues?.usageStats
+        if (isUsageStats(value)) {
+          values[sessionId] = value
+        } else {
+          values[sessionId] = { quarters: {} }
+          absentCount += 1
+        }
       }
+      if (this.generation !== generation) return
       this.store.set({
         status: 'ready',
         error: null,
         values,
-        sessionCount: items.length,
+        sessionCount: list.ids.length,
         absentCount,
-        failedCount,
+        failedCount: 0,
       })
     } catch (error) {
       // A stale load reports nothing: the reset already owns the snapshot.
@@ -203,12 +133,11 @@ export class UsageStatsController {
   /**
    * Drop back to the idle snapshot (connection reset: rescan on next open).
    * The generation advance discards any load still in flight: its late
-   * completion neither overwrites this snapshot nor repopulates the cache.
+   * completion cannot overwrite this snapshot.
    */
   reset(): void {
     this.generation += 1
     this.running = false
-    this.backfilled.clear()
     this.store.set(INITIAL)
   }
 }

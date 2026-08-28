@@ -41,7 +41,9 @@
  * @module @deepseek-ai/dsh-client-text-file-cards/client
  */
 
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+// Type-only: pulls the renderer's Context merge (ctx.slots).
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the conversation service's Context merge (ctx.conversation)
 // and the ui-conversation SlotMap merge (the input.dock entry).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -67,7 +69,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 const NS = 'textFileCards'
 
 /** Selector for the composer textarea (marked by InputBar via data-dsh-composer). */
-const COMPOSER_SELECTOR = 'textarea[data-dsh-composer]'
+const COMPOSER_SELECTOR = '[data-dsh-composer]'
 
 /**
  * Required services: the session list (current session), the conversation
@@ -100,7 +102,7 @@ export function apply(ctx: ClientContext): void {
       if (!files.every(isTextFile)) return
       const resolved = resolveEditableInput(ctx)
       if (resolved === undefined) return
-      const composer = document.querySelector<HTMLTextAreaElement>(COMPOSER_SELECTOR)
+      const composer = document.querySelector<HTMLElement>(COMPOSER_SELECTOR)
       if (composer === null) return
       // Composer masked by a takeover overlay — leave the drop to native
       // handling instead of staging invisibly.
@@ -179,7 +181,7 @@ export function apply(ctx: ClientContext): void {
         const block = `# ${entry.name}\n${content}`
         input.setDraft(after.draft === '' ? block : `${after.draft}\n${block}`)
         staged.remove(sessionId, fileId)
-        const composer = document.querySelector<HTMLTextAreaElement>(COMPOSER_SELECTOR)
+        const composer = document.querySelector<HTMLElement>(COMPOSER_SELECTOR)
         if (composer !== null) composer.focus({ preventScroll: true })
       },
       remove: (fileId) => {

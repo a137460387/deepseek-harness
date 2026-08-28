@@ -1,80 +1,58 @@
 /**
- * The section controller: the list baseline is the fast path, sessions whose
- * baseline predates the unit are backfilled through the history tail page at
- * a bounded in-flight cap, completed backfills are reused on later loads
- * while the baseline still lacks the key, an ok backfill still lacking the
- * key counts toward the composition hint while an errored backfill (refused
- * call or transport throw) stays out of it and is retried instead,
- * single-session failures degrade to empty values instead of failing the
- * page, list failures surface as the error status, overlapping loads
- * collapse to one run, and a load that completes after a reset is discarded.
+ * The section controller: the refreshed session-list baseline is the single
+ * read path — rows whose host projection cache carries the key deliver their
+ * value, rows lacking it deliver an empty value and count toward the
+ * composition hint (the hint predicate is absentCount === sessionCount),
+ * failedCount stays zero because the baseline is one synchronous snapshot
+ * read, a rejected refresh surfaces as the error status, overlapping loads
+ * collapse to one refresh, and a load that completes after a reset is
+ * discarded. The pre-0.1.2-alpha.1 history-backfill lane retired with the
+ * Connection-owned transport (fork sync ledger records the disposition).
  */
 
 import { describe, expect, it } from 'vitest'
-import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import { UsageStatsController } from '../src/client/stats-store.ts'
 import type { UsageStatsSectionState } from '../src/client/stats-store.ts'
 import type { UsageStatsProjection } from '../src/types.ts'
 
-/** One session row as the sessions wire face shapes it. */
+/** One session row the fake list serves, shaped by its projection cache. */
 interface Row {
-  sessionId: string
-  projections?: { asOfSeq: number; values: Record<string, unknown> }
+  id: string
+  usageStats?: UsageStatsProjection
 }
 
-type SessionsApi = Pick<IApiClient['sessions'], 'list' | 'history'>
-
-/** A controllable sessions wire face recording every call. */
-function fakeApi(options: {
-  rows: Row[]
-  historyValues?: Record<string, Record<string, unknown>>
-  historyThrow?: string[]
-  /** Refuse the history call for these sessions with a server error. */
-  historyError?: string[]
-  /** Throw on the first history call per session only, then succeed. */
-  historyFlaky?: string[]
-  listError?: string
-  listThrow?: boolean
-}): { api: SessionsApi; listCalls: () => number; historyCalls: () => string[]; maxInFlight: () => number } {
-  let listCalls = 0
-  const historyCalls: string[] = []
-  const flakyRemaining = new Set(options.historyFlaky ?? [])
-  let inFlight = 0
-  let peakInFlight = 0
-  const api = {
-    async list() {
-      listCalls += 1
-      if (options.listThrow) throw new Error('transport down')
-      if (options.listError !== undefined) {
-        return { rpcId: 'r', result: { ok: false as const, error: { code: 'internal', message: options.listError, details: {} } } }
-      }
-      return { rpcId: 'r', result: { ok: true as const, value: { items: options.rows } } }
-    },
-    async history(payload: { sessionId: string }) {
-      historyCalls.push(payload.sessionId)
-      inFlight += 1
-      peakInFlight = Math.max(peakInFlight, inFlight)
-      // Yield so overlapping backfills are observable in the peak.
-      await new Promise(resolve => setTimeout(resolve, 0))
-      inFlight -= 1
-      if (options.historyThrow?.includes(payload.sessionId)) throw new Error('history failed')
-      if (options.historyError?.includes(payload.sessionId)) {
-        return { rpcId: 'r', result: { ok: false as const, error: { code: 'internal', message: 'history refused', details: {} } } }
-      }
-      if (flakyRemaining.has(payload.sessionId)) {
-        flakyRemaining.delete(payload.sessionId)
-        throw new Error('history failed')
-      }
-      const values = options.historyValues?.[payload.sessionId] ?? {}
-      return { rpcId: 'r', result: { ok: true as const, value: { events: [], hasMore: false, projections: { asOfSeq: 0, values } } } }
-    },
-  } as unknown as SessionsApi
-  return {
-    api,
-    listCalls: () => listCalls,
-    historyCalls: () => historyCalls,
-    maxInFlight: () => peakInFlight,
+/** A controllable sessions face counting refresh calls. */
+function fakeSessions(options: {
+  rows?: Row[]
+  /** Reject the refresh with this message. */
+  refreshError?: string
+}): { sessions: Pick<ISessions, 'list' | 'refresh'>; refreshCalls: () => number } {
+  let refreshCalls = 0
+  const rows = options.rows ?? []
+  const byId: Record<string, unknown> = {}
+  for (const row of rows) {
+    byId[row.id] = {
+      projectionValues: row.usageStats === undefined ? {} : { usageStats: row.usageStats },
+    }
   }
+  const state = {
+    ids: rows.map(row => row.id),
+    byId,
+    current: undefined,
+    phase: {},
+    subagentsByParent: {},
+    jobsBySession: {},
+    currentAddress: undefined,
+  }
+  const sessions = {
+    list: { getSnapshot: () => state, subscribe: () => () => {} },
+    async refresh() {
+      refreshCalls += 1
+      if (options.refreshError !== undefined) throw new Error(options.refreshError)
+    },
+  } as unknown as Pick<ISessions, 'list' | 'refresh'>
+  return { sessions, refreshCalls: () => refreshCalls }
 }
 
 const VALUE: UsageStatsProjection = {
@@ -84,31 +62,26 @@ const VALUE: UsageStatsProjection = {
 }
 
 describe('UsageStatsController', () => {
-  it('records baseline values and backfills sessions whose baseline lacks the key', async () => {
-    const { api, historyCalls } = fakeApi({
+  it('records baseline values from the list projection cache', async () => {
+    const { sessions } = fakeSessions({
       rows: [
-        { sessionId: 'a', projections: { asOfSeq: 3, values: { usageStats: VALUE } } },
-        { sessionId: 'b', projections: { asOfSeq: 1, values: {} } },
+        { id: 'a', usageStats: VALUE },
+        { id: 'b', usageStats: VALUE },
       ],
-      historyValues: { b: { usageStats: VALUE } },
     })
-    const controller = new UsageStatsController(api)
+    const controller = new UsageStatsController(sessions)
     await controller.load()
     const state = controller.store.getSnapshot()
     expect(state.status).toBe('ready')
     expect(state.sessionCount).toBe(2)
     expect(state.absentCount).toBe(0)
-    expect(Object.keys(state.values)).toEqual(['a', 'b'])
+    expect(state.values.a).toEqual(VALUE)
     expect(state.values.b).toEqual(VALUE)
-    expect(historyCalls()).toEqual(['b'])
   })
 
-  it('counts a session absent when even the history backfill serves no key', async () => {
-    const { api } = fakeApi({
-      rows: [{ sessionId: 'a', projections: { asOfSeq: 1, values: {} } }],
-      historyValues: { a: {} },
-    })
-    const controller = new UsageStatsController(api)
+  it('counts a session absent when its cache row lacks the key', async () => {
+    const { sessions } = fakeSessions({ rows: [{ id: 'a' }] })
+    const controller = new UsageStatsController(sessions)
     await controller.load()
     const state = controller.store.getSnapshot()
     expect(state.status).toBe('ready')
@@ -117,143 +90,43 @@ describe('UsageStatsController', () => {
     expect(state.values.a).toEqual({ quarters: {} })
   })
 
-  it('degrades a failing history backfill to an empty value instead of failing the page', async () => {
-    const { api } = fakeApi({
-      rows: [
-        { sessionId: 'a', projections: { asOfSeq: 1, values: {} } },
-        { sessionId: 'b', projections: { asOfSeq: 1, values: {} } },
-      ],
-      historyThrow: ['a'],
-      historyValues: { b: { usageStats: VALUE } },
-    })
-    const controller = new UsageStatsController(api)
+  it('holds the unregistered-hint input when every baseline lacks the key', async () => {
+    const { sessions } = fakeSessions({ rows: [{ id: 'a' }, { id: 'b' }] })
+    const controller = new UsageStatsController(sessions)
     await controller.load()
     const state = controller.store.getSnapshot()
-    expect(state.status).toBe('ready')
-    expect(state.values.a).toEqual({ quarters: {} })
-    expect(state.values.b).toEqual(VALUE)
-    expect(state.failedCount).toBe(1)
-    expect(state.absentCount).toBe(0)
-  })
-
-  it('counts a refused history backfill as failed, not absent', async () => {
-    const { api } = fakeApi({
-      rows: [{ sessionId: 'a', projections: { asOfSeq: 1, values: {} } }],
-      historyError: ['a'],
-    })
-    const controller = new UsageStatsController(api)
-    await controller.load()
-    const state = controller.store.getSnapshot()
-    expect(state.status).toBe('ready')
-    expect(state.absentCount).toBe(0)
-    expect(state.failedCount).toBe(1)
-    expect(state.values.a).toEqual({ quarters: {} })
-  })
-
-  it('keeps the hint input empty when every backfill errored', async () => {
-    const { api } = fakeApi({
-      rows: [
-        { sessionId: 'a', projections: { asOfSeq: 1, values: {} } },
-        { sessionId: 'b', projections: { asOfSeq: 1, values: {} } },
-      ],
-      historyThrow: ['a'],
-      historyError: ['b'],
-    })
-    const controller = new UsageStatsController(api)
-    await controller.load()
-    const state = controller.store.getSnapshot()
-    // Two unknowns, zero confirmations: absentCount === sessionCount (the
-    // section's unregistered-hint predicate) cannot hold on errors alone.
+    // absentCount === sessionCount is the section's unregistered predicate.
     expect(state.sessionCount).toBe(2)
-    expect(state.absentCount).toBe(0)
-    expect(state.failedCount).toBe(2)
+    expect(state.absentCount).toBe(2)
+    expect(state.failedCount).toBe(0)
   })
 
-  it('re-backfills a confirmed-absent session on the next load instead of caching it', async () => {
-    const { api, historyCalls } = fakeApi({
-      rows: [{ sessionId: 'a', projections: { asOfSeq: 1, values: {} } }],
-      historyValues: { a: {} },
-    })
-    const controller = new UsageStatsController(api)
+  it('keeps failedCount at zero — the baseline is one synchronous read', async () => {
+    const { sessions } = fakeSessions({ rows: [{ id: 'a', usageStats: VALUE }, { id: 'b' }] })
+    const controller = new UsageStatsController(sessions)
     await controller.load()
-    await controller.load()
-    // Absence is a per-composition fact, not a value to reuse: every load
-    // re-checks it, so a unit registered after the first open is seen.
-    expect(historyCalls()).toEqual(['a', 'a'])
-    expect(controller.store.getSnapshot().absentCount).toBe(1)
+    expect(controller.store.getSnapshot().failedCount).toBe(0)
   })
 
-  it('bounds the history backfill in-flight count', async () => {
-    const rows = Array.from({ length: 20 }, (_, index) => ({
-      sessionId: `s${index}`,
-      projections: { asOfSeq: 1, values: {} },
-    }))
-    const { api, historyCalls, maxInFlight } = fakeApi({
-      rows,
-      historyValues: Object.fromEntries(rows.map(row => [row.sessionId, { usageStats: VALUE }])),
-    })
-    const controller = new UsageStatsController(api)
-    await controller.load()
-    expect(historyCalls().length).toBe(20)
-    expect(maxInFlight()).toBeLessThanOrEqual(8)
-    expect(maxInFlight()).toBeGreaterThan(1)
-  })
-
-  it('reuses completed backfills on a later load while the baseline lacks the key', async () => {
-    const { api, historyCalls } = fakeApi({
-      rows: [{ sessionId: 'a', projections: { asOfSeq: 1, values: {} } }],
-      historyValues: { a: { usageStats: VALUE } },
-    })
-    const controller = new UsageStatsController(api)
-    await controller.load()
-    await controller.load()
-    expect(historyCalls()).toEqual(['a'])
-    expect(controller.store.getSnapshot().values.a).toEqual(VALUE)
-  })
-
-  it('retries a failed backfill on the next load instead of caching the failure', async () => {
-    const { api, historyCalls } = fakeApi({
-      rows: [{ sessionId: 'a', projections: { asOfSeq: 1, values: {} } }],
-      historyFlaky: ['a'],
-      historyValues: { a: { usageStats: VALUE } },
-    })
-    const controller = new UsageStatsController(api)
-    await controller.load()
-    expect(controller.store.getSnapshot().values.a).toEqual({ quarters: {} })
-    await controller.load()
-    expect(historyCalls()).toEqual(['a', 'a'])
-    expect(controller.store.getSnapshot().values.a).toEqual(VALUE)
-  })
-
-  it('surfaces a refused list call as the error status with the host message', async () => {
-    const { api } = fakeApi({ rows: [], listError: 'boom' })
-    const controller = new UsageStatsController(api)
+  it('surfaces a rejected refresh as the error status with the message', async () => {
+    const { sessions } = fakeSessions({ rows: [], refreshError: 'boom' })
+    const controller = new UsageStatsController(sessions)
     await controller.load()
     const state = controller.store.getSnapshot()
     expect(state.status).toBe('error')
     expect(state.error).toBe('boom')
   })
 
-  it('surfaces a rejected list transport as the error status', async () => {
-    const { api } = fakeApi({ rows: [], listThrow: true })
-    const controller = new UsageStatsController(api)
-    await controller.load()
-    expect(controller.store.getSnapshot().status).toBe('error')
-  })
-
-  it('collapses overlapping loads into one run', async () => {
-    const { api, listCalls } = fakeApi({ rows: [] })
-    const controller = new UsageStatsController(api)
+  it('collapses overlapping loads into one refresh', async () => {
+    const { sessions, refreshCalls } = fakeSessions({ rows: [] })
+    const controller = new UsageStatsController(sessions)
     await Promise.all([controller.load(), controller.load()])
-    expect(listCalls()).toBe(1)
+    expect(refreshCalls()).toBe(1)
   })
 
-  it('reset() drops back to the idle snapshot and clears the backfill cache', async () => {
-    const { api, historyCalls } = fakeApi({
-      rows: [{ sessionId: 'a', projections: { asOfSeq: 1, values: {} } }],
-      historyValues: { a: { usageStats: VALUE } },
-    })
-    const controller = new UsageStatsController(api)
+  it('reset() drops back to the idle snapshot and a later load rescans', async () => {
+    const { sessions, refreshCalls } = fakeSessions({ rows: [{ id: 'a', usageStats: VALUE }] })
+    const controller = new UsageStatsController(sessions)
     await controller.load()
     controller.reset()
     expect(controller.store.getSnapshot()).toEqual<UsageStatsSectionState>({
@@ -265,25 +138,21 @@ describe('UsageStatsController', () => {
       failedCount: 0,
     })
     await controller.load()
-    expect(historyCalls()).toEqual(['a', 'a'])
+    expect(refreshCalls()).toBe(2)
+    expect(controller.store.getSnapshot().values.a).toEqual(VALUE)
   })
 
-  it('discards a load that completes after a reset', async () => {
+  it('discards a load whose refresh completes after a reset', async () => {
     let release: (() => void) | undefined
-    const api = {
-      list: async () => ({
-        rpcId: 'r',
-        result: { ok: true as const, value: { items: [{ sessionId: 'a', projections: { asOfSeq: 1, values: {} } }] } },
+    const sessions = {
+      list: { getSnapshot: () => ({ ids: ['a'], byId: { a: { projectionValues: { usageStats: VALUE } } } }), subscribe: () => () => {} },
+      refresh: () => new Promise<void>((resolve) => {
+        release = () => resolve()
       }),
-      history: () => new Promise((resolve) => {
-        release = () => {
-          resolve({ rpcId: 'r', result: { ok: true, value: { events: [], hasMore: false, projections: { asOfSeq: 0, values: { usageStats: VALUE } } } } })
-        }
-      }),
-    } as unknown as SessionsApi
-    const controller = new UsageStatsController(api)
+    } as unknown as Pick<ISessions, 'list' | 'refresh'>
+    const controller = new UsageStatsController(sessions)
     const pending = controller.load()
-    // Let the list read resolve and the backfill reach its in-flight history read.
+    // Let the refresh hang in flight, then reset and release it.
     await new Promise(resolve => setTimeout(resolve, 0))
     controller.reset()
     release?.()
@@ -298,17 +167,15 @@ describe('UsageStatsController', () => {
     })
   })
 
-  it('marks the store loading while a read is in flight', async () => {
+  it('marks the store loading while the refresh is in flight', async () => {
     let release: (() => void) | undefined
-    const api = {
-      list: () => new Promise((resolve) => {
-        release = () => {
-          resolve({ rpcId: 'r', result: { ok: true, value: { items: [] } } })
-        }
+    const sessions = {
+      list: { getSnapshot: () => ({ ids: [] }), subscribe: () => () => {} },
+      refresh: () => new Promise<void>((resolve) => {
+        release = () => resolve()
       }),
-      history: async () => ({ rpcId: 'r', result: { ok: true, value: { events: [], hasMore: false } } }),
-    } as unknown as SessionsApi
-    const controller = new UsageStatsController(api)
+    } as unknown as Pick<ISessions, 'list' | 'refresh'>
+    const controller = new UsageStatsController(sessions)
     const pending = controller.load()
     expect(controller.store.getSnapshot().status).toBe('loading')
     release?.()
@@ -317,8 +184,8 @@ describe('UsageStatsController', () => {
   })
 
   it('load is idempotent across a reset run', async () => {
-    const { api } = fakeApi({ rows: [] })
-    const controller = new UsageStatsController(api)
+    const { sessions } = fakeSessions({ rows: [] })
+    const controller = new UsageStatsController(sessions)
     await controller.load()
     controller.reset()
     await controller.load()

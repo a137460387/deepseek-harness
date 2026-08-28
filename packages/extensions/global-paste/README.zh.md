@@ -1,6 +1,12 @@
+---
+description: "Web UI composer 的全页粘贴路由：纯文本经公开 input 服务进草稿，图片文件转发给 composer 自己的粘贴入口。"
+kind: "package-reference"
+---
 # @deepseek-ai/dsh-client-global-paste
 
 [English](README.md) | 中文
+
+## 概述
 
 Web UI 全页文本粘贴:在窗口任意位置按 Ctrl/Cmd+V,会把剪贴板的纯文本路由到当前会话的 composer 草稿中,无需先点击输入框。对标 Claude.ai 的"任意位置粘贴"行为。
 
@@ -25,6 +31,15 @@ Web UI 全页文本粘贴:在窗口任意位置按 Ctrl/Cmd+V,会把剪贴板的
 
 文本文件**拖拽**由伴生插件 `@deepseek-ai/dsh-client-text-file-cards` 负责:它把拖入的文本文件暂存为 composer 上方的卡片,而不是直接内联进草稿。
 
+## 目录
+
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无——本浏览器端插件只通过公开的 `ctx.conversation.input` 服务路由剪贴板粘贴事件,不注册任何模型可见内容。
@@ -35,6 +50,20 @@ Web UI 全页文本粘贴:在窗口任意位置按 Ctrl/Cmd+V,会把剪贴板的
 
 ## 已知限制与后续工作
 
+<a id="known-limitations-and-deferred-work"></a>
+
 - **无 paste-upgrade** —— composer 自身的 `onPaste` 会把文本送入输入状态机的 `pasteBegin` 事务,可把粘贴文本升级为 slash 引用 chip。本插件改用公开的 `setDraft` 路径(状态机的 keyboard 面是 InputBar 私有,不跨插件边界),因此粘贴的 URL 和路径保持为纯文本,不会变成 chip。对于全页粘贴这正是期望行为。图片路径不受影响:它重新派发到 composer,因此 composer 自身的 `onPaste`(含其 paste-upgrade)对图片部分照常运行。
 - **浏览器支持** —— 图片转发路径依赖浏览器支持脚本构造的 `ClipboardEvent` + 携带 File 的 `DataTransfer`。已在 Chromium 验证;其他引擎可能限制此项(合成事件的 `clipboardData` 可能为 null,旧版 Safari 构造 `DataTransfer` 时直接抛 TypeError)。构造失败会柔性降级:混合粘贴仍路由文本半边并聚焦 composer,纯图片粘贴则放行原生处理,不会半吞事件。在构造成功但不理会转发的浏览器上,图片粘贴静默无效;文本粘贴不受影响。
 - **可见性探测** —— composer 被遮挡的判断用 `elementFromPoint` 在 composer 中心点检测。若覆盖层遮住 composer 但未遮住中心点(如细侧栏),则无法检测;粘贴会路由到一个部分可见的 composer,这是无害的。
+
+-----
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者工作上下文——点击展开</summary>
+
+无。
+
+</details>

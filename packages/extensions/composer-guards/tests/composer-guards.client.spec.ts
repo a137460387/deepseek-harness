@@ -9,10 +9,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import InvariantRegistry from '@deepseek-ai/dsh-invariants'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import type {
-  ClientContext, SessionFace, SessionId, SessionListState,
-} from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { SessionFace, SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { apply, composerVisible, resolveEditableInput, sessionAcceptsEdits } from '../src/client/index.ts'
 import { apply as applyNode } from '../src/index.ts'
 import * as ComposerGuardsInvariant from '../src/invariant.ts'

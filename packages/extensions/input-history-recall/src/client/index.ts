@@ -32,15 +32,17 @@
  * @module @deepseek-ai/dsh-client-input-history-recall/client
  */
 
-import type { ClientContext, SessionFace, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { SessionBinding } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 // Type-only: pulls the conversation service's Context merge (ctx.conversation).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: pulls the input-trigger service's Context merge (ctx.inputTriggers).
 import type {} from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import { sessionAcceptsEdits } from '@deepseek-ai/dsh-client-composer-guards/client'
 
-/** Selector for the composer textarea (marked by InputBar via data-dsh-composer). */
-const COMPOSER_SELECTOR = 'textarea[data-dsh-composer]'
+/** Selector for the composer input surface (marked by InputBar via data-dsh-composer). */
+const COMPOSER_SELECTOR = '[data-dsh-composer]'
 
 /** One live history traversal over the current session's sent texts. */
 interface RecallSlot {
@@ -63,20 +65,23 @@ interface RecallSlot {
 export const inject = ['sessions', 'conversation']
 
 /**
- * The current session's sent texts, oldest first: user and steering message
- * nodes' text blocks concatenated in order. Image-only messages contribute
- * nothing and are dropped; non-text blocks are skipped. Read fresh on each
- * keypress — the conversation snapshot is the authority and no second copy
- * of the history is kept.
- * @param session - the session face behind the current scope.
+ * The current session's sent texts, oldest first: user-submitted message
+ * events' text blocks concatenated in order over the binding's event window.
+ * Image-only messages contribute nothing and are dropped; non-text blocks are
+ * skipped; packed assistant history records never carry user messages. Read
+ * fresh on each keypress — the session window is the authority and no second
+ * copy of the history is kept.
+ * @param binding - the session binding behind the current scope.
  * @returns the non-empty sent texts in log order.
  */
-function sentTexts(session: SessionFace): readonly string[] {
+function sentTexts(binding: SessionBinding): readonly string[] {
   const texts: string[] = []
-  for (const node of session.getSnapshot().nodes) {
-    if (node.kind !== 'user' && node.kind !== 'steering') continue
+  for (const entry of binding.eventSource.getSnapshot().entries) {
+    if (entry.type !== 'event') continue
+    const event = entry.event
+    if (event.type !== 'user/message' || event.data.source.kind !== 'user') continue
     let text = ''
-    for (const block of node.content) {
+    for (const block of event.data.content) {
       if (block.type === 'text') text += block.text
     }
     if (text !== '') texts.push(text)
@@ -121,14 +126,14 @@ export function apply(ctx: ClientContext): void {
       // keyCode 229 is the legacy composition signal engines emit without isComposing.
       // oxlint-disable-next-line typescript/no-deprecated
       if (event.isComposing || event.keyCode === 229) return
-      const composer = document.querySelector<HTMLTextAreaElement>(COMPOSER_SELECTOR)
+      const composer = document.querySelector<HTMLElement>(COMPOSER_SELECTOR)
       if (composer === null || document.activeElement !== composer) return
 
       const current = ctx.sessions.list.getSnapshot().current
       if (current === undefined) return
-      const actx = ctx.sessions.scope(current)
-      const session = actx === undefined ? undefined : ctx.sessions.sessionOf(actx)
-      if (actx === undefined || session === undefined || !sessionAcceptsEdits(session)) return
+      const binding = ctx.sessions.binding(current)
+      if (binding === undefined || !sessionAcceptsEdits(binding.session)) return
+      const actx = binding.ctx
       const input = ctx.conversation.input.for(actx)
       const state = input.state.getSnapshot()
       // Recall replaces the whole draft, so it is refused outside the plain
@@ -157,13 +162,19 @@ export function apply(ctx: ClientContext): void {
         return
       }
 
-      const history = sentTexts(session)
+      const history = sentTexts(binding)
       if (event.key === 'ArrowUp') {
         if (active === null) {
-          // Entry requires the caret at offset 0 with no selection (the
-          // claude.ai gesture). Mid-traversal presses skip the recheck: the
-          // draft rewrite leaves the caret where the engine puts it.
-          if (composer.selectionStart !== 0 || composer.selectionEnd !== 0) return
+          // Entry requires the caret at text offset 0 with no selection (the
+          // claude.ai gesture), probed through the Selection API over the
+          // contenteditable composer. Mid-traversal presses skip the recheck:
+          // the draft rewrite leaves the caret where the engine puts it.
+          const selection = window.getSelection()
+          if (selection === null || !selection.isCollapsed) return
+          const before = document.createRange()
+          before.setStart(composer, 0)
+          before.setEnd(selection.anchorNode ?? composer, selection.anchorOffset)
+          if (before.toString().length !== 0) return
           if (history.length === 0) return
           // `written` seeds from the entry draft because the first history
           // write happens later in this same keypress.

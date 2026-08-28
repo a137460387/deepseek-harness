@@ -1,6 +1,12 @@
+---
+description: "按会话把 composer 草稿镜像进 localStorage，重载后恢复纯文本。"
+kind: "package-reference"
+---
 # @deepseek-ai/dsh-client-draft-keeper
 
 [English](README.md) | 中文
+
+## 概述
 
 Web UI 的 composer 草稿持久化：每个会话未发送的草稿镜像进 localStorage，重载或崩溃后把存储的文本恢复进空 composer，并附一条 info 提示。仅恢复纯文本。
 
@@ -15,6 +21,15 @@ Web UI 的 composer 草稿持久化：每个会话未发送的草稿镜像进 lo
 - **修剪**：会话离开 live 会话列表后，其条目在每次列表变化时删除；仅在列表已到达后执行（pending 阶段的空 id 列表是加载态而非无会话世界）。
 - **存储失败**：版本不同或结构不符的记录整体弃用——不迁移。任何存储失败（配额、隐私模式）或 localStorage 缺失都会把镜像静默禁用到插件生命周期结束；composer 毫无感知。这与 client runtime 自身存储持久化的契约一致。
 
+## 目录
+
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无——本浏览器端插件只把 composer 草稿经公开 input 服务镜像进 localStorage,不注册任何模型可见内容。
@@ -25,8 +40,22 @@ Web UI 的 composer 草稿持久化：每个会话未发送的草稿镜像进 lo
 
 ## 已知限制与后续工作
 
+<a id="known-limitations-and-deferred-work"></a>
+
 - **仅纯文本** —— slash 命令 claim 与 @ 引用 chip 是草稿字符串旁边的机器状态,恢复时不复存在:composer 以 plain 相位回来,chip 的内联显示文本作为普通草稿文本存活,但 chip 本身不恢复。claim token 按其字面文本恢复。
 - **单条记录** —— 一个 localStorage 键持有全部会话的草稿;大小上限于存储配额,配额耗尽会静默禁用持久化(在存储腾出空间且页面重挂插件之前,草稿不再跨重载存活)。
 - **每生命周期一次** —— 恢复每会话每插件生命周期只运行一次。同一生命周期内清空已恢复的草稿再重载不会恢复;HMR 重挂载会重新武装恢复,因为内存守卫重置而存储存活。
 - **离开期间排空的 steering 队列** —— 队列保留条目的删除只在会话为 current 时运行(订阅是信号);队列在别的会话为 current 时排空,保留的条目要等该会话被再次访问或被修剪。
 - **不跨会话恢复** —— 存储的草稿只恢复进它自己的会话。
+
+-----
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者工作上下文——点击展开</summary>
+
+无。
+
+</details>

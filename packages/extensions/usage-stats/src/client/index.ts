@@ -8,12 +8,17 @@
  * @module @deepseek-ai/dsh-client-usage-stats/client
  */
 
-import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the settings shell's SlotMap merge (the 'settings.section' entry).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+// Type-only: pulls the connection plugin's client event map (connection/reset).
+import type {} from '@deepseek-ai/dsh-client-connection/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+// Type-only: pulls the renderer's Context merge (ctx.slots).
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+// Type-only: pulls the sessions service's Context merge (ctx.sessions).
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import { UsageStatsSection } from './UsageStatsSection.tsx'
 import type { UsageStatsSectionInjected } from './UsageStatsSection.tsx'
 import { UsageStatsController } from './stats-store.ts'
@@ -40,7 +45,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 const NS = 'usageStats'
 
 /** Required services (cordis fiber inject). */
-export const inject = ['slots', 'locale', 'connection']
+export const inject = ['slots', 'locale', 'sessions']
 
 /**
  * Mount the usage statistics settings section, ordered after Agent presets
@@ -50,8 +55,7 @@ export const inject = ['slots', 'locale', 'connection']
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'usage-stats: dictionaries')
 
-  const { api } = ctx.get('connection') as ConnectionHandle
-  const controller = new UsageStatsController(api.sessions)
+  const controller = new UsageStatsController(ctx.sessions)
 
   // A reconnect can serve a different host composition; dropping to idle
   // makes the next section open rescan instead of trusting the old snapshot.

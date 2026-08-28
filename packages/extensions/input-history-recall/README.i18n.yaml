@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/extensions/input-history-recall/README.md
-README.md: 14c2757b9484b8e0aa39345f58ad58771cc58359
-README.zh.md: fecb66b8e2a67fd02fd1944a6ad5da02996225e5
+README.md: 827e6941a19bde4f72efd37159dc4b620463b3e4
+README.zh.md: 684de1955dba3628861f2c26f1b1ba71cd61fd1e

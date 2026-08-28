@@ -21,7 +21,11 @@
  * @module @deepseek-ai/dsh-client-find-in-chat/client
  */
 
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+// Type-only: pulls the renderer's Context merge (ctx.slots) and the
+// session-controller client merge (ctx.sessions).
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 // Type-only: pulls the ui-slots SlotMap merge (the shell.overlay entry).
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pulls the locale service's Context merge (ctx.locale).
