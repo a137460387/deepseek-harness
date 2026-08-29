@@ -12,7 +12,11 @@
  * public hostname riding a loopback peer (the reverse-tunnel shape) stays
  * gated. The composition's web-app runtime derives the LAN trust fence from
  * the real bind (`resolveLanTrust`), so this package never fakes Host or
- * Origin.
+ * Origin. A request already holding the valid gate cookie passes untouched
+ * even when it carries a foreign `?token=`: since the 0.1.2-alpha.1 sync the
+ * host's own browser auth guards index and `/api` with a separate process
+ * launch token, and that two-stage entry (gate cookie first, then the launch
+ * token through this gate) is the supported way through both layers.
  * @module @deepseek-ai/dsh-host-lan-access
  */
 
@@ -43,22 +47,30 @@ export type Config = BaseConfig
 const lanAccessSchema = WebServer.Config
 
 /**
- * Whether the request already carries the valid secret: the cookie set by
- * the `?token=` entry redirect or {@link AUTH_SET_PATH}, or a `?token=` query
- * on the entry path (the browser handoff form). Both compare SHA-256 digests
- * through `timingSafeEqual`.
+ * Whether the request carries the valid secret on the gate cookie alone (the
+ * cookie set by the `?token=` entry redirect or {@link AUTH_SET_PATH}).
+ * Compares SHA-256 digests through `timingSafeEqual`.
  */
-function requestCarriesToken(req: IncomingMessage, expectedDigest: Buffer): boolean {
+function cookieCarriesToken(req: IncomingMessage, expectedDigest: Buffer): boolean {
   const cookieHeader = req.headers.cookie
-  if (typeof cookieHeader === 'string') {
-    for (const part of cookieHeader.split(';')) {
-      const eq = part.indexOf('=')
-      if (eq === -1) continue
-      if (part.slice(0, eq).trim() === DSH_LAN_COOKIE && tokenMatches(part.slice(eq + 1).trim(), expectedDigest)) {
-        return true
-      }
+  if (typeof cookieHeader !== 'string') return false
+  for (const part of cookieHeader.split(';')) {
+    const eq = part.indexOf('=')
+    if (eq === -1) continue
+    if (part.slice(0, eq).trim() === DSH_LAN_COOKIE && tokenMatches(part.slice(eq + 1).trim(), expectedDigest)) {
+      return true
     }
   }
+  return false
+}
+
+/**
+ * Whether the request already carries the valid secret: the gate cookie, or a
+ * `?token=` query on the entry path (the browser handoff form). Both compare
+ * SHA-256 digests through `timingSafeEqual`.
+ */
+function requestCarriesToken(req: IncomingMessage, expectedDigest: Buffer): boolean {
+  if (cookieCarriesToken(req, expectedDigest)) return true
   const url = req.url ?? '/'
   const queryAt = url.indexOf('?')
   if (queryAt !== -1) {
@@ -225,9 +237,12 @@ export class LanAccessWebServer extends WebServer {
           deny(res, 'no-token')
           return
         }
-        // A ?token= on any path clears it by redirecting to the same path
-        // without the query; a valid cookie (or a valid ?token= on a non-entry
-        // request) passes straight through.
+        // A matching ?token= clears itself by redirecting to the same path
+        // without the query. A foreign ?token= on a request already carrying
+        // the valid gate cookie falls through untouched: that is stage two of
+        // the two-stage entry, handing the host process's own launch token to
+        // the upstream browser-auth exchange behind this gate. Without the
+        // cookie a foreign token stays refused.
         const queryAt = url.indexOf('?')
         if (queryAt !== -1 && new URLSearchParams(url.slice(queryAt + 1)).has('token')) {
           const presented = new URLSearchParams(url.slice(queryAt + 1)).get('token') ?? ''
@@ -240,8 +255,10 @@ export class LanAccessWebServer extends WebServer {
             res.end()
             return
           }
-          deny(res, 'invalid-token')
-          return
+          if (!cookieCarriesToken(req, digest)) {
+            deny(res, 'invalid-token')
+            return
+          }
         }
         // The opt-in localhost exemption skips only this judgment: both the
         // TCP peer and the Host header must be loopback, so the reverse-tunnel

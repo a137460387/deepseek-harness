@@ -38,11 +38,19 @@ Every request — static assets, `index.html`, `/api`, websocket upgrades — pa
 - `?token=<secret>` on any path → validates, sets the session cookie (same attributes as `/auth-set`), 302 to the same path with the query cleared.
 - `/auth-set?token=<secret>` → validates, sets `dsh-lan-token=<secret>` cookie (`HttpOnly; SameSite=Lax; Path=/`, no `Secure` — plain HTTP), 302 to `/`.
 - Valid cookie → request passes through to the stock dispatch.
+- Valid cookie plus a foreign `?token=` → passes through untouched (no redirect, no gate cookie): see the two-stage entry below.
 - With `DSH_LAN_TRUST_LOCALHOST=1/true`, requests whose TCP peer and Host header are both loopback forms skip the token judgment and pass directly (pages and websocket upgrades share one decision point); the `/auth-set` and `?token=` cookie-exchange flows are unchanged.
-- Invalid token → 401.
+- Invalid token → 401 (with or without a foreign `?token=`, unless the valid gate cookie is present).
 - Websocket handshake without a credential → rejected with 401 before any protocol negotiation.
 
 Token comparison is `crypto.timingSafeEqual` over SHA-256 digests, never plaintext. No log line prints a URL containing the token.
+
+Since the 0.1.2-alpha.1 sync the host also runs its own browser authentication (the Connection's BrowserAuth): it guards `index.html` and `/api` with a per-process launch token and authority-bound cookies, independently of this gate. Browser entry therefore takes two stages:
+
+1. Open `/?token=<DSH_LAN_TOKEN>` — this gate sets the `dsh-lan-token` cookie and redirects to `/`.
+2. Open `/?token=<launch token>` — the launch token is printed by `dsh web` at boot (and lands in the service log of a supervised deployment); bearing the gate cookie, this request passes the gate untouched, and the host's own exchange mints its browser cookie so the app loads.
+
+A request without the gate cookie never reaches the second stage: a foreign `?token=` stays refused. The second token grants nothing on its own against this gate; the gate token remains the outer boundary.
 
 ## Security warnings
 

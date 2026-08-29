@@ -309,6 +309,41 @@ describe('LAN token gate', () => {
     expect(landing.body).toContain('shell')
   })
 
+  it('two-stage entry: a valid gate cookie carries a foreign ?token= through to the handlers; without the cookie the foreign token stays refused', { timeout: 60_000 }, async () => {
+    setLanEnv('true', TOKEN)
+    const loaded = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts')
+    const server = loaded.webServer
+    // The fallback stands in for the host's own browser-auth exchange behind
+    // the gate: it must observe the foreign token untouched.
+    const observedUrls: string[] = []
+    server.registerFallback((req, res) => {
+      observedUrls.push(req.url ?? '')
+      res.writeHead(200, { 'content-type': 'text/html' })
+      res.end('<html><body>shell</body></html>')
+    })
+
+    // Stage one: the gate token mints the cookie.
+    const entry = await request(server.port, `/?token=${TOKEN}`)
+    expect(entry.status).toBe(302)
+    const cookie = (entry.setCookie ?? '').split(';')[0] ?? ''
+    expect(cookie).toBe(`dsh-lan-token=${TOKEN}`)
+
+    // Without the cookie a foreign token stays refused and never reaches the
+    // handlers; it never mints anything either.
+    const refused = await request(server.port, '/?token=foreign-launch-token')
+    expect(refused.status).toBe(401)
+    expect(refused.setCookie).toBeNull()
+    expect(observedUrls).toEqual([])
+
+    // Stage two: the valid gate cookie carries the foreign ?token= through
+    // untouched — no redirect, no gate cookie, the downstream exchange sees
+    // the exact URL.
+    const stageTwo = await request(server.port, '/?token=foreign-launch-token', { headers: { cookie } })
+    expect(stageTwo.status).toBe(200)
+    expect(stageTwo.setCookie).toBeNull()
+    expect(observedUrls).toEqual(['/?token=foreign-launch-token'])
+  })
+
   it('serves a placeholder 401 page that leaks no real dist path or asset name', { timeout: 60_000 }, async () => {
     setLanEnv('true', TOKEN)
     const loaded = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts')

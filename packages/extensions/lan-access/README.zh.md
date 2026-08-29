@@ -38,11 +38,19 @@ LAN 模式关闭时，行的 `host` 表达式就是原版的 `ctx.webStartup.hos
 - 任意路径带 `?token=<secret>` → 校验通过后设置会话 cookie（属性同 `/auth-set`），302 到同路径并清除查询参数。
 - `/auth-set?token=<secret>` → 校验通过后设置 `dsh-lan-token=<secret>` cookie（`HttpOnly; SameSite=Lax; Path=/`，不加 `Secure`——明文 HTTP 场景），302 回 `/`。
 - 有效 cookie → 请求放行到原版分派。
+- 有效 cookie 且带外来 `?token=` → 原样放行（不重定向、不种门禁 cookie）：见下方两段式入场。
 - `DSH_LAN_TRUST_LOCALHOST=1/true` 时，TCP 对端与 Host 头均为回环形态的请求跳过 token 判定直接放行（普通请求与 websocket 升级走同一判定点）；`/auth-set` 与 `?token=` 换取 cookie 的流程不变。
-- 无效 token → 401。
+- 无效 token → 401（无论是否携带外来 `?token=`，除非同时持有有效门禁 cookie）。
 - 无凭据的 websocket 握手在任何协议协商之前以 401 拒绝。
 
 token 比较用 `crypto.timingSafeEqual` 比对 SHA-256 摘要，绝不比较明文。任何日志行都不打印含 token 明文的 URL。
+
+0.1.2-alpha.1 同步之后，宿主还运行自己的浏览器鉴权（Connection 的 BrowserAuth）：它以进程级启动令牌和 authority 绑定的 cookie 独立把守 `index.html` 与 `/api`，与本门禁互不知晓。浏览器入场因此分两段：
+
+1. 访问 `/?token=<DSH_LAN_TOKEN>`——本门禁种下 `dsh-lan-token` cookie 并 302 回 `/`。
+2. 访问 `/?token=<启动令牌>`——启动令牌由 `dsh web` 启动时打印（受监督部署中落在服务日志里）；携带门禁 cookie 的该请求原样穿过门禁，宿主自己的交换流程种下浏览器 cookie，应用加载。
+
+未持门禁 cookie 的请求到不了第二段：外来 `?token=` 一律被拒。第二段令牌本身过不了本门禁；门禁 token 仍是外层边界。
 
 ## 安全警示
 
