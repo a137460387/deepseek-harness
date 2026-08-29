@@ -128,7 +128,7 @@ $node = "C:\Program Files\nodejs\node.exe"
 ## 4. Token 管理
 
 - **权威来源是 NSSM 服务配置**(`dsh-web` 的 `AppEnvironmentExtra`)。用户级环境变量 `DSH_LAN_TOKEN` 仅是前台手动运行时的来源;两者不一致时,服务行为以 NSSM 配置为准。
-- token 校验为 SHA-256 摘要 + 常数时间比较;浏览器入口 `https://dsh.lgyu.cloud/?token=<TOKEN>`,302 应答种下 HttpOnly cookie,之后长期免登。
+- token 校验为 SHA-256 摘要 + 常数时间比较;浏览器入场为**两段式**(0.1.2-alpha.1 同步后,宿主自带 BrowserAuth 以进程启动令牌独立把守 `index.html` 与 `/api`):第一段访问 `https://dsh.lgyu.cloud/?token=<TOKEN>`,302 应答种下门禁 HttpOnly cookie(`dsh-lan-token`);第二段携带该 cookie 访问 `/?token=<启动令牌>`——启动令牌取自 `.logs\dsh-web-out.log` 中 `dsh web: ...?token=...` 行(每次重启更新,仅本机日志可得),上游交换种下 `dsh-auth-*` cookie 后应用加载。门禁 cookie 是外层边界:无门禁 cookie 时启动令牌过不了第一层。
 - **轮换流程**(注意 `nssm set AppEnvironmentExtra` 为整体覆盖,必须重设全部四个变量——若启用了可选的 `DSH_LAN_TRUST_LOCALHOST` 须一并重写,漏写等于回到关闭;漏一个 `DSH_HOME` 就触发数据根漂移):
 
 ```powershell
@@ -147,18 +147,18 @@ Restart-Service dsh-web
 
 ## 5. 验收清单
 
-全部实测通过(2026-08-27,commit 6c9c7690ad 时点):
+全部实测通过(2026-08-27,commit 6c9c7690ad 时点;2026-08-29 切换到合并后代码 `36d6d1ee37` 并复测两段式入场,见第 4 项):
 
 | # | 项 | 预期 | 实测 |
 |---|---|---|---|
 | 1 | `Get-Service dsh-web` | Running | Running / Automatic |
 | 2 | `Restart-Service dsh-web`;5s 后再查 | 仍 Running(NSSM 拉起子进程) | Running,3080 由新 PID 重新绑定 |
 | 3 | `https://dsh.lgyu.cloud` 无 token | 401 | 401(门禁先于 Host 栅栏) |
-| 4 | token 入口后带 cookie `GET /` | 200 | 302 + Set-Cookie → 200(16,885 字节) |
+| 4 | 两段式入场:① `https://dsh.lgyu.cloud/?token=<TOKEN>` 种门禁 cookie;② 携带门禁 cookie 访问 `/?token=<启动令牌>`(启动令牌取自 `.logs\dsh-web-out.log` 的 `dsh web: ...?token=...` 行) | ① 302 + Set-Cookie(`dsh-lan-token`,HttpOnly; SameSite=Lax);② 303 + Set-Cookie(`dsh-auth-*`,上游 BrowserAuth 种),应用加载 | 2026-08-29 回环实测:① 302 + 门禁 cookie;② 303 + 上游 cookie;双 cookie `GET /` → 200;无门禁 cookie 时外来令牌 401(上游层独立有效) |
 | 5 | `.logs\dsh-web-err.log` | 无致命报错 | 0 字节(另做 token 泄漏扫描:无) |
 | 6 | `.gitignore` 覆盖 `tools/`、`.logs/` | 已覆盖 | 已提交(6c9c7690ad) |
 | 7 | 强杀 node 子进程后 | NSSM 自动拉起(崩溃自愈) | 旧 PID 7348 被杀 → 服务保持 Running → 新 PID 28748 重新绑定 |
-| 8 | `session.list`(带 cookie) | 200 且含既有数据 | 200,70 条既有记录(DSH_HOME 生效) |
+| 8 | `session.list`(带双 cookie) | 穿过双层(门禁 + 上游浏览器鉴权) | 2026-08-29 实测:双 cookie `POST /api/session/list` 穿过双层(415 为 RPC 层应答,非门禁);仅门禁 cookie 时上游层 401 |
 | 9 | 重启电脑后 | `dsh-web` 与 `cloudflared` 均自动 Running | 两服务均 Automatic(下次重启自证) |
 
 ## 6. 已知权衡
