@@ -127,23 +127,22 @@ $node = "C:\Program Files\nodejs\node.exe"
 
 ## 4. Token 管理
 
-- **权威来源是 NSSM 服务配置**(`dsh-web` 的 `AppEnvironmentExtra`)。用户级环境变量 `DSH_LAN_TOKEN` 仅是前台手动运行时的来源;两者不一致时,服务行为以 NSSM 配置为准。
-- token 校验为 SHA-256 摘要 + 常数时间比较;浏览器入场为**两段式**(0.1.2-alpha.1 同步后,宿主自带 BrowserAuth 以进程启动令牌独立把守 `index.html` 与 `/api`):第一段访问 `https://dsh.lgyu.cloud/?token=<TOKEN>`,302 应答种下门禁 HttpOnly cookie(`dsh-lan-token`);第二段携带该 cookie 访问 `/?token=<启动令牌>`——启动令牌取自 `.logs\dsh-web-out.log` 中 `dsh web: ...?token=...` 行(每次重启更新,仅本机日志可得),上游交换种下 `dsh-auth-*` cookie 后应用加载。门禁 cookie 是外层边界:无门禁 cookie 时启动令牌过不了第一层。
-- **轮换流程**(注意 `nssm set AppEnvironmentExtra` 为整体覆盖,必须重设全部四个变量——若启用了可选的 `DSH_LAN_TRUST_LOCALHOST` 须一并重写,漏写等于回到关闭;漏一个 `DSH_HOME` 就触发数据根漂移):
+- **入场为一步式(2026-08-29 起单层认证)**:浏览器直接打开 `https://dsh.lgyu.cloud/?token=<启动令牌>`,303 应答种下 `dsh-auth-*` cookie(宿主 BrowserAuth,HttpOnly; SameSite=Strict),随后 `GET /` 返回 200 应用加载。启动令牌取自 `.logs\dsh-web-out.log` 中 `dsh web: ...?token=...` 行,每次进程重启更新,仅本机日志可得;无凭据请求 401 由 BrowserAuth 承担。
+- **门禁层已禁用**:`packages/bundle/web-app/cordis.patch.yml` 中 stock `webserver` 行恢复启用、`lan-access-webserver` 行 `disabled: true`,服务绑定回到 `127.0.0.1:3080`;cloudflared 转发目标 `http://localhost:3080` 不受影响。公网 Host 信任不依赖 webserver 行:同一 patch 文件 connection 行的 `DSH_LAN_EXTRA_AUTHORITIES=dsh.lgyu.cloud` 继续为 `/api` 浏览器信任栅栏追加公网域,换行后公网链路实测正常(303/200)。
+- **服务环境变量现状**:`AppEnvironmentExtra` 中 `DSH_LAN_TOKEN` 与 `DSH_LAN_ENABLED` 残留但闲置(唯一消费者是已禁用的 lan-access 行),`DSH_HOME` 与 `DSH_LAN_EXTRA_AUTHORITIES` 仍必需;下次管理员操作服务时可顺手清理前两者。
+
+### 回退到双层认证(备注)
+
+- **恢复方法**:把 `packages/bundle/web-app/cordis.patch.yml` 两行 `disabled` 翻回(stock `webserver` 行加回 `disabled: true`,`lan-access-webserver` 行移除 `disabled: true`)后 `Restart-Service dsh-web`;或不动 bundle,用用户 patch 层 overlay(`~\.dsh\profiles\web\cordis.patch.yml`)热切换,无须重启。热切换必须分两步:先禁用当前持有 3080 的行并等端口释放,再启用另一行——loader 应用更新时先启新行后停旧行,一次翻两行会触发 EADDRINUSE 回滚。回退后 `DSH_LAN_TOKEN` 必须仍在服务环境变量里(当前残留保留,恰好满足)。
+- **旧两段式入场(双层形态描述,留档)**:第一段访问 `https://dsh.lgyu.cloud/?token=<DSH_LAN_TOKEN>`,302 应答种下门禁 HttpOnly cookie(`dsh-lan-token`);第二段携带该 cookie 访问 `/?token=<启动令牌>`,上游交换种下 `dsh-auth-*` cookie 后应用加载。门禁 cookie 是外层边界:无门禁 cookie 时启动令牌过不了第一层。门禁 token 轮换仅双层形态适用(`nssm set AppEnvironmentExtra` 为整体覆盖,必须重设全部条目——若启用了可选的 `DSH_LAN_TRUST_LOCALHOST` 须一并重写;漏一个 `DSH_HOME` 就触发数据根漂移;前台手动运行双层形态时同步更新用户级 `DSH_LAN_TOKEN`):
 
 ```powershell
-# 1. 生成新值
 $newToken = [Convert]::ToBase64String((New-Object byte[] 32))   # 自行记录,勿打印到共享日志
-# 2. 重写服务环境(管理员;四个条目全量)
 & "<REPO_DIR>\tools\nssm.exe" set dsh-web AppEnvironmentExtra `
     "DSH_LAN_ENABLED=true" "DSH_LAN_EXTRA_AUTHORITIES=dsh.lgyu.cloud" `
     "DSH_HOME=C:\Users\luoguangyu\.dsh" "DSH_LAN_TOKEN=$newToken"
-# 3. 重启生效
-Restart-Service dsh-web
-# 4. 浏览器用新 token 重新登录(旧 cookie 失效)
+Restart-Service dsh-web   # 浏览器用新 token 重新登录,旧 cookie 失效
 ```
-
-建议同步更新用户级环境变量(`[Environment]::SetEnvironmentVariable('DSH_LAN_TOKEN',$newToken,'User')`)保持前台与服务一致。
 
 ## 5. 验收清单
 

@@ -108,13 +108,12 @@
     # Plain route-registration carrier; host and port come from the app's
     # webStartup provider, with these deployment fallbacks. The dist is served by
     # the web-runtime row below through the fallback seat.
-    # Fork: disabled in favor of lan-access-webserver below (same transport,
-    # optional token gate for all-interfaces binds). The row keeps its stock
-    # name and config so an overlay patch can swap the two rows back.
+    # Fork: the stock row is the active server (loopback bind, no token
+    # gate); the lan-access-webserver row below stays disabled. An overlay
+    # patch can swap the two rows back for the all-interfaces gated bind.
     - id: webserver
       name: '@deepseek-ai/dsh-host-webserver'
       inject: [webStartup]
-      disabled: true
       config:
         host: !!js ctx.webStartup.host ?? '127.0.0.1'
         port: !!js ctx.webStartup.port ?? 3080
@@ -122,7 +121,8 @@
         compressionLevel: 1
         compressionThresholdBytes: 1024
 
-    # Fork LAN-access webserver: a subclass of the plain webserver's plugin.
+    # Fork LAN-access webserver: a subclass of the plain webserver's plugin;
+    # disabled in this deployment (single-layer browser auth, loopback bind).
     # DSH_LAN_ENABLED=false (or unset) leaves it byte-for-byte the stock
     # server; DSH_LAN_ENABLED=true requires DSH_LAN_TOKEN and binds
     # DSH_LAN_BIND (default 0.0.0.0) with every path behind the token gate.
@@ -137,6 +137,7 @@
     - id: lan-access-webserver
       name: '@deepseek-ai/dsh-host-lan-access/src/server.ts'
       inject: [webStartup]
+      disabled: true
       config:
         host: !!js "process.env.DSH_LAN_ENABLED ? (process.env.DSH_LAN_BIND === '127.0.0.1' || process.env.DSH_LAN_BIND === '0.0.0.0' ? process.env.DSH_LAN_BIND : '0.0.0.0') : (ctx.webStartup.host ?? '127.0.0.1')"
         port: !!js ctx.webStartup.port ?? 3080
