@@ -15,7 +15,12 @@
 
 ## 报告渠道
 
-- GitHub 私有漏洞报告:仓库页 Security → Report a vulnerability
+由于本仓库是 fork 仓库，GitHub 不支持在其上启用私有漏洞报告功能。
+
+- **上游代码漏洞**：请前往上游仓库 `deepseek-ai/deepseek-harness` 的 Security 页面报告。
+- **本 Fork 专属代码漏洞**：请通过以下两种方式之一报告：
+  1. 提交一个公开的 GitHub Issue（请尽量隐去可直接用于攻击的敏感细节）。
+  2. 发送邮件至 `a137460387@users.noreply.github.com`（此为 GitHub 官方匿名邮箱，仅仓库所有者可见）。
 
 ## 报告前
 
