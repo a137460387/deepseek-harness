@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-client-input-history-recall",
   "description": "Composer history recall: ArrowUp at the caret-zero position of the composer walks back through the current session's sent messages; ArrowDown walks forward and restores the pre-traversal draft",
-  "version": "0.1.2-alpha.1",
+  "version": "0.1.2-alpha.2",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

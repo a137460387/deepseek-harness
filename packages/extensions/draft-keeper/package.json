@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-client-draft-keeper",
   "description": "Composer draft persistence: each session's unsent draft is mirrored to localStorage behind a debounce and restored into the empty composer after a reload or crash, plain text only",
-  "version": "0.1.2-alpha.1",
+  "version": "0.1.2-alpha.2",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

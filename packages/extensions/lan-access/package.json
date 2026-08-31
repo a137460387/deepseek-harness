@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-host-lan-access",
   "description": "LAN-access webserver: subclass of the plain webserver that binds all interfaces behind a token gate when DSH_LAN_ENABLED=true, and behaves byte-for-byte like the base server otherwise",
-  "version": "0.1.2-alpha.1",
+  "version": "0.1.2-alpha.2",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
