@@ -11,7 +11,7 @@
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
-  border: 1px solid var(--dsw-alias-border-inverted);
+  border: 0.5px solid var(--dsw-alias-border-inverted);
   border-radius: 10px;
   background: var(--dsw-alias-bg-overlay);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);

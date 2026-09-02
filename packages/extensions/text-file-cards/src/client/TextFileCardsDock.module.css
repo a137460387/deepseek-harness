@@ -31,8 +31,9 @@
   gap: 2px;
   height: 28px;
   padding: 0 4px 0 10px;
-  border: 1px solid var(--dsw-alias-border-l1);
+  border: 0.5px solid var(--dsw-alias-border-l1);
   border-radius: 999px;
+  corner-shape: round;
   background: var(--dsw-specific-tip);
 }
 
@@ -85,6 +86,7 @@
   padding: 0;
   border: none;
   border-radius: 999px;
+  corner-shape: round;
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
