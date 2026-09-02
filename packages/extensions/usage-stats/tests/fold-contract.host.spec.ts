@@ -14,7 +14,7 @@
 import { describe, expect, it } from 'vitest'
 import { createMessage } from '@deepseek-ai/dsh-llm'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { SessionSeq, type SessionEvent } from '@deepseek-ai/dsh-session'
 // Type-only: the `compaction/summary` SessionEventMap merge (summarizer usage).
 import type {} from '@deepseek-ai/dsh-compaction'
 import { tokenUsageProjectionDefinition } from '@deepseek-ai/dsh-token-meter/src/usage-projection.ts'
@@ -69,8 +69,8 @@ function summaryEvent(time: number, usage?: TokenUsage): SessionEvent {
     data: {
       compactionId: 'compact-1' as never,
       summary: [{ type: 'text', text: 'summary' }],
-      shadowedRange: { start: 1, end: 2 },
-      shadowedSeqs: [1, 2],
+      shadowedRange: { start: SessionSeq(1), end: SessionSeq(2) },
+      shadowedSeqs: [SessionSeq(1), SessionSeq(2)],
       shadowedTokenCount: 10,
       provider: 'summarizer',
       model: 'summarizer-model',

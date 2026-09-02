@@ -102,7 +102,7 @@ function appendSummaryMeter(
 }
 
 /** Append the replacement user message a summary metering event promises. */
-function replaceWithSummary(session: Session, start: number, end: number, sourceSeqs: number[]): void {
+function replaceWithSummary(session: Session, start: SessionSeq, end: SessionSeq, sourceSeqs: SessionSeq[]): void {
   session.append('user/message', createUserMessage({
     content: [{ type: 'text', text: 'compacted' }],
     source: { kind: 'plugin', plugin: 'test' },

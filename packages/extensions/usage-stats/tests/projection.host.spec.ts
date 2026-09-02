@@ -14,7 +14,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { createMessage } from '@deepseek-ai/dsh-llm'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
 import SessionStore from '@deepseek-ai/dsh-session'
-import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
+import { SessionSeq, type Session, type SessionEvent } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import * as UsageStatsPlugin from '../src/index.ts'
 import { usageStatsProjectionDefinition } from '../src/projection.ts'
@@ -68,8 +68,8 @@ function summaryEvent(time: number, usage?: TokenUsage): SessionEvent {
     data: {
       compactionId: 'compact-1' as never,
       summary: [{ type: 'text', text: 'summary' }],
-      shadowedRange: { start: 1, end: 2 },
-      shadowedSeqs: [1, 2],
+      shadowedRange: { start: SessionSeq(1), end: SessionSeq(2) },
+      shadowedSeqs: [SessionSeq(1), SessionSeq(2)],
       shadowedTokenCount: 10,
       provider: 'summarizer',
       model: 'summarizer-model',
