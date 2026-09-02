@@ -43,3 +43,5 @@ worktrees/
 tools/
 .logs/
 README_jailbreak.md
+.dsh-cu-tmp/
+calculator-*.jpg
