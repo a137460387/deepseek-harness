@@ -80,8 +80,25 @@
     # Resolve bind host, SSH launch, and display once at boot, then mount the
     # matching dual-face directory picker. Mount -native or -browse directly in
     # an overlay to pin the interaction.
+    # Fork: pinned to the browse pair below. The production dsh web runs as an
+    # NSSM Windows service in session 0, where auto resolves `native` (loopback
+    # bind, win32, no SSH env) and the OS chooser dialog opens on the invisible
+    # session-0 desktop: the pick RPC never settles (no timeout anywhere on the
+    # pick path) and the "Add workspace…" gesture is fully silent. The browse
+    # backend serves the in-app dialog over the wire and works for every
+    # operator. Revert is a three-row swap: enable the auto row, disable both
+    # browse rows (same shape as the webserver rows above). Retire the pin once
+    # upstream resolves service deployments (Agent Note:
+    # 2026-09-03-directory-picker-service-session0).
     - id: directory-picker
       name: '@deepseek-ai/dsh-host-directory-picker-auto'
+      disabled: true
+
+    - id: directory-picker-browse
+      name: '@deepseek-ai/dsh-host-directory-picker-browse'
+
+    - id: directory-picker-surface
+      name: '@deepseek-ai/dsh-client-ui-directory-picker-browse'
 
     # Read-only projection of current Loader entries for trusted client RPCs.
     - id: plugin-inventory
