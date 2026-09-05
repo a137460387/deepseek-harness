@@ -185,3 +185,10 @@
 - 评估结论：所有可行路线(清单 Remote 加开关动词、boot 组合覆盖表、client boot 清单重组)都要改官方核心包，属 `patches/` 或 upstream 提案级别；收益(省一次改配置)配不上代价(核心补丁 + 每次同步的维护负担)，暂不启动。
 - 触发条件：官方长期不做、且 fork 真的频繁需要启停时，按"重启生效 MVP"(设置覆盖表 + boot 时置 `disabled` + 重启提示)以 `patches/` 方式启动；热开关复杂度约其两倍，不作为起点。
 - 可随时起草 upstream issue：清单页是官方建的，开关动词是其自然下一步。
+
+### Web e2e 启动失败：directory-picker pin 双重注册(2026-09-05 登记，待修复)
+
+- 现象：web 浏览器级 e2e(`pnpm exec vitest run apps/web/tests/seeded-history.e2e.ts --config vitest.web.config.ts`，以它为代表的整个 `apps/web/tests/*.e2e.ts` 套件)在 scaffold 启动阶段整体失败、用例全部 skip，报 `Caused by: TypeError: duplicate loader entry id: directory-picker-browse`(抛自 `vendor/loader/src/config/group.ts` `EntryGroup.update` 的组合内重复 id 硬检查，经 `vendor/include` `_apply` 路径触发)。
+- 根因：双重注册——上游测试基座 `apps/web/tests/scaffold.ts` 自带 directory-picker pin 行(`{ id: 'directory-picker', disabled: true }` + `{ insert: [directory-picker-browse, ui-directory-picker-browse] }`；该 pin 形态由上游提交 `f0f897ef02`(creatixchu)引入、后经 `a2d0f7f411`(Tianyi Cui)的仓库命名契约调整，至 dsh-0.1.2-alpha.4 合并基点已存在)，且 scaffold 组合会叠加 `packages/bundle/web-app/cordis.patch.yml`(`loadOverlayPatches`，镜像生产组合)；fork commit `f686cfb7c1` 为服务/会话 0 部署向该 patch 追加了同 id 的 browse pin 行(见「已知本地补丁」directory-picker 条目)后，测试组合内同一 loader entry id 出现两次，启动即失败。
+- 为何此前未暴露：该套件面向 Linux PR CI(`vitest.web.config.ts` 头注释)，fork 无 CI 且从未在本地运行过 web e2e；2026-09-05 上游同步(dsh-0.1.3-alpha.1)期间为验证 Windows 路径场景本地首跑才暴露。
+- 处置：经决策(2026-09-05)本次上游同步不修，scaffold.ts、cordis.patch.yml 与 loader/include 相关代码暂不动；这是 `f686cfb7c1` 引入的历史遗留问题，与本次同步无关。待修复：需后续单独梳理测试侧 pin 与生产侧 pin 的关系(候选方向：测试基座已自带 pin 时测试组合不再叠加生产 patch 的 pin 行；或先厘清 include 插件对 patch 行与既有组成行的合并语义再收敛为单一 pin 来源)，修复后重跑 `vitest.web.config.ts` 全量 e2e 验证。

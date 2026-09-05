@@ -2,8 +2,9 @@
  * The usage-mirror contract spec: the fixture's whole-log tokenUsage fold is
  * a parallel of token-meter's real projection, and the compaction-summary
  * branch both sides carry had no coverage on the fixture side. One corpus —
- * usage chunks, a same-step replacement, an identical repeat, a later step,
- * compaction summaries with and without usage — folds through the real
+ * an attempt-streamed early sample, a same-step final settlement, an
+ * identical repeat, a later step, compaction summaries with and without
+ * usage — folds through the real
  * `tokenUsageProjectionDefinition` and the fixture's `tokenUsageOf`; the
  * wire values must agree at EVERY prefix of the log, so either
  * implementation drifting turns this red on the next sync.
@@ -50,9 +51,13 @@ function row(type: string, data: Record<string, unknown>, index: number): Sessio
 
 /** The corpus both folds must agree on, in order. */
 function corpus(): SessionEvent[] {
-  const chunk = (turn: number, step: number, usage: Usage) => ({
-    type: 'assistant/chunk',
-    data: { turn, step, chunk: { type: 'usage', usage } },
+  // v2 carriers, mirroring token-meter's own corpus idiom: the early sample
+  // rides an `assistant/attempt` stream (the last usage chunk wins); the
+  // direct `usage` field on `assistant/message` is the final settlement and
+  // takes precedence over the stream — `usageOf`'s exact precedence.
+  const attempt = (turn: number, step: number, usage: Usage) => ({
+    type: 'assistant/attempt',
+    data: { turn, step, stream: [{ type: 'chunk', time: 0, chunk: { type: 'usage', usage } }] },
   })
   const message = (turn: number, step: number, usage: Usage) => ({
     type: 'assistant/message',
@@ -63,17 +68,21 @@ function corpus(): SessionEvent[] {
     data: { provider: 'summarizer', model: 'summarizer', ...(usage === undefined ? {} : { usage }) },
   })
   const rows = [
-    chunk(1, 1, { inputTokens: 100, outputTokens: 10, cacheReadTokens: 5 }),
-    // The finalized message for the same step replaces the chunk's sample.
+    // The attempt-streamed early sample for turn 1 step 1...
+    attempt(1, 1, { inputTokens: 100, outputTokens: 10, cacheReadTokens: 5 }),
+    // ...is replaced by the final settlement for the same step.
     message(1, 1, { inputTokens: 120, outputTokens: 12, cacheReadTokens: 5 }),
     // An identical repeat is no movement at all.
     message(1, 1, { inputTokens: 120, outputTokens: 12, cacheReadTokens: 5 }),
-    chunk(1, 2, { inputTokens: 200, outputTokens: 20 }),
+    // A new step accumulates in full; its sample rides the attempt stream.
+    attempt(1, 2, { inputTokens: 200, outputTokens: 20 }),
     // A summarizer that reported usage: accumulated in full, no turn/step.
     summary({ inputTokens: 31, outputTokens: 9, cacheReadTokens: 37, cacheWriteTokens: 6 }),
     // A summarizer that reported none: contributes nothing.
     summary(undefined),
-    chunk(2, 1, { inputTokens: 400, outputTokens: 40, cacheWriteTokens: 3 }),
+    // Turn 2 step 1: attempt-streamed sample...
+    attempt(2, 1, { inputTokens: 400, outputTokens: 40, cacheWriteTokens: 3 }),
+    // ...replaced by the final settlement.
     message(2, 1, { inputTokens: 410, outputTokens: 41, cacheWriteTokens: 3 }),
   ]
   return rows.map(({ type, data }, index) => row(type, data, index))
@@ -97,11 +106,11 @@ describe('fixture tokenUsage mirror contract', () => {
   })
 
   it('pins the corpus arithmetic by hand: replacement, compaction in full, repeat at zero', () => {
-    // step1: chunk 100/10/5 replaced by the final message 120/12/5 → 120/12/5/0
+    // step1: attempt-streamed 100/10/5 replaced by the final settlement 120/12/5 → 120/12/5/0
     // step2: a NEW step accumulates in full +200/20 → 320/32/5/0
     // summary: +31/9/37/6 in full → 351/41/42/6 (the summary without usage adds nothing)
     // turn2 step1: another new step, +400/40/0/3 → 751/81/42/9
-    // final message for the same step replaces: 751-400+410 → 761/82/42/9
+    // final settlement for the same step replaces: 751-400+410 → 761/82/42/9
     expect(tokenUsageOf(corpus())).toEqual({
       uncachedInputTokens: 761,
       outputTokens: 82,
