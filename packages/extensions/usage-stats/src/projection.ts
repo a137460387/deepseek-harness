@@ -1,10 +1,10 @@
 /**
  * The `usageStats` projection unit: a pure fold of durable usage samples into
  * UTC quarter-hour buckets split by provider route, mirroring `tokenUsage`'s
- * scope — main-loop chunk/message samples with their (turn, step) replacement
+ * scope — main-loop attempt/message samples with their (turn, step) replacement
  * semantics, plus compaction summarizer usage accumulated in full.
  *
- * Route attribution follows the durable request envelope: chunk/message
+ * Route attribution follows the durable request envelope: attempt/message
  * samples are attributed to the provider/model of the nearest preceding
  * `request/header`; a `compaction/summary` names its own route. Usage before
  * any header (a legal log never produces one) lands in the `unknown` route.
@@ -13,7 +13,7 @@
  */
 
 import { z } from 'zod'
-import type { TokenUsage } from '@deepseek-ai/dsh-llm'
+import { expandAssistantStream, type TokenUsage } from '@deepseek-ai/dsh-llm'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 // Type-only: the `compaction/summary` SessionEventMap merge (summarizer usage).
 import type {} from '@deepseek-ai/dsh-compaction'
@@ -168,17 +168,20 @@ export const usageStatsProjectionDefinition = {
 
     /* jscpd:ignore-start */
     // 有意镜像 token-meter 公式做契约对拍，勿去重（对拍防护见 tests/fold-contract.host.spec.ts）。
-    let turn: number
-    let step: number
-    let usage: TokenUsage
-    if (event.type === 'assistant/chunk' && event.data.chunk.type === 'usage') {
-      ;({ turn, step } = event.data)
-      usage = event.data.chunk.usage
-    } else if (event.type === 'assistant/message' && event.data.usage !== undefined) {
-      ;({ turn, step, usage } = event.data)
-    } else {
-      return state
+    // v2 取样与 token-meter 的 usageOf 同序：直接 usage 字段优先，否则取事件
+    // 内嵌 stream 的最后一个 usage 分片。
+    if (event.type !== 'assistant/message' && event.type !== 'assistant/attempt') return state
+    let usage: TokenUsage | undefined = event.type === 'assistant/message' ? event.data.usage : undefined
+    if (usage === undefined) {
+      for (const member of expandAssistantStream(event.data.stream).toReversed()) {
+        if (member.chunk.type === 'usage') {
+          usage = member.chunk.usage
+          break
+        }
+      }
     }
+    if (usage === undefined) return state
+    const { turn, step } = event.data
     /* jscpd:ignore-end */
 
     const route = state.route ?? UNKNOWN_ROUTE

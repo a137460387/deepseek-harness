@@ -76,10 +76,10 @@ describe('real Loader composition', () => {
       reason: 'initial',
     })
     session.append('step/start', { turn: 1, step: 1 })
-    session.append('assistant/chunk', {
+    session.append('assistant/attempt', {
       turn: 1,
       step: 1,
-      chunk: { type: 'usage', usage: { inputTokens: 9, outputTokens: 2 } },
+      stream: [{ type: 'chunk', time: 0, chunk: { type: 'usage', usage: { inputTokens: 9, outputTokens: 2 } } }],
     })
     const value = loaded.sessionProjections.snapshot(session).values.usageStats
     const quarter = String(Math.floor(Date.now() / 900_000))

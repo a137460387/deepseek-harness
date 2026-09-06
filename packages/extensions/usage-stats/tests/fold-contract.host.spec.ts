@@ -1,6 +1,6 @@
 /**
  * The usage-fold contract spec (host plane): `usageStats` intentionally
- * mirrors `tokenUsage`'s intake semantics — chunk/message samples with their
+ * mirrors `tokenUsage`'s intake semantics — attempt/message samples with their
  * (turn, step) replacement rule, compaction summaries accumulated in full —
  * while re-splitting the same samples into quarter/route buckets. This spec
  * folds representative corpora through the real
@@ -37,11 +37,11 @@ function headerEvent(time: number, provider: string, model: string): SessionEven
   })
 }
 
-/** A usage-chunk event for one step. */
-function chunkEvent(time: number, turn: number, step: number, usage: TokenUsage): SessionEvent {
+/** An assistant attempt whose stream embeds one usage chunk — the v2 early-sample carrier. */
+function attemptEvent(time: number, turn: number, step: number, usage: TokenUsage): SessionEvent {
   return event(time, {
-    type: 'assistant/chunk',
-    data: { turn, step, chunk: { type: 'usage', usage } },
+    type: 'assistant/attempt',
+    data: { turn, step, stream: [{ type: 'chunk', time: 0, chunk: { type: 'usage', usage } }] },
   })
 }
 
@@ -133,27 +133,27 @@ describe('usageStats fold contract against token-meter', () => {
 
   it('keeps the summed bucket mass equal to tokenUsage totals at every prefix', () => {
     const corpora: readonly (readonly SessionEvent[])[] = [
-      // A chunk replaced by its step's final message.
+      // A streamed sample replaced by its step's final message.
       [
         headerEvent(T0, 'deepseek', 'deepseek-chat'),
-        chunkEvent(T0 + 1_000, 1, 1, { inputTokens: 10, outputTokens: 2 }),
+        attemptEvent(T0 + 1_000, 1, 1, { inputTokens: 10, outputTokens: 2 }),
         messageEvent(T0 + 2_000, 1, 1, { inputTokens: 14, outputTokens: 5 }),
       ],
-      // The identical final sample after its chunk: no movement.
+      // The identical final sample after its streamed sample: no movement.
       [
         headerEvent(T0, 'deepseek', 'deepseek-chat'),
-        chunkEvent(T0 + 1_000, 1, 1, { inputTokens: 10, outputTokens: 2 }),
+        attemptEvent(T0 + 1_000, 1, 1, { inputTokens: 10, outputTokens: 2 }),
         messageEvent(T0 + 1_500, 1, 1, { inputTokens: 10, outputTokens: 2 }),
       ],
-      // A chunk-only sample survives without a final message.
+      // An attempt-only sample survives without a final message.
       [
         headerEvent(T0, 'deepseek', 'deepseek-chat'),
-        chunkEvent(T0 + 1_000, 1, 1, { inputTokens: 9, outputTokens: 3, cacheReadTokens: 4, cacheWriteTokens: 1 }),
+        attemptEvent(T0 + 1_000, 1, 1, { inputTokens: 9, outputTokens: 3, cacheReadTokens: 4, cacheWriteTokens: 1 }),
       ],
       // Compaction summaries accumulate in full, with and without usage.
       [
         headerEvent(T0, 'deepseek', 'deepseek-chat'),
-        chunkEvent(T0 + 1_000, 1, 1, { inputTokens: 10, outputTokens: 2 }),
+        attemptEvent(T0 + 1_000, 1, 1, { inputTokens: 10, outputTokens: 2 }),
         summaryEvent(T0 + 2_000, { inputTokens: 40, outputTokens: 6, cacheWriteTokens: 2 }),
         summaryEvent(T0 + 3_000),
         messageEvent(T0 + 4_000, 1, 1, { inputTokens: 12, outputTokens: 3 }),
@@ -161,20 +161,20 @@ describe('usageStats fold contract against token-meter', () => {
       // A route change mid-stream re-attributes later samples only.
       [
         headerEvent(T0, 'deepseek', 'deepseek-chat'),
-        chunkEvent(T0 + 1_000, 1, 1, { inputTokens: 10, outputTokens: 2 }),
+        attemptEvent(T0 + 1_000, 1, 1, { inputTokens: 10, outputTokens: 2 }),
         headerEvent(T0 + 2_000, 'openai', 'gpt'),
-        chunkEvent(T0 + 3_000, 1, 2, { inputTokens: 7, outputTokens: 1 }),
+        attemptEvent(T0 + 3_000, 1, 2, { inputTokens: 7, outputTokens: 1 }),
       ],
       // The replacement crosses a quarter boundary and preserves its mass.
       [
         headerEvent(T0 - 1, 'deepseek', 'deepseek-chat'),
-        chunkEvent(T0, 1, 1, { inputTokens: 10, outputTokens: 2 }),
+        attemptEvent(T0, 1, 1, { inputTokens: 10, outputTokens: 2 }),
         messageEvent(T0 + 900_000, 1, 1, { inputTokens: 10, outputTokens: 2 }),
       ],
       // A replacement down to zero empties the placement.
       [
         headerEvent(T0, 'deepseek', 'deepseek-chat'),
-        chunkEvent(T0 + 1_000, 1, 1, { inputTokens: 10, outputTokens: 2 }),
+        attemptEvent(T0 + 1_000, 1, 1, { inputTokens: 10, outputTokens: 2 }),
         messageEvent(T0 + 2_000, 1, 1, { inputTokens: 0, outputTokens: 0 }),
       ],
     ]
