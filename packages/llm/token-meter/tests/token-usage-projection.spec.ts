@@ -303,8 +303,8 @@ describe('tokenUsage session projection', () => {
   it('accumulates a compaction summary usage in full', async () => {
     const { ctx, session } = await harness()
     startStep(session, 1, 1)
-    const source = usageChunk(session, { inputTokens: 12, outputTokens: 3 }, 1, 1)
-    finalUsage(session, { inputTokens: 12, outputTokens: 3 }, 1, 1, [source])
+    usageChunk(session, { inputTokens: 12, outputTokens: 3 }, 1, 1)
+    finalUsage(session, { inputTokens: 12, outputTokens: 3 }, 1, 1)
     const before = session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'before compaction' }],
       source: { kind: 'user' },
@@ -327,8 +327,8 @@ describe('tokenUsage session projection', () => {
   it('skips a compaction summary that reported no usage without a change push', async () => {
     const { ctx, session } = await harness()
     startStep(session, 1, 1)
-    const source = usageChunk(session, { inputTokens: 12, outputTokens: 3 }, 1, 1)
-    finalUsage(session, { inputTokens: 12, outputTokens: 3 }, 1, 1, [source])
+    usageChunk(session, { inputTokens: 12, outputTokens: 3 }, 1, 1)
+    finalUsage(session, { inputTokens: 12, outputTokens: 3 }, 1, 1)
     const before = session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'before compaction' }],
       source: { kind: 'user' },
@@ -368,8 +368,8 @@ describe('tokenUsage session projection', () => {
     replaceWithSummary(session, before.seq, before.seq, [before.seq])
     // Step 2 of a later turn replaces its own chunk sample normally.
     startStep(session, 2, 1)
-    const second = usageChunk(session, { inputTokens: 20, outputTokens: 4 }, 2, 1)
-    finalUsage(session, { inputTokens: 25, outputTokens: 7 }, 2, 1, [second])
+    usageChunk(session, { inputTokens: 20, outputTokens: 4 }, 2, 1)
+    finalUsage(session, { inputTokens: 25, outputTokens: 7 }, 2, 1)
 
     expect(projected(ctx, session)).toEqual({
       uncachedInputTokens: 75,
