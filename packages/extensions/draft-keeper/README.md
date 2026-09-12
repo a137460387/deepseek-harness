@@ -8,7 +8,19 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Composer draft persistence for the Web UI: each session's unsent draft is mirrored into localStorage, and after a reload or crash the stored text is restored into the empty composer with an info notice. Plain text only.
+Composer draft persistence for the Web UI: each session's unsent draft is mirrored into localStorage, and after a reload or crash the stored text is restored into the empty composer with an info notice. Plain text only. Writes go through the public `setDraft` path and every restore is gated by the shared `resolveEditableInput` resolution, so InputBar and every `packages/client` file stay untouched.
+
+## Table of Contents
+
+- [Details](#details)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="details"></a>
+## Details
 
 The plugin subscribes to the current session's input-state store (`ctx.conversation.input.for(actx).state`, the public InputZone currency) and writes back through the public single write path (`setDraft`) — InputBar and every `packages/client` file stay untouched. The shared `resolveEditableInput` resolution from `@deepseek-ai/dsh-client-composer-guards` (requested as a module-table row through `dsh.client.external`) gates every restore write.
 
@@ -20,12 +32,6 @@ How the mirror works:
 - **Restore**: once per session per plugin lifetime, only as a session becomes current, and only when the composer is safely writable — the `resolveEditableInput` resolution succeeds (session locks open, no submit or adjudication in flight), the phase is `plain` (a claimed command line must not turn into plain text), the live draft is empty, the queue is empty (pending steering rows own the "empty" draft), and a stored non-empty draft exists. The restore writes through `setDraft` and surfaces `notify('info', …)` in the composer's own copy namespace.
 - **Prune**: entries whose sessions left the live session list are dropped on every list change, once the list has arrived (the pending phase carries an empty id list by construction).
 - **Storage failures**: a record with a different version or a malformed shape is discarded wholesale — no migration. Any storage failure (quota, private mode) or a missing localStorage latches the mirror off silently for the plugin lifetime; the composer never notices. This is the same contract the client runtime's own store persistence follows.
-
-## Table of Contents
-
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
 
 -----
 

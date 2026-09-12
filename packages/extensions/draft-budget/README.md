@@ -8,7 +8,19 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Draft token budget for the Web UI: a muted readout under the composer estimating the current draft's token cost and, when the provider reports context figures, the after-send occupancy as a percentage of the context window. The estimate mirrors the token-meter's own heuristic, so the readout prices a draft at exactly what the meter will charge it when sent.
+Draft token budget for the Web UI: a muted readout under the composer estimating the current draft's token cost and, when the provider reports context figures, the after-send occupancy as a percentage of the context window. The estimate mirrors the token-meter's own heuristic, so the readout prices a draft at exactly what the meter will charge it when sent. The readout is a pure slot consumer beside the stats line: the composer is never written and no listener of any kind is registered.
+
+## Table of Contents
+
+- [Details](#details)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="details"></a>
+## Details
 
 The readout is a pure slot consumer mounted beside the stats line in the composer dock (`conversation.composer.dock`): the live draft arrives through the dock's `useInput` share behind a 250 ms trailing debounce, and the context baseline through the session projection `contextPressure` — provider-anchored `projectedTokens` preferred, `pressureTokens` fallback, a percentage only when a route capacity exists (tokens-only otherwise). The composer is never written; no listener of any kind is registered.
 
@@ -17,12 +29,6 @@ How the numbers work:
 - **Estimate**: `ceil(length / 4) + 8` — the token-meter's fixed text density plus block and role framing, the exact price a plain-text draft pays as a sent user message. A contract spec pins the mirror against the real `estimateMessage` from `@deepseek-ai/dsh-token-meter`, so an upstream formula change turns this fork's test red on the next sync.
 - **After-send percent**: `(baseline + draft) / context window`, capped at 100%, baseline anchored on the provider-reported projection — the heuristic prices only the draft increment.
 - **Every figure carries `~`**: the heuristic underprices CJK text and JSON schemas and has measured tens-of-percent divergence from provider-reported usage in long sessions (see the upstream token-meter README and discussion #3514). Approximation is stated, never implied.
-
-## Table of Contents
-
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
 
 -----
 

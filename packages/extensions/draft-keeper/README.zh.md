@@ -8,7 +8,19 @@ kind: "package-reference"
 
 ## 概述
 
-Web UI 的 composer 草稿持久化：每个会话未发送的草稿镜像进 localStorage，重载或崩溃后把存储的文本恢复进空 composer，并附一条 info 提示。仅恢复纯文本。
+Web UI 的 composer 草稿持久化：每个会话未发送的草稿镜像进 localStorage，重载或崩溃后把存储的文本恢复进空 composer，并附一条 info 提示。仅恢复纯文本。写入走公开的 `setDraft` 路径，每次恢复都由共享的 `resolveEditableInput` 解析把关——InputBar 与所有 `packages/client` 文件零改动。
+
+## 目录
+
+- [详细说明](#details)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="details"></a>
+## 详细说明
 
 插件订阅当前会话的 input 状态存储（`ctx.conversation.input.for(actx).state`，公开的 InputZone 通货），并经公开的唯一写路径（`setDraft`）写回——InputBar 与所有 `packages/client` 文件零改动。每次恢复写入都由 `@deepseek-ai/dsh-client-composer-guards` 的共享 `resolveEditableInput` 解析把关（经 `dsh.client.external` 请求的模块表行）。
 
@@ -20,12 +32,6 @@ Web UI 的 composer 草稿持久化：每个会话未发送的草稿镜像进 lo
 - **恢复**：每会话每插件生命周期一次，仅在会话成为 current 时，且 composer 确认可写——`resolveEditableInput` 解析成功（会话锁开启、无 submit/adjudication 在途）、phase 为 `plain`（claimed 命令行不能变成纯文本）、活草稿为空、队列为空（待处理的 steering 行拥有这"空"草稿）、且存在非空存储草稿。恢复经 `setDraft` 写入，并在 composer 自有的文案命名空间发出 `notify('info', …)`。
 - **修剪**：会话离开 live 会话列表后，其条目在每次列表变化时删除；仅在列表已到达后执行（pending 阶段的空 id 列表是加载态而非无会话世界）。
 - **存储失败**：版本不同或结构不符的记录整体弃用——不迁移。任何存储失败（配额、隐私模式）或 localStorage 缺失都会把镜像静默禁用到插件生命周期结束；composer 毫无感知。这与 client runtime 自身存储持久化的契约一致。
-
-## 目录
-
-- [模型体验](#model-experience)
-- [已知限制与后续工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
 
 -----
 

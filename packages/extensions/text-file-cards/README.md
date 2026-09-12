@@ -8,22 +8,11 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Text-file drop staging cards for the Web UI: dropping a batch of pure text files anywhere over the window — the same zone the composer's own image intake covers — stages them as compact cards docked above the composer instead of inlining their content into the draft. Clicking a card expands `# <filename>` plus the file's content at the draft end and focuses the composer; the close button unstages a file without touching the draft. Long documents therefore never flood the draft — their content joins the message only on an explicit expand click.
-
-The plugin mounts one document-level `drop` listener on the **capture phase** so it runs before the composer's own bubble-phase `onDrop`. A drop is taken over only when every guard below holds; otherwise the event is left to the composer's native whole-file intake:
-
-- Every file in the batch is text — its extension matches a common text/code allowlist, or its MIME type starts with `text/`.
-- A current session exists, the session-level composer locks stand open (the session is not removed; a continuable subagent child has its exact parent available), and the input machine is not `adjudicating`/`submitting`.
-- The composer is mounted and visible (not masked by a takeover overlay).
-
-Any image or other non-text file in the batch lets the whole batch pass through untouched (no splitting), so images keep the first-party intake path.
-
-The composer's own whole-window `dragover` listener already allows file drops and sets the copy cursor, so the plugin adds no `dragover` handling; the text-vs-image decision is made at `drop`, when the files are readable.
-
-Because the takeover stops the drop from reaching the composer's own handler and an OS file drag fires no `dragend`, the plugin dispatches a synthetic `dragend` on `window` to clear the composer's drag-active overlay.
+Text-file drop staging cards for the Web UI: dropping a batch of pure text files anywhere over the window — the same zone the composer's own image intake covers — stages them as compact cards docked above the composer instead of inlining their content into the draft. Clicking a card expands `# <filename>` plus the file's content at the draft end and focuses the composer; the close button unstages a file without touching the draft. Long documents never flood the draft, and any image in the batch passes through to the first-party intake.
 
 ## Table of Contents
 
+- [Details](#details)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -38,6 +27,25 @@ Because the takeover stops the drop from reaching the composer's own handler and
 ## Staging model
 
 A staged file is held WHOLE (the `File` object, not its content), keyed by session id in a registrant-owned snapshot store that rides the dock registration's `hooks` compartment. The content is read only when the user expands a card; the read re-checks the input machine and the session-level locks afterwards and abandons the expansion if a submit began or a lock turned (removal, a lost parent) meanwhile. A read that rejects (the OS file vanished or the browser revoked the blob) fails soft: the card stays staged for a retry or removal, and the click path never throws. Additions prune entries of sessions that no longer exist.
+
+-----
+
+<a id="details"></a>
+## Details
+
+The plugin mounts one document-level `drop` listener on the **capture phase** so it runs before the composer's own bubble-phase `onDrop`. A drop is taken over only when every guard below holds; otherwise the event is left to the composer's native whole-file intake:
+
+- Every file in the batch is text — its extension matches a common text/code allowlist, or its MIME type starts with `text/`.
+- A current session exists, the session-level composer locks stand open (the session is not removed; a continuable subagent child has its exact parent available), and the input machine is not `adjudicating`/`submitting`.
+- The composer is mounted and visible (not masked by a takeover overlay).
+
+Any image or other non-text file in the batch lets the whole batch pass through untouched (no splitting), so images keep the first-party intake path.
+
+The composer's own whole-window `dragover` listener already allows file drops and sets the copy cursor, so the plugin adds no `dragover` handling; the text-vs-image decision is made at `drop`, when the files are readable.
+
+Because the takeover stops the drop from reaching the composer's own handler and an OS file drag fires no `dragend`, the plugin dispatches a synthetic `dragend` on `window` to clear the composer's drag-active overlay.
+
+-----
 
 <a id="model-experience"></a>
 ## Model Experience

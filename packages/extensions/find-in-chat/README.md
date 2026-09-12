@@ -8,7 +8,19 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-In-conversation find for the Web UI: Ctrl/Cmd+F opens a top-center find bar over the active chat view — literal case-insensitive matching over the conversation's loaded messages, wrap-around stepping, center-scrolling highlights, and an honest coverage note. The browser's native find bar is otherwise untouched wherever this plugin declines the key.
+In-conversation find for the Web UI: Ctrl/Cmd+F opens a top-center find bar over the active chat view — literal case-insensitive matching over the conversation's loaded messages, wrap-around stepping, center-scrolling highlights, and an honest coverage note. The browser's native find bar is otherwise untouched wherever this plugin declines the key. A document-level capture-phase keydown listener takes the key only while a chat flow is mounted and no dialog owns the page; the composer is never touched.
+
+## Table of Contents
+
+- [Details](#details)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="details"></a>
+## Details
 
 The interception is a document-level capture-phase keydown listener (the global-paste pattern). It only ever takes Ctrl/Cmd+F without Shift/Alt, and only while a chat flow is mounted and no dialog owns the page: the no-session hero and the trajectory tab both leave the chat DOM, and with it the interception — those states keep the browser's own find. The composer is never touched; the package consumes no `conversation.input` verbs and requests no composer-guards module row.
 
@@ -18,12 +30,6 @@ How the search works:
 - **Navigate**: Enter steps forward and Shift+Enter steps backward, wrapping at both ends; the active match scrolls to the conversation scrollport's center and paints through the CSS Custom Highlight API — ranges over the existing DOM, zero mutation of the React tree, cleared on every step and on close. Platforms without the API (old browsers, jsdom) degrade to counting and scrolling without paint.
 - **Coverage**: searches run over the chat flow's live DOM — exactly what the native find can see — and the bar says so: the settled-message count plus an "earlier messages not loaded" note whenever the loaded window does not reach the session's head. Nothing calls `loadOlder` automatically: the chat view keeps every loaded message mounted, so auto-paging would grow the DOM without bound; clicking the view's own Load earlier button and searching again picks the older window up.
 - **Close**: Escape (from the find input), a session switch, or the chat view unmounting (session closed, trajectory tab) closes the bar, clears every highlight, and restores the pre-open focus. Streaming stays live: DOM mutations rescan the window behind a 200 ms debounce, and the current index clamps when matches shrink.
-
-## Table of Contents
-
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
 
 -----
 

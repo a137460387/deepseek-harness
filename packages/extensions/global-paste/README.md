@@ -8,7 +8,19 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Whole-page text paste for the Web UI: pressing Ctrl/Cmd+V anywhere over the window routes the clipboard's plain text into the current session's composer draft, without first clicking the input. Mirrors Claude.ai's "paste anywhere" behavior.
+Whole-page text paste for the Web UI: pressing Ctrl/Cmd+V anywhere over the window routes the clipboard's plain text into the current session's composer draft, without first clicking the input — mirroring Claude.ai's "paste anywhere" behavior. One document-level capture-phase `paste` listener runs before the composer's own React `onPaste`: plain text is appended to the draft through the public `setDraft`, image files are re-dispatched onto the composer for its first-party intake, and mixed clips are split.
+
+## Table of Contents
+
+- [Details](#details)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="details"></a>
+## Details
 
 The plugin mounts one document-level `paste` listener on the **capture phase** so it runs before the composer textarea's own React `onPaste`. Two routing paths:
 
@@ -30,12 +42,6 @@ The guards, evaluated in order before routing:
 Text is appended to the draft **end**; an existing non-collapsed selection is not preserved (this matches the confirmed design choice). Existing reference chips (occurrences) in the draft are preserved — `setDraft` carries them as U+FFFC placeholders and only the new text is appended.
 
 Text-file DROPS are owned by the companion plugin `@deepseek-ai/dsh-client-text-file-cards`, which stages dropped text files as cards over the composer instead of inlining them into the draft.
-
-## Table of Contents
-
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
 
 -----
 

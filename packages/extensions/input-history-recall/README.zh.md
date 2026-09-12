@@ -8,7 +8,19 @@ kind: "package-reference"
 
 ## 概述
 
-Web UI 的 composer 历史召回:光标处于输入框最前面(第 0 位、无选区)时按 ArrowUp,把当前会话最近发送的一条消息召回进草稿;继续按往更早翻;按 ArrowDown 往回翻到更新的一条;翻过最新一条后恢复按 ArrowUp 之前正在编辑的草稿。对标 Claude.ai 的 composer 行为。
+Web UI 的 composer 历史召回:光标处于输入框最前面(第 0 位、无选区)时按 ArrowUp,把当前会话最近发送的一条消息召回进草稿;继续按往更早翻;按 ArrowDown 往回翻到更新的一条;翻过最新一条后恢复按 ArrowUp 之前正在编辑的草稿——对标 Claude.ai 的 composer 行为。一个 document 级捕获相 `keydown` 监听器先于 composer 自身的 React `onKeyDown` 认领合资格按键;被认领的写入走公开的 `setDraft`,InputBar 与所有 `packages/client` 文件均不改动。
+
+## 目录
+
+- [详细说明](#details)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="details"></a>
+## 详细说明
 
 插件在**捕获阶段**挂载一个 document 级 `keydown` 监听器,先于 composer textarea 自身的 React `onKeyDown` 运行。被认领的按键同时 `preventDefault()`(不做原生光标移动)与 `stopPropagation()`(composer 自身的处理器不会看到);未认领的按键原样到达 composer。InputBar 与所有 `packages/client` 文件均不改动——composer textarea 通过 `textarea[data-dsh-composer]` 选择器只读定位,global-paste 与 text-file-cards 已在消费同一选择器。
 
@@ -33,12 +45,6 @@ Web UI 的 composer 历史召回:光标处于输入框最前面(第 0 位、无�
 - 遍历进行中,草稿不再等于遍历最近一次写入的内容(用户编辑了召回文本)→ 结束遍历,该次按键交还原生行为。
 
 遍历进行中,ArrowUp/ArrowDown 不复查光标(草稿重写后光标位置由引擎决定),因此遍历中的编辑不会打断游标。但编辑召回文本本身会结束遍历:内存槽记录插件最近一次写入的内容,下一次按键时草稿与之不符即意味着用户已接管——遍历结束、该次按键放行,后续方向键表现得如同从未进入过遍历(之后的 ArrowUp 经光标在第 0 位的门槛重新进入)。编辑后又改回与写入内容完全一致的文本则保持遍历(纯字符串比较)。input-trigger 服务经 `ctx.get` 可选读取,未组合 slash 管线的组合仍有历史召回。
-
-## 目录
-
-- [模型体验](#model-experience)
-- [已知限制与后续工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
 
 -----
 

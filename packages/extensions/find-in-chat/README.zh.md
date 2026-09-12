@@ -8,7 +8,19 @@ kind: "package-reference"
 
 ## 概述
 
-会话内查找（Web UI）：Ctrl/Cmd+F 在当前 chat 视图上方打开顶部居中的查找栏——对已加载消息做字面、不区分大小写的匹配，双向回绕步进、居中滚动高亮，并如实标注覆盖范围。本插件不接管的场合，浏览器原生查找栏行为不变。
+会话内查找（Web UI）：Ctrl/Cmd+F 在当前 chat 视图上方打开顶部居中的查找栏——对已加载消息做字面、不区分大小写的匹配，双向回绕步进、居中滚动高亮，并如实标注覆盖范围。本插件不接管的场合，浏览器原生查找栏行为不变。拦截由 document 级 capture 相 keydown 监听承担，仅在 chat 流已挂载、页面无 dialog 接管时接管按键；composer 完全不被触碰。
+
+## 目录
+
+- [详细说明](#details)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="details"></a>
+## 详细说明
 
 拦截方式是 document 级 capture 相 keydown 监听（global-paste 先例）。只接管不带 Shift/Alt 的 Ctrl/Cmd+F，且仅在 chat 流已挂载、页面无 dialog 接管时生效：无会话的 hero 与 trajectory 标签页都不含 chat DOM，拦截随之让位——这些状态保留浏览器原生查找。composer 完全不被触碰；本包不消费任何 `conversation.input` 动词，也不请求 composer-guards 模块行。
 
@@ -18,12 +30,6 @@ kind: "package-reference"
 - **导航**：Enter 前进、Shift+Enter 后退，两端回绕；当前命中滚动至会话滚动容器中央，并经 CSS Custom Highlight API 绘制高亮——对现有 DOM 建 Range，零 React 树改动，每次步进与关闭时清理。不支持该 API 的平台（旧浏览器、jsdom）降级为只计数与滚动、不绘制。
 - **覆盖**：搜索范围是 chat 流的活 DOM——与原生查找可见的范围一致——查找栏如实说明：显示已搜索的定稿消息数，并在已加载窗口未达会话头部时附注「更早消息未加载」。本包不自动调用 `loadOlder`：chat 视图将已加载消息全量挂载，自动翻页会无界增长 DOM；点击视图自带的 Load earlier 后重新搜索即可纳入更早窗口。
 - **关闭**：查找栏内 Escape、会话切换、或 chat 视图卸载（会话关闭、切到 trajectory）即关闭查找栏、清除全部高亮并恢复打开前焦点。流式更新保持实时：DOM 变更经 200 ms 防抖后重扫窗口，命中缩减时当前序号钳制。
-
-## 目录
-
-- [模型体验](#model-experience)
-- [已知限制与后续工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
 
 -----
 

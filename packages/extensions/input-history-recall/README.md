@@ -8,7 +8,19 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Composer history recall for the Web UI: with the caret at the very front of the composer (offset 0, no selection), pressing ArrowUp recalls the current session's most recently sent message into the draft; further presses walk older; ArrowDown walks forward, and walking past the newest entry restores the draft as it was before the traversal. Mirrors Claude.ai's composer behavior.
+Composer history recall for the Web UI: with the caret at the very front of the composer (offset 0, no selection), pressing ArrowUp recalls the current session's most recently sent message into the draft; further presses walk older; ArrowDown walks forward, and walking past the newest entry restores the draft as it was before the traversal — mirroring Claude.ai's composer behavior. One document-level capture-phase `keydown` listener claims eligible keys before the composer's own React `onKeyDown`; claimed writes go through the public `setDraft`, and InputBar and every `packages/client` file stay unmodified.
+
+## Table of Contents
+
+- [Details](#details)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="details"></a>
+## Details
 
 The plugin mounts one document-level `keydown` listener on the **capture phase** so it runs before the composer textarea's own React `onKeyDown`. A claimed key is both `preventDefault()`ed (no native caret move) and `stopPropagation()`ed (the composer's own handler never sees it); every unclaimed key reaches the composer untouched. InputBar and every `packages/client` file stay unmodified — the composer textarea is located read-only via the `textarea[data-dsh-composer]` selector that global-paste and text-file-cards already consume.
 
@@ -33,12 +45,6 @@ The guards, evaluated in order before a key is claimed:
 - While traversing, a draft that no longer matches the traversal's last written entry (the user edited the recalled text) ends the traversal and hands the key back to native handling.
 
 While a traversal is live, ArrowUp/ArrowDown skip the caret recheck (the draft rewrite leaves the caret wherever the engine puts it), so edits made mid-traversal keep the cursor position. Editing the recalled text itself, however, ends the traversal: the slot records what the plugin last wrote, and a draft that differs from it on the next keypress means the user has taken over — the traversal ends, that key passes through, and later arrows behave as if no traversal had been started (a later ArrowUp re-enters through the caret-at-0 gate). An edit reverted back to the exact written text keeps the traversal alive (plain string comparison). The input-trigger service is read optionally through `ctx.get`, so compositions without the slash pipeline still get history recall.
-
-## Table of Contents
-
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
 
 -----
 

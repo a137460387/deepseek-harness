@@ -8,7 +8,19 @@ kind: "package-reference"
 
 ## 概述
 
-草稿 token 预算（Web UI）：composer 下方的一条弱化读数，估算当前草稿的 token 成本，并在 provider 报告上下文数据时给出发送后占上下文窗口的百分比。估算镜像 token-meter 自身的启发式——读数给草稿的价，就是草稿发出时 meter 将计的价。
+草稿 token 预算（Web UI）：composer 下方的一条弱化读数，估算当前草稿的 token 成本，并在 provider 报告上下文数据时给出发送后占上下文窗口的百分比。估算镜像 token-meter 自身的启发式——读数给草稿的价，就是草稿发出时 meter 将计的价。读数是 stats line 旁的纯 slot 消费者：composer 永不被写，也不注册任何监听器。
+
+## 目录
+
+- [详细说明](#details)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="details"></a>
+## 详细说明
 
 读数是挂载于 composer dock（`conversation.composer.dock`）、与 stats line 相邻的纯 slot 消费者：活草稿经 dock 的 `useInput` 份额、以 250ms 尾随防抖到达；上下文基准经 session 投影 `contextPressure`——优先 provider 锚定的 `projectedTokens`、退化 `pressureTokens`、仅在存在路由容量时给百分比（否则 tokens-only）。composer 永不被写；不注册任何监听器。
 
@@ -17,12 +29,6 @@ kind: "package-reference"
 - **估算**：`ceil(长度 / 4) + 8`——token-meter 的固定文本密度加块与角色框架开销，恰是纯文本草稿作为已发送用户消息支付的价格。契约规格以 `@deepseek-ai/dsh-token-meter` 的真实 `estimateMessage` 钉住镜像，上游改公式会在下次同步时让本 fork 的测试转红。
 - **发送后百分比**：`(基准 + 草稿) / 上下文窗口`，封顶 100%，基准锚定 provider 实报投影——启发式只承担草稿增量段。
 - **每个数字都带 `~`**：启发式低估 CJK 与 JSON，社区实测长会话中与 provider 实报可有数十个百分点偏差（见上游 token-meter README 与 discussion #3514）。近似性是明示的，不是暗示的。
-
-## 目录
-
-- [模型体验](#model-experience)
-- [已知限制与后续工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
 
 -----
 

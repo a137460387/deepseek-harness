@@ -8,7 +8,19 @@ kind: "package-reference"
 
 ## 概述
 
-Web UI 全页文本粘贴:在窗口任意位置按 Ctrl/Cmd+V,会把剪贴板的纯文本路由到当前会话的 composer 草稿中,无需先点击输入框。对标 Claude.ai 的"任意位置粘贴"行为。
+Web UI 全页文本粘贴:在窗口任意位置按 Ctrl/Cmd+V,会把剪贴板的纯文本路由到当前会话的 composer 草稿中,无需先点击输入框——对标 Claude.ai 的"任意位置粘贴"行为。一个 document 级捕获相 `paste` 监听器先于 composer 自身的 React `onPaste` 运行:纯文本经公开的 `setDraft` 追加进草稿,图片文件重新派发给 composer 走其官方 intake,混合剪贴板则拆分处理。
+
+## 目录
+
+- [详细说明](#details)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="details"></a>
+## 详细说明
 
 插件在 **捕获阶段** 挂载一个 document 级 `paste` 监听器,在 composer textarea 自身的 React `onPaste` 之前运行。两条路由路径:
 
@@ -30,12 +42,6 @@ Web UI 全页文本粘贴:在窗口任意位置按 Ctrl/Cmd+V,会把剪贴板的
 文本追加到草稿**末尾**;不保留已有非折叠选区(这是已确认的设计选择)。草稿中已有的引用 chip(occurrences)会被保留——`setDraft` 以 U+FFFC 占位符携带它们,只追加新文本。
 
 文本文件**拖拽**由伴生插件 `@deepseek-ai/dsh-client-text-file-cards` 负责:它把拖入的文本文件暂存为 composer 上方的卡片,而不是直接内联进草稿。
-
-## 目录
-
-- [模型体验](#model-experience)
-- [已知限制与后续工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
 
 -----
 

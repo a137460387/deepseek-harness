@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The extensions group lets an agent inspect and modify the live DSH runtime without editing repository files or configuration. It can define, run, update, stop, and remove dynamic Cordis packages from model tools or a browser panel. A package may affect the host, browser, or both, and immutable versions support controlled updates. Definitions exist only in process memory and disappear when DSH restarts. Choose the child package for model tooling, host execution, browser execution, or browser controls.
+The extensions group lets an agent inspect and modify the live DSH runtime without editing repository files or configuration: define, run, update, stop, and remove dynamic Cordis packages from model tools or a browser panel, on the host, the browser, or both. Definitions exist only in process memory and disappear when DSH restarts.
 
 This fork also hosts its Web UI input extensions here as self-contained browser-half plugin packages on official seams only ([placement Agent Note](../../.agents/notes/implemented/architecture/2026-08-19-fork-ui-extensions-placement.md)); they stay out of `packages/client/` to keep the upstream merge surface to this README.
 
@@ -17,6 +17,7 @@ This fork also hosts its Web UI input extensions here as self-contained browser-
 
 - [Packages](#packages)
 - [Related documentation](#related-documentation)
+- [Details](#details)
 - [Dev Note](#dev-note)
 
 -----
@@ -50,6 +51,13 @@ This fork also hosts its Web UI input extensions here as self-contained browser-
 - [Generated configuration catalog](../../docs/config-catalog.md#deepseek-aidsh-cordis-host-runner) — the runner's accepted config fields.
 - [Self-referential Cordis toolset Agent Note](../../.agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md) — design home for sandbox semantics, lifecycle, and composition.
 - [Client shells and dynamic packages Agent Note](../../.agents/notes/implemented/architecture/2026-08-15-client-shells-and-dynamic-packages.md) — package placement and build faces for the client halves.
+
+-----
+
+<a id="details"></a>
+## Details
+
+Immutable package versions support controlled updates. Choose the child package for model tooling, host execution, browser execution, or browser controls.
 
 -----
 

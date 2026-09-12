@@ -8,22 +8,11 @@ kind: "package-reference"
 
 ## 概述
 
-Web UI 文本文件拖拽暂存卡片:把一批纯文本文件拖放到窗口任意位置——与 composer 自身图片 intake 覆盖的区域相同——会把它们暂存为悬浮在 composer 上方的紧凑卡片,而不是把内容直接内联进草稿。点击卡片会把 `# <文件名>` 加文件内容展开到草稿末尾并聚焦 composer;关闭按钮则移除暂存、不动草稿。长文档因此不会刷屏——内容只在你明确点击展开时才进入消息。
-
-插件在 **捕获阶段** 挂载一个 document 级 `drop` 监听器,在 composer 自身的冒泡阶段 `onDrop` 之前运行。仅当下面所有守卫都成立时才接管该 drop;否则事件交给 composer 原生的整文件 intake:
-
-- 批次中每个文件都是文本——其扩展名命中常见文本/代码白名单,或 MIME 类型以 `text/` 开头。
-- 存在当前会话,会话级 composer 锁全部敞开(会话未被移除;可续接 subagent 子会话的精确父会话在线),且输入状态机不处于 `adjudicating`/`submitting`。
-- composer 已挂载且可见(未被接管面板遮挡)。
-
-批次中只要含图片或其他非文本文件,就整批原样放行(不拆分),以保证图片走官方原生 intake 路径。
-
-composer 自身的全窗口 `dragover` 监听器已允许文件放置并设置 copy 光标,因此插件不处理 `dragover`;文本/图片的判定在 `drop` 时做出,此时文件可读。
-
-由于接管会阻止 drop 到达 composer 自身的处理器,而操作系统文件拖拽不会触发 `dragend`,插件会向 `window` 派发一个合成 `dragend` 以清除 composer 的拖拽高亮遮罩。
+Web UI 文本文件拖拽暂存卡片:把一批纯文本文件拖放到窗口任意位置——与 composer 自身图片 intake 覆盖的区域相同——会把它们暂存为悬浮在 composer 上方的紧凑卡片,而不是把内容直接内联进草稿。点击卡片会把 `# <文件名>` 加文件内容展开到草稿末尾并聚焦 composer;关闭按钮则移除暂存、不动草稿。长文档不会刷屏,批次中含图片时整批放行走官方 intake。
 
 ## 目录
 
+- [详细说明](#details)
 - [模型体验](#model-experience)
 - [已知限制与后续工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -38,6 +27,25 @@ composer 自身的全窗口 `dragover` 监听器已允许文件放置并设置 c
 ## 暂存模型
 
 暂存文件以整体(`File` 对象,而非内容)按会话 id 存放在插件自有的快照 store 中,该 store 经 dock 注册的 `hooks` 隔间供给组件。内容只在用户点击展开时读取;读取完成后会重新检查输入状态机与会话级锁,若期间已开始提交或锁已翻转(会话被移除、父会话离线)则放弃展开。读取被拒(磁盘文件已被移走或浏览器收回了 blob)时静默失败:卡片保留在原处供重试或移除,点击路径不会抛错。新增暂存时会顺带清理已不存在会话的条目。
+
+-----
+
+<a id="details"></a>
+## 详细说明
+
+插件在 **捕获阶段** 挂载一个 document 级 `drop` 监听器,在 composer 自身的冒泡阶段 `onDrop` 之前运行。仅当下面所有守卫都成立时才接管该 drop;否则事件交给 composer 原生的整文件 intake:
+
+- 批次中每个文件都是文本——其扩展名命中常见文本/代码白名单,或 MIME 类型以 `text/` 开头。
+- 存在当前会话,会话级 composer 锁全部敞开(会话未被移除;可续接 subagent 子会话的精确父会话在线),且输入状态机不处于 `adjudicating`/`submitting`。
+- composer 已挂载且可见(未被接管面板遮挡)。
+
+批次中只要含图片或其他非文本文件,就整批原样放行(不拆分),以保证图片走官方原生 intake 路径。
+
+composer 自身的全窗口 `dragover` 监听器已允许文件放置并设置 copy 光标,因此插件不处理 `dragover`;文本/图片的判定在 `drop` 时做出,此时文件可读。
+
+由于接管会阻止 drop 到达 composer 自身的处理器,而操作系统文件拖拽不会触发 `dragend`,插件会向 `window` 派发一个合成 `dragend` 以清除 composer 的拖拽高亮遮罩。
+
+-----
 
 <a id="model-experience"></a>
 ## 模型体验

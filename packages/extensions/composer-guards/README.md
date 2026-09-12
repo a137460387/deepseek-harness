@@ -8,7 +8,19 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Shared composer guards for the fork's browser input plugins (`global-paste`, `text-file-cards`, `input-history-recall`, `draft-keeper`): the three predicates each of them needs before a plugin-side write may reach the composer.
+Shared composer guards for the fork's browser input plugins (`global-paste`, `text-file-cards`, `input-history-recall`, `draft-keeper`): the three predicates each of them needs before a plugin-side write may reach the composer. The package ships as a dynamic `dsh.client` library row: consumers declare it in `dsh.client.external`, and a composition mounting any consumer must mount this row too. The helpers stay pure over public seams only; the owner-prop composer lock reasons stay out of reach, so consumers keep their own current-session guard around them.
+
+## Table of Contents
+
+- [Details](#details)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="details"></a>
+## Details
 
 - **`composerVisible(composer)`** — the composer textarea is visible and not occluded by a takeover overlay (probed with `elementFromPoint` at the composer's center).
 - **`sessionAcceptsEdits(session)`** — every session-level composer lock stands open: the session is not removed, and a continuable subagent child still has its exact parent available.
@@ -17,12 +29,6 @@ Shared composer guards for the fork's browser input plugins (`global-paste`, `te
 The package is a library row, not a feature plugin: both halves' `apply` are inert and it provides no services or slots. It exists as a dynamic `dsh.client` row so consumers can share this code — each consumer declares `@deepseek-ai/dsh-client-composer-guards/client` in `dsh.client.external`, the boot-graph composer orders this row before its consumers, and the browser module table resolves the request to this package's `lib/client.js` exports. A composition that mounts a consumer must mount this row too, or graph composition rejects the missing request.
 
 The helpers stay pure over public seams only: DOM probes and the `sessions` / `conversation` services every consumer already injects. The owner-prop composer lock reasons (the inert no-workspace hero, an owner block) have no public signal and stay out of reach, so every consumer keeps its own current-session guard around them.
-
-## Table of Contents
-
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
 
 -----
 
