@@ -6,7 +6,7 @@ English | [中文](2026-09-03-directory-picker-service-session0.md)
 
 ## Problem
 
-在本 fork 的生产部署形态——`dsh web` 经 NSSM 注册为 Windows 服务——每次点击「添加工作区…」都完全静默：无对话框、无错误弹窗、任何反馈都没有。[自适应默认](../feature/2026-07-29-directory-picker-adaptive-default.zh.md)对该宿主解析出 `native`（回环绑定、`win32`、无 SSH 环境变量），而 native 后端 spawn 的对话框子进程，其 `IFileOpenDialog` 创建在**父进程所在的会话**——服务即会话 0。对话框在不可见的会话 0 桌面上成功创建，于是没有任何失败：worker 发出 `showing` 后永久阻塞在 `Show` 里，`error` 与 `exit` 都不会触发，pick RPC 永不落定（整条链路按设计无超时），客户端零反馈。[自适应默认笔记](../feature/2026-07-29-directory-picker-adaptive-default.zh.md)预期错选 `native` 时会「退化为后端既有的可重试失败弹窗」；会话 0 宿主正是反例——错选不会失败，而是不可见地挂起，因此该笔记给出的出路「此类部署直接组合 `-browse`」是唯一正确的组合方式。
+在本 fork 的生产部署形态——`dsh web` 经 NSSM 注册为 Windows 服务——每次点击「添加工作区…」都完全静默：无对话框、无错误弹窗、任何反馈都没有。[自适应默认](../../archived/feature/2026-07-29-directory-picker-adaptive-default.md)对该宿主解析出 `native`（回环绑定、`win32`、无 SSH 环境变量），而 native 后端 spawn 的对话框子进程，其 `IFileOpenDialog` 创建在**父进程所在的会话**——服务即会话 0。对话框在不可见的会话 0 桌面上成功创建，于是没有任何失败：worker 发出 `showing` 后永久阻塞在 `Show` 里，`error` 与 `exit` 都不会触发，pick RPC 永不落定（整条链路按设计无超时），客户端零反馈。[自适应默认笔记](../../archived/feature/2026-07-29-directory-picker-adaptive-default.md)预期错选 `native` 时会「退化为后端既有的可重试失败弹窗」；会话 0 宿主正是反例——错选不会失败，而是不可见地挂起，因此该笔记给出的出路「此类部署直接组合 `-browse`」是唯一正确的组合方式。
 
 ## Decision
 
