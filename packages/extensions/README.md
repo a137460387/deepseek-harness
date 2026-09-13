@@ -33,6 +33,7 @@ This fork also hosts its Web UI input extensions here as self-contained browser-
 | [`ui-cordis`](ui-cordis/README.md) | Browser surfaces: the frame-wide panel, lifecycle tool cards, and the `@pluginId` input source | client face; registers slots |
 | [`global-paste`](global-paste/README.md) | Fork: whole-page paste routing — text through the public input service, images forwarded onto the composer | client face; document capture listener |
 | [`text-file-cards`](text-file-cards/README.md) | Fork: text-file drop staging cards over the composer, expanded on click | client face; registers the input dock slot |
+| [`long-text-fold`](long-text-fold/README.md) | Fork: long-text paste staging cards over the composer, restored at submit, with the sent message folded into an expandable chat card | client face; registers the input dock slot and replaces the chat user-node renderer |
 | [`usage-stats`](usage-stats/README.md) | Fork: usage statistics settings tab over the `usageStats` session projection — token counts by route, day, and month | dual face; registers a projection unit and the settings-section slot |
 | [`input-history-recall`](input-history-recall/README.md) | Fork: composer ArrowUp/ArrowDown history recall of the current session's sent messages, with the pre-traversal draft restored on exit | client face; document capture listener |
 | [`draft-keeper`](draft-keeper/README.md) | Fork: per-session composer draft mirror into localStorage with reload restore of plain text | client face; input-state subscription |

@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-13-long-text-fold.md
+2026-09-13-long-text-fold.md: c78048e9ac3a18eb296a62459b8af1cb93a5291b
+2026-09-13-long-text-fold.zh.md: b8e9ea17293eeec0f7aefdf62f1934237dda0b4a

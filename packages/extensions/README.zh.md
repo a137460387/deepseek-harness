@@ -33,6 +33,7 @@ extensions 组让 agent（智能体）检查并修改实时 DSH 运行时，而�
 | [`ui-cordis`](ui-cordis/README.zh.md) | 浏览器面：全局面板、生命周期工具卡片与 `@pluginId` 输入源 | client 面；注册 slot |
 | [`global-paste`](global-paste/README.zh.md) | fork：全页粘贴路由——文本走公开 input 服务，图片转发到 composer | client 面；document 捕获监听器 |
 | [`text-file-cards`](text-file-cards/README.zh.md) | fork：composer 上方的文本文件拖拽暂存卡片，点击展开 | client 面；注册 input dock slot |
+| [`long-text-fold`](long-text-fold/README.zh.md) | fork：composer 上方的长文本粘贴暂存卡片，提交时还原全文，发送后消息折叠为可展开聊天卡片 | client 面；注册 input dock slot 并替换聊天 user-node 渲染器 |
 | [`usage-stats`](usage-stats/README.zh.md) | fork：`usageStats` 会话投影之上的使用统计设置页——按路由、按天、按月的 token 数量 | 双面；注册投影单元与 settings-section slot |
 | [`input-history-recall`](input-history-recall/README.zh.md) | fork：composer 的 ArrowUp/ArrowDown 历史召回——翻当前会话已发送消息，退出遍历时恢复进入前草稿 | client 面；document 捕获监听器 |
 | [`draft-keeper`](draft-keeper/README.zh.md) | fork：按会话把 composer 草稿镜像进 localStorage，重载后恢复纯文本 | client 面；input 状态订阅 |
