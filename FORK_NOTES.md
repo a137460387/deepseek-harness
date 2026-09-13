@@ -179,6 +179,8 @@
 
 - **long-text-fold 聊天折叠形态对齐 Claude 网页版**（commits `f2afe5f28b` feat + `bd014b219f` test + `d6f2b9a705` docs）：应用户裁定把聊天侧折叠从「独立摘要卡片——首行预览 + 字符/行 meta + 惰性展开」的附件卡隐喻改为「原位限高 + 底部渐隐遮罩 + 浮动展开/收起按钮」的 Show more 形态：折叠态渲染真实 bubble（`.foldClamped` CSS max-height 六行帽 + `.foldMask` 遮罩；`.foldWrap` 转 flex 列使收起按钮 `align-self: flex-end` 生效），展开态原位去帽、气泡下方出现收起按钮；折叠判定新增行数阈值 `RENDER_FOLD_LINES = 50`（字符阈值 `RENDER_FOLD_CHARS` 不变），chat 探针值 `data-long-text-fold` 由 `card` 改为 `collapsed`（`expanded` 不变），e2e 定位器随改；README 双语（Summary、frontmatter description、Details）与 Note 双语（Decision、后果段）残留的「可展开卡片」措辞统一为原位限高表述，两份 i18n 侧车重录。pairing 全量校验恰剩登记的两条根 README 横幅基线红、零新增；Summary 词数门 329 全绿；包套件 74/74（原 73 + 新增 RENDER_FOLD_LINES 用例）；登记面（cordis.patch.yml、slot-catalog.ts、locale 键、`dsh.client.external`）零变化；未打新 tag——收尾修正轮无 tag 先例（usage-stats 深化、健壮性收口、守卫钉死均未打），tag 仅绑定上游基线迭代与特性交付，`fork-dsh-v0.1.5-rc.2+2` 行继续指向本特性交付。
 
+- **long-text-fold 真实浏览器 boot 修复（keyed 注册同 priority 相撞）**（commit `a36cfe5024` fix）：本轮同步的浏览器肉眼验证首次在真实组合中 boot 该插件，暴露 `conversation.chat.node` keyed 注册与上游 shipped 渲染器同 key 同 priority 0 相撞——loader 占位硬检查拒绝、整个客户端插件图加载失败（"Failed to load plugins"）。双盲区成因：jsdom bench 的 root children 未声明 chat.node 槽（注入的注册空操作、冲突不可见），web e2e 泳道又因 directory-picker scaffold 议题停摆（见上方待办登记），交付验收从未在真实组合 boot 过该插件。修复按 `ui-slots` 契约（同 key 不同 priority 即 shadow、lowest renders）将 user/steering 两笔 keyed 注册改为 priority -1；回归钉死测试在 bench 声明该槽并预置 shipped 占位者、断言我方以更低 priority 阴影（包套件 75/75）；修复后真实浏览器 boot 全绿，四态截图验证通过（composer dock 卡片、折叠遮罩+浮动展开按钮、原位展开+右对齐收起按钮、收起回路）。
+
 ## 上游 FR 与 endorsement 登记（fork 发起的上游互动，2026-08-23 立册）
 
 登记格式沿用「已知本地补丁」的上报状态条款；区别在于这些是 fork 主动发起的上游请求或对上游线程的应答，不附本地修改。路线图「两个上游 FR」当日双双落地（其一因查重改为 endorsement 形态）。
