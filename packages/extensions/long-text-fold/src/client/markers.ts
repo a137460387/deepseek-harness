@@ -22,6 +22,8 @@ export const PASTE_FOLD_CHARS = 2000
 export const PASTE_FOLD_LINES = 50
 /** Character count that folds a sent user text block in the chat view. */
 export const RENDER_FOLD_CHARS = 2000
+/** Line count that folds a sent user text block in the chat view. */
+export const RENDER_FOLD_LINES = 50
 /** Single staged-entry ceiling in UTF-16 code units (≈250k tokens). */
 export const MAX_STAGED_BYTES = 1_000_000
 /** LRU entry cap across all sessions. */

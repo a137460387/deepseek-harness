@@ -21,7 +21,7 @@ import {
 import type { UserMessageNode } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { MessageImageSource } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { RENDER_FOLD_CHARS, countLines, firstLine } from './markers.ts'
+import { RENDER_FOLD_CHARS, RENDER_FOLD_LINES, countLines } from './markers.ts'
 import css from './FoldView.module.css'
 
 /* jscpd:ignore-start -- intentional mirror of MessageItem.tsx's attachment
@@ -86,29 +86,32 @@ function formatClock(time: number, t: FoldT, now: number = Date.now()): string {
 }
 
 /**
- * The collapsed card: first-line preview, size meta, and the expand toggle.
- * The expanded body renders lazily so a collapsed long text never builds its
- * React tree.
+ * The collapsed card shows the real bubble clamped to a line cap behind a
+ * bottom fade mask with a floating expand button; expanded, the cap and mask
+ * drop and a collapse button renders below the bubble.
  */
-function FoldCard({ text, renderExpanded, t }: {
+function FoldCard({ renderExpanded, t }: {
   text: string
   renderExpanded: () => ReactNode
   t: FoldT
 }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className={css.foldCard} data-long-text-fold={open ? 'expanded' : 'card'}>
-      <button
-        type="button"
-        className={css.foldToggle}
-        aria-expanded={open}
-        onClick={() => { setOpen(!open) }}
-      >
-        <span className={css.foldPreview}>{firstLine(text)}</span>
-        <span className={css.foldMeta}>{t('card.meta', { chars: text.length, lines: countLines(text) })}</span>
-        <span className={css.foldAction}>{open ? t('card.collapse') : t('card.expand')}</span>
-      </button>
-      {open && <div className={css.foldBody}><div className={css.bubble}>{renderExpanded()}</div></div>}
+    <div className={css.foldWrap} data-long-text-fold={open ? 'expanded' : 'collapsed'}>
+      <div className={open ? css.bubble : `${css.bubble} ${css.foldClamped}`}>
+        {renderExpanded()}
+      </div>
+      {!open && <div className={css.foldMask} />}
+      {!open && (
+        <button type="button" className={css.foldToggle} onClick={() => { setOpen(true) }}>
+          {t('card.expand')}
+        </button>
+      )}
+      {open && (
+        <button type="button" className={css.foldCollapseBtn} onClick={() => { setOpen(false) }}>
+          {t('card.collapse')}
+        </button>
+      )}
     </div>
   )
 }
@@ -166,7 +169,7 @@ export function LongTextFoldNodeView({ node, renderMessageImages, openFile, open
   const parts = contentParts(data.content)
   const referenceLabels = data.referenceLabels ?? []
   const skillNames = data.skillNames ?? []
-  const fold = parts.text.length >= RENDER_FOLD_CHARS
+  const fold = parts.text.length >= RENDER_FOLD_CHARS || countLines(parts.text) >= RENDER_FOLD_LINES
   const bubble = (): ReactNode => (
     <>
       {projectUserText(parts.text, referenceLabels, skillNames, 'skill', { openFile, openSkill })}
