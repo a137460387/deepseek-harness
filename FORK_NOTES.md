@@ -177,6 +177,8 @@
 
 - **long-text-fold 落地**（commits `7556bc9916` scaffold + `cfa565ff86` feat + `637f60d392` test + `8b069db097` docs + `89c0c7a2ac` fix，tag `fork-dsh-v0.1.5-rc.2+2`）：纯浏览器扩展包，解决 composer 粘贴超长文本卡顿与聊天视图全文撑爆问题。走路线 B-1（展示卡片，模型语义不变），经 document capture 拦截、localStorage 暂存、`setDraft` 同步展开、`'user'`/`'steering'` keyed slot 替换渲染。73 个测试用例全绿，3 处有意镜像加 jscpd 内联豁免（镜像面由收尾清单其六对照）。验收期以 fix 笔修正两处登记/类型债（根客户端程序登记 + 测试 SessionId 品牌化）；hygiene 的 invariants 舰队级漂移（19 条，涉全部十个 fork 扩展包）为独立议题待舰队级决议。双源查重社区面非空（#1031、dsh-paste-collapse 等）经维护者特批立项。决策记录见 [long-text-fold Agent Note](.agents/notes/implemented/feature/2026-09-13-long-text-fold.md)。
 
+- **long-text-fold 聊天折叠形态对齐 Claude 网页版**（commits `f2afe5f28b` feat + `bd014b219f` test + `d6f2b9a705` docs）：应用户裁定把聊天侧折叠从「独立摘要卡片——首行预览 + 字符/行 meta + 惰性展开」的附件卡隐喻改为「原位限高 + 底部渐隐遮罩 + 浮动展开/收起按钮」的 Show more 形态：折叠态渲染真实 bubble（`.foldClamped` CSS max-height 六行帽 + `.foldMask` 遮罩；`.foldWrap` 转 flex 列使收起按钮 `align-self: flex-end` 生效），展开态原位去帽、气泡下方出现收起按钮；折叠判定新增行数阈值 `RENDER_FOLD_LINES = 50`（字符阈值 `RENDER_FOLD_CHARS` 不变），chat 探针值 `data-long-text-fold` 由 `card` 改为 `collapsed`（`expanded` 不变），e2e 定位器随改；README 双语（Summary、frontmatter description、Details）与 Note 双语（Decision、后果段）残留的「可展开卡片」措辞统一为原位限高表述，两份 i18n 侧车重录。pairing 全量校验恰剩登记的两条根 README 横幅基线红、零新增；Summary 词数门 329 全绿；包套件 74/74（原 73 + 新增 RENDER_FOLD_LINES 用例）；登记面（cordis.patch.yml、slot-catalog.ts、locale 键、`dsh.client.external`）零变化；未打新 tag——收尾修正轮无 tag 先例（usage-stats 深化、健壮性收口、守卫钉死均未打），tag 仅绑定上游基线迭代与特性交付，`fork-dsh-v0.1.5-rc.2+2` 行继续指向本特性交付。
+
 ## 上游 FR 与 endorsement 登记（fork 发起的上游互动，2026-08-23 立册）
 
 登记格式沿用「已知本地补丁」的上报状态条款；区别在于这些是 fork 主动发起的上游请求或对上游线程的应答，不附本地修改。路线图「两个上游 FR」当日双双落地（其一因查重改为 endorsement 形态）。
