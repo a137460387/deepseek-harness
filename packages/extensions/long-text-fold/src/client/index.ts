@@ -240,8 +240,10 @@ export function apply(ctx: ClientContext): void {
   }, PreviewPopup)), 'long-text-fold: preview popup')
 
   ctx.effect(() => ctx.slots.inject('conversation.chat.node', () => {
-    const offUser = ctx.slots.register({ name: 'conversation.chat.node', key: 'user', locale: NS }, LongTextFoldNodeView)
-    const offSteering = ctx.slots.register({ name: 'conversation.chat.node', key: 'steering', locale: NS }, LongTextFoldNodeView)
+    // Same key + same priority throws: priority -1 shadows the shipped
+    // renderers at the default 0 (lowest renders) instead of failing boot.
+    const offUser = ctx.slots.register({ name: 'conversation.chat.node', key: 'user', priority: -1, locale: NS }, LongTextFoldNodeView)
+    const offSteering = ctx.slots.register({ name: 'conversation.chat.node', key: 'steering', priority: -1, locale: NS }, LongTextFoldNodeView)
     return () => {
       offUser()
       offSteering()

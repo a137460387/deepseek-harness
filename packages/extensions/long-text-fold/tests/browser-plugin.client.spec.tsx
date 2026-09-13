@@ -180,6 +180,8 @@ interface BenchOptions {
   readonly parentOffline?: boolean
   /** Make every staged-store write refuse before the plugin boots. */
   readonly failStorage?: boolean
+  /** Pre-register a shipped-like keyed chat-node occupant at the default priority. */
+  readonly shippedChatNode?: boolean
 }
 
 interface Bench {
@@ -228,6 +230,7 @@ async function bench(over: BenchOptions = {}): Promise<Bench> {
     name: 'root', children: {
       'conversation.input.dock': { kind: 'list', scope: 'session' },
       'shell.overlay': { kind: 'list', scope: 'root' },
+      'conversation.chat.node': { kind: 'keyed', scope: 'session' },
     },
   } as never, (() => null) as never)
   const locale = new LocaleRuntime(ctx)
@@ -243,6 +246,13 @@ async function bench(over: BenchOptions = {}): Promise<Bench> {
   } as never)
 
   if (over.failStorage === true) fake.failWrites = true
+
+  if (over.shippedChatNode === true) {
+    ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
+      { name: 'conversation.chat.node', key: 'user' },
+      (() => null) as never,
+    ))
+  }
 
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
@@ -296,6 +306,15 @@ afterEach(async () => {
 describe('long-text-fold browser half', () => {
   it('declares the services it binds', () => {
     expect(inject).toEqual(['slots', 'sessions', 'conversation', 'locale'])
+  })
+
+  it('shadows the shipped chat-node renderer via a lower priority', async () => {
+    const { ctx } = await bench({ shippedChatNode: true })
+    const userEntries = ctx.slots.entries('conversation.chat.node')
+      .filter(entry => (entry.options as { key?: string }).key === 'user')
+    expect(userEntries).toHaveLength(2)
+    const priorities = userEntries.map(entry => (entry.options as { priority?: number }).priority ?? 0)
+    expect(Math.min(...priorities)).toBe(-1)
   })
 })
 
