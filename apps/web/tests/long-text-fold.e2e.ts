@@ -99,8 +99,8 @@ function buildLog(): string {
   ].join('\n')
 }
 
-/** The fold card, addressed through the plugin's stable probe. */
-const foldCard = (page: Page) => page.locator('[data-long-text-fold="card"]')
+/** The collapsed fold wrap, addressed through the plugin's stable probe. */
+const foldCard = (page: Page) => page.locator('[data-long-text-fold="collapsed"]')
 
 describe('web e2e: long-text-fold chat fold', () => {
   let scaffold: WebScaffold
@@ -122,8 +122,8 @@ describe('web e2e: long-text-fold chat fold', () => {
   it('folds the long user message and expands it in place', async () => {
     onTestFailed(async () => { await saveFailureShot(page, 'long-text-fold') })
     await page.getByText(SHORT_MARKER).waitFor({ timeout: 30_000 })
-    // One text block ≥ the render threshold folds; the card shows the
-    // first-line preview and the size meta.
+    // One text block ≥ the render threshold folds; the collapsed wrap clamps
+    // the real bubble behind the bottom fade mask.
     const card = foldCard(page)
     await expect(card).toHaveCount(1)
     const cardText = await card.textContent()

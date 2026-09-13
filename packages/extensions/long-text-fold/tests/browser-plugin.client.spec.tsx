@@ -22,7 +22,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, within } from '@testing-library/react'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -34,8 +34,9 @@ import { en as conversationEn, zh as conversationZh } from '@deepseek-ai/dsh-cli
 import { apply, inject } from '../src/client/index.ts'
 import { LongTextFoldDock, PreviewPopup, type LongTextFoldDockInjected, type LongTextFoldDockProps, type PreviewPopupProps, type PreviewRequest } from '../src/client/dock.tsx'
 import { LongTextFoldNodeView, type LongTextFoldNodeProps } from '../src/client/fold-view.tsx'
+import foldViewCss from '../src/client/FoldView.module.css'
 import type { StagedState } from '../src/client/staged-store.ts'
-import { MAX_STAGED_BYTES, markerOf } from '../src/client/markers.ts'
+import { MAX_STAGED_BYTES, RENDER_FOLD_CHARS, RENDER_FOLD_LINES, markerOf } from '../src/client/markers.ts'
 import { en, zh } from '../src/client/locales.ts'
 import { apply as nodeApply } from '../src/index.ts'
 import * as LongTextFoldInvariant from '../src/invariant.ts'
@@ -590,16 +591,34 @@ describe('LongTextFoldNodeView component', () => {
     } as unknown as LongTextFoldNodeProps
   }
 
-  it('folds a long text into the probe-marked card and expands on click', () => {
+  it('folds a long text into the clamped real-content card and expands on click', () => {
     const long = 'word '.repeat(600)
     const { container } = render(<LongTextFoldNodeView {...nodeProps([{ type: 'text', text: long }])} />)
-    const card = container.querySelector('[data-long-text-fold="card"]')
-    expect(card).not.toBeNull()
-    expect(card!.textContent).toContain('word')
-    expect(container.textContent).not.toContain(long.trim())
-    fireEvent.click(card!.querySelector('button')!)
-    expect(container.querySelector('[data-long-text-fold="expanded"]')).not.toBeNull()
-    expect(container.textContent).toContain(long.trim())
+    // Collapsed: the wrap holds the real bubble under the foldClamped cap
+    // with the fade mask over it (jsdom has no layout, so class presence is
+    // the height-cap pin).
+    const wrap = container.querySelector<HTMLElement>('[data-long-text-fold="collapsed"]')
+    expect(wrap).not.toBeNull()
+    expect(wrap!.classList.contains(foldViewCss.foldWrap!)).toBe(true)
+    const clamped = wrap!.querySelector(`.${foldViewCss.foldClamped}`)
+    expect(clamped).not.toBeNull()
+    expect(clamped!.textContent).toContain(long.trim())
+    expect(wrap!.querySelector(`.${foldViewCss.foldMask}`)).not.toBeNull()
+    fireEvent.click(within(wrap!).getByRole('button', { name: T('card.expand') }))
+    const expanded = container.querySelector<HTMLElement>('[data-long-text-fold="expanded"]')
+    expect(expanded).not.toBeNull()
+    expect(expanded!.querySelector(`.${foldViewCss.foldClamped}`)).toBeNull()
+    expect(expanded!.querySelector(`.${foldViewCss.foldMask}`)).toBeNull()
+    expect(expanded!.textContent).toContain(long.trim())
+    fireEvent.click(within(expanded!).getByRole('button', { name: T('card.collapse') }))
+    expect(container.querySelector('[data-long-text-fold="collapsed"]')).not.toBeNull()
+  })
+
+  it('folds a many-line text below the character threshold (RENDER_FOLD_LINES)', () => {
+    const text = Array.from({ length: RENDER_FOLD_LINES + 10 }, (_, index) => `line ${index}`).join('\n')
+    expect(text.length).toBeLessThan(RENDER_FOLD_CHARS)
+    const { container } = render(<LongTextFoldNodeView {...nodeProps([{ type: 'text', text }])} />)
+    expect(container.querySelector('[data-long-text-fold="collapsed"]')).not.toBeNull()
   })
 
   it('renders a short text as the shipped bubble shape without the probe', () => {
