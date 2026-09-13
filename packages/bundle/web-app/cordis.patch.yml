@@ -360,6 +360,13 @@
     - id: composer-guards
       name: '@deepseek-ai/dsh-client-composer-guards'
 
+    # Long-text paste staging: a long plain-text paste stages as a card over
+    # the composer, submission restores the full text, and the sent message
+    # folds into an expandable chat card. Must stay BEFORE global-paste: the
+    # unfocused-paste takeover must see the document capture event first.
+    - id: long-text-fold
+      name: '@deepseek-ai/dsh-client-long-text-fold'
+
     # Whole-page paste: Ctrl/Cmd+V anywhere routes text into the composer draft.
     - id: global-paste
       name: '@deepseek-ai/dsh-client-global-paste'

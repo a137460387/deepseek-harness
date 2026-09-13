@@ -87,6 +87,7 @@
     "@deepseek-ai/dsh-client-ui-sidebar-documentpreview": "workspace:^",
     "@deepseek-ai/dsh-client-ui-skill": "workspace:^",
     "@deepseek-ai/dsh-client-ui-subagent": "workspace:^",
+    "@deepseek-ai/dsh-client-long-text-fold": "workspace:^",
     "@deepseek-ai/dsh-client-global-paste": "workspace:^",
     "@deepseek-ai/dsh-client-composer-guards": "workspace:^",
     "@deepseek-ai/dsh-client-text-file-cards": "workspace:^",

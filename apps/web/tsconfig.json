@@ -119,7 +119,8 @@
     "tests/text-file-cards.e2e.ts",
     "tests/draft-keeper.e2e.ts",
     "tests/find-in-chat.e2e.ts",
-    "tests/draft-budget.e2e.ts"
+    "tests/draft-budget.e2e.ts",
+    "tests/long-text-fold.e2e.ts"
   ],
   "references": [
     {
