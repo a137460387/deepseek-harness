@@ -1,5 +1,5 @@
 ---
-description: "Stages pasted long text as a composer card, restores the full text at submit, and folds the sent message into an expandable chat card."
+description: "Stages pasted long text as a composer card, restores the full text at submit, and folds the sent message in place behind an expandable clamp."
 kind: "package-reference"
 ---
 # @deepseek-ai/dsh-client-long-text-fold
@@ -8,7 +8,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Long-text paste staging cards for the Web UI: pasting a plain-text clip past the character or line threshold stages it in localStorage under the current session and drops a short `[LongText#N]` marker into the draft instead of thousands of characters; a focused composer receives the marker at the caret through a marker-only re-dispatched paste. Submitting restores every staged marker to its full text synchronously before the composer's own send path reads the draft, and the chat side folds sent long texts into expandable cards. The model receives the verbatim inline-paste text.
+Long-text paste staging cards for the Web UI: pasting a plain-text clip past the character or line threshold stages it in localStorage under the current session and drops a short `[LongText#N]` marker into the draft instead of thousands of characters; a focused composer receives the marker at the caret through a marker-only re-dispatched paste. Submitting restores every staged marker to its full text synchronously before the composer's own send path reads the draft, and the chat side folds sent long texts in place behind an expandable clamp. The model receives the verbatim inline-paste text.
 
 ## Table of Contents
 
@@ -47,7 +47,7 @@ Insertion reuses the composer's own paste path. With the composer focused, the p
 
 The plugin also mounts document-level capture `keydown`/`click` listeners ahead of the composer's own gestures. An Enter keydown on the composer — or on the primary submit button, identified by its `aria-label` against the upstream `input.send` / `input.send.steer` / `input.send.queue` labels resolved through the public locale service — runs one synchronous expansion pass: every staged marker in the draft is replaced by its full text through the public `setDraft`, whose discrete update commits before the gesture reaches the composer's submit path, so the sent message carries the exact inline-paste shape. A marker whose entry was evicted notifies without blocking (the literal short text sends); Shift+Enter and IME composition never expand; the pass is idempotent, so the keydown+click pair of one gesture expands once.
 
-The chat side replaces the `conversation.chat.node` keyed renderers for the `'user'` and `'steering'` keys. The fold decision is the joined text-block **length** at or above the render threshold — not the marker: a hand-edited or stale marker that reaches a sent message is too short to fold and renders literally, so the renderer needs neither marker trust nor storage access, and long texts from typing or other clients fold identically. A folded text block renders as a card with the first-line preview, the character/line meta, and a lazy expand that projects the message's own full text through the same `projectUserText` primitive the shipped bubble uses; short texts mirror the shipped bubble shape (attachments row, reference summary, a copy+clock actions row) through this package's own CSS module. The input dock lists the session's staged entries with a read-only preview popup (`shell.overlay`).
+The chat side replaces the `conversation.chat.node` keyed renderers for the `'user'` and `'steering'` keys. The fold decision is the joined text-block **length** at or above the render threshold — not the marker: a hand-edited or stale marker that reaches a sent message is too short to fold and renders literally, so the renderer needs neither marker trust nor storage access, and long texts from typing or other clients fold identically. A folded text block renders its real content in place: the bubble clamps under a CSS max-height behind a bottom fade mask with a floating expand button, and expanding drops the clamp and mask and offers a collapse button below the bubble; the body projects the message's own full text through the same `projectUserText` primitive the shipped bubble uses, and short texts mirror the shipped bubble shape (attachments row, reference summary, a copy+clock actions row) through this package's own CSS module. The input dock lists the session's staged entries with a read-only preview popup (`shell.overlay`).
 
 -----
 

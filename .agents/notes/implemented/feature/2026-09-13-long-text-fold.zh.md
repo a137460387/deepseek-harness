@@ -16,7 +16,7 @@ Status: implemented
 
 - **粘贴接管、标记暂存**:document 捕获阶段 `paste` 监听把越过阈值(2,000 字符或 50 行)的纯文本剪辑按会话存入 localStorage,草稿里放进纯 ASCII 的 `[LongText#N]` 标记——composer 聚焦时经仅含标记的合成 `ClipboardEvent` 重派发到 composer,让上游粘贴路径在光标处插入(global-paste 的转发手法,`packages/extensions/global-paste/src/client/index.ts:86`);无焦点时经公开 `setDraft` 追加到草稿末尾。组合中本行挂 global-paste 之前,非聚焦接管才能先看到事件;聚焦场景与顺序无关,因为 global-paste 让回聚焦态。文件与混合剪辑整体放行。
 - **提交拦截、同步还原**:composer 手势上游的捕获 keydown/click 监听——composer 上的 Enter,或以 `aria-label` 对照经公开 locale 服务读取的上游 `input.send` / `input.send.steer` / `input.send.queue` 识别的主发送按钮——经公开 `setDraft`(discrete,刷新后的投影正是 `facade.ts:397` 读到的那份)展开每条暂存标记,然后放行原生提交。提交面只有一处草稿读取、没有第二次读取(`packages/client/ui-conversation/src/client/input/machine.ts:145-160`),`inputActions.submit()` 无生产调用方,两个手势即完整的旁路面。
-- **聊天折叠按长度判定,不按标记**:替换 `conversation.chat.node` 的 `'user'`/`'steering'` keyed 渲染器(目录文档化的 occupant 替换机制),达到渲染阈值的文本块折叠为可展开卡片,展开体经公开 `projectUserText` 原语投影消息自身文本。伪造或失效的标记发出短字面文本、短到无法折叠,渲染器因此永不信任标记、永不触碰存储;打字或他端而来的长文本同样折叠。
+- **聊天折叠按长度判定,不按标记**:替换 `conversation.chat.node` 的 `'user'`/`'steering'` keyed 渲染器(目录文档化的 occupant 替换机制),达到渲染阈值的文本块原位折叠——真实气泡经 CSS max-height 限高、底部渐隐遮罩上浮着展开按钮,展开体经公开 `projectUserText` 原语投影消息自身文本。伪造或失效的标记发出短字面文本、短到无法折叠,渲染器因此永不信任标记、永不触碰存储;打字或他端而来的长文本同样折叠。
 - **两处失败点都开放失败**:无法暂存的粘贴(超限、配额、无存储)继续流向原生粘贴并给出错误提示;条目被逐出的标记只通知、不阻塞,字面短文本照常发送。暂存仓以 LRU 限容(50 条 / 200 万字符),带死会话修剪与 localStorage 的重载持久化。
 - **常量而非 Config**:阈值与预算是带依据说明的包常量——text-file-cards 先例(`MAX_FILE_BYTES`);Config 表面会引入浏览器 fork 包从未携带的 config-catalog 面。
 
@@ -34,7 +34,7 @@ Status: implemented
 
 ## Consequences
 
-- 长文本粘贴者得到紧凑的 composer、带预览的暂存条目 dock,以及长消息折叠为可展开卡片的聊天历史——模型可见形状与内联粘贴逐字节一致(`user/message` 内一个逐字文本块)。
+- 长文本粘贴者得到紧凑的 composer、带预览的暂存条目 dock,以及长消息原位折叠为限高可展开区域的聊天历史——模型可见形状与内联粘贴逐字节一致(`user/message` 内一个逐字文本块)。
 - long-text-fold 是 fork 第十个扩展包:第七个纯浏览器成员、第五个 `conversation.input.dock` 消费者、首个 `conversation.chat.node` keyed 替换(`replaceRisk: 'shadows-shipped-ui'` 席位——上游用户气泡改动须在每次同步时与 `fold-view.tsx` 对照,已列为 FORK_NOTES 核查项),以及把 composer-guards 带到第五个消费者的包。
 - 契约 spec 把上游漂移(Lexical 更新语义、keymap 路由、locale 键、镜像文案、slot catalog)变成同步时的可见测试失败。
-- 提交回显在准入前的短暂窗口按上游构造显示全文,折叠卡随持久化节点出现。若上游原生落地长文本卡片化,本插件退役而非竞争(第 7 步既行规则)。
+- 提交回显在准入前的短暂窗口按上游构造显示全文,折叠区随持久化节点出现。若上游原生落地长文本卡片化,本插件退役而非竞争(第 7 步既行规则)。
