@@ -90,7 +90,7 @@
 
 ## Fork 工作流程（2026-08-23 沉淀）
 
-三轮完整交付——draft-keeper（[#3999](https://github.com/deepseek-ai/deepseek-harness/discussions/3999)）、find-in-chat（[#4029](https://github.com/deepseek-ai/deepseek-harness/discussions/4029)）、draft-budget（[#4138](https://github.com/deepseek-ai/deepseek-harness/discussions/4138)）——沉淀的七步工作流程；新帖发布后把 URL 追加进本行。特性 Note 均在 `.agents/notes/implemented/feature/` 下，正文以 `文件名:行号` 引用；提交形状以 hash 引用；仓库无记录的会话级细节标注（交付记录），出处为历次交付汇总与交接提示词。
+三轮完整交付——draft-keeper（[#3999](https://github.com/deepseek-ai/deepseek-harness/discussions/3999)）、find-in-chat（[#4029](https://github.com/deepseek-ai/deepseek-harness/discussions/4029)）、draft-budget（[#4138](https://github.com/deepseek-ai/deepseek-harness/discussions/4138)）——沉淀的七步工作流程；第四轮 long-text-fold（[Show Your Plugins! 占位]）已交付待发布，新帖发布后把 URL 追加进本行。特性 Note 均在 `.agents/notes/implemented/feature/` 下，正文以 `文件名:行号` 引用；提交形状以 hash 引用；仓库无记录的会话级细节标注（交付记录），出处为历次交付汇总与交接提示词。
 
 ### 七步流程定义
 
@@ -174,6 +174,8 @@
 - **健壮性收口三缺口**（commits `622cb35dc3` fix + `85d8de79b5` test）：2026-08-25 只读健壮性盘点的三个值得修缺口一并收口——① draft-keeper 配额闩锁后的删除丢弃（可致重载复活已清除文本、违反核心契约）：闩锁分支补 best-effort 清除（缩小重写或整键删除，配额失败下通常仍可用），读失败闩锁不触碰不可读记录；② usage-stats CSV 导出裸链路：整体 try/catch，失败经区块既有错误行惯用法呈现（`export.error` 语言键 + `role="alert"`）；③ find-in-chat 逐键全量重扫：查询研究 200ms 防抖（输入即时显示、扫描跟随末次击键），导航（step/Enter）前按需冲洗保证步进作用于当前查询，close/dispose 清理定时器。七处既有即时读取钉死改为防抖外围 `vi.waitFor`，钉死内容不变；新增钉死 8 例（含端到端「先存储→配额失败→清除→重载不复活」），三套件 155/155。决策记录见 [健壮性收口 Agent Note](.agents/notes/implemented/bug-fix/2026-08-25-fork-robustness-hardening.md)。
 
 - **守卫矩阵钉死收口**（commit `576e5307e2` test）：2026-08-25 测试覆盖盘点的推荐补缺一轮收口，纯测试零源码改动——global-paste 补 4 例守卫钉死（无剪贴板数据按浏览器 `null` 形状构造、无 composer 挂载、takeover 遮挡期粘贴静默让原生、contenteditable 焦点让路；bench 增 `occluded`/`noComposer` 两选项，`isContentEditable` 以 jsdom 平台事实桩补齐），守卫链分支全闭合；composer-guards 补齐视口四对称中缺失的上方（cy<0）与右方（cx>innerWidth）2 例，与既有左/下用例同构。两包钉死数 19→23、25→27，套件 50/50。决策记录见 [守卫钉死收口 Agent Note](.agents/notes/implemented/testing/2026-08-25-guard-branch-pin-closure.md)。
+
+- **long-text-fold 落地**（commits `7556bc9916` scaffold + `cfa565ff86` feat + `637f60d392` test + `8b069db097` docs + `89c0c7a2ac` fix，tag `fork-dsh-v0.1.5-rc.2+2`）：纯浏览器扩展包，解决 composer 粘贴超长文本卡顿与聊天视图全文撑爆问题。走路线 B-1（展示卡片，模型语义不变），经 document capture 拦截、localStorage 暂存、`setDraft` 同步展开、`'user'`/`'steering'` keyed slot 替换渲染。73 个测试用例全绿，3 处有意镜像加 jscpd 内联豁免（镜像面由收尾清单其六对照）。验收期以 fix 笔修正两处登记/类型债（根客户端程序登记 + 测试 SessionId 品牌化）；hygiene 的 invariants 舰队级漂移（19 条，涉全部十个 fork 扩展包）为独立议题待舰队级决议。双源查重社区面非空（#1031、dsh-paste-collapse 等）经维护者特批立项。决策记录见 [long-text-fold Agent Note](.agents/notes/implemented/feature/2026-09-13-long-text-fold.md)。
 
 ## 上游 FR 与 endorsement 登记（fork 发起的上游互动，2026-08-23 立册）
 
