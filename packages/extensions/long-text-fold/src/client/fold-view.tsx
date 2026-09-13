@@ -24,6 +24,10 @@ import type { MessageImageSource } from '@deepseek-ai/dsh-client-ui-conversation
 import { RENDER_FOLD_CHARS, countLines, firstLine } from './markers.ts'
 import css from './FoldView.module.css'
 
+/* jscpd:ignore-start -- intentional mirror of MessageItem.tsx's attachment
+   type derivation: the shipped component and its CSS module are
+   package-internal, so the fold view re-declares the shape it renders
+   (contract-pinned by tests/browser-plugin.client.spec.tsx). */
 type UserImage = Extract<UserMessageNode['content'][number], { type: 'image' }>
 type UserFile = Extract<UserMessageNode['content'][number], { type: 'file' }>
 
@@ -36,6 +40,7 @@ interface ContentParts {
   readonly attachments: readonly PresentedAttachment[]
   readonly rest: readonly unknown[]
 }
+/* jscpd:ignore-end */
 
 function contentParts(content: readonly unknown[]): ContentParts {
   const texts: string[] = []
@@ -131,11 +136,15 @@ function LongTextFoldActions({ text, time, t }: {
   return (
     <div className={css.actions}>
       {time !== undefined && <span className={css.time}>{formatClock(time, t)}</span>}
+      {/* jscpd:ignore-start -- intentional mirror of the shipped copy chrome
+          (MessageIconActions is package-internal); drift is caught by the
+          upstream locale contract spec. */}
       <Tooltip label={copied ? t('copied') : t('copy')} side="bottom">
         <button type="button" className={css.action} aria-label={copied ? t('copied') : t('copy')} onClick={onCopy}>
           {copied ? <IconCheckOutline16 /> : <IconCopyOutline16 />}
         </button>
       </Tooltip>
+      {/* jscpd:ignore-end */}
     </div>
   )
 }
@@ -176,6 +185,9 @@ export function LongTextFoldNodeView({ node, renderMessageImages, openFile, open
       <div className={css.userStack}>
         {parts.attachments.length > 0 && (
           <div className={css.attachmentRow} data-message-attachments>
+            {/* jscpd:ignore-start -- intentional mirror of the shipped
+                attachment row (MessageItem.tsx is package-internal); the sync
+                checklist diffs this block against upstream changes. */}
             {parts.attachments.map((attachment, index) => attachment.type === 'image'
               ? (
                 <Fragment key={`image:${index}`}>
@@ -198,6 +210,7 @@ export function LongTextFoldNodeView({ node, renderMessageImages, openFile, open
                   </span>
                 </span>
               ))}
+            {/* jscpd:ignore-end */}
           </div>
         )}
         {(parts.text !== '' || parts.rest.length > 0) && (fold

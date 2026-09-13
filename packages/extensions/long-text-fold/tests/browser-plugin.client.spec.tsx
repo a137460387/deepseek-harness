@@ -32,7 +32,7 @@ import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/c
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { en as conversationEn, zh as conversationZh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
 import { apply, inject } from '../src/client/index.ts'
-import { LongTextFoldDock, PreviewPopup, type LongTextFoldDockInjected, type PreviewPopupProps } from '../src/client/dock.tsx'
+import { LongTextFoldDock, PreviewPopup, type LongTextFoldDockInjected, type LongTextFoldDockProps, type PreviewPopupProps, type PreviewRequest } from '../src/client/dock.tsx'
 import { LongTextFoldNodeView, type LongTextFoldNodeProps } from '../src/client/fold-view.tsx'
 import type { StagedState } from '../src/client/staged-store.ts'
 import { MAX_STAGED_BYTES, markerOf } from '../src/client/markers.ts'
@@ -507,9 +507,9 @@ describe('LongTextFoldDock component', () => {
       sessionId: SESSION,
       preview: over.preview ?? vi.fn(),
       remove: over.remove ?? vi.fn(),
-      useStaged: selector => selector(store.getSnapshot()),
+      useStaged: (selector: (state: StagedState) => unknown) => selector(store.getSnapshot()),
       t: T,
-    } as LongTextFoldDockProps
+    } as unknown as LongTextFoldDockProps
   }
 
   it('renders nothing when the session has no staged entries', () => {
@@ -550,11 +550,11 @@ describe('PreviewPopup component', () => {
   }): PreviewPopupProps {
     const store = createSnapshotStore<PreviewRequest | null>(over.request)
     return {
-      useRequest: selector => selector(store.getSnapshot()),
+      useRequest: (selector: (state: PreviewRequest | null) => unknown) => selector(store.getSnapshot()),
       text: over.text ?? (() => 'the full staged text'),
       close: over.close ?? vi.fn(),
       t: T,
-    } as PreviewPopupProps
+    } as unknown as PreviewPopupProps
   }
 
   it('renders nothing without a request', () => {
@@ -587,7 +587,7 @@ describe('LongTextFoldNodeView component', () => {
       openFile,
       openSkill,
       t: T,
-    } as LongTextFoldNodeProps
+    } as unknown as LongTextFoldNodeProps
   }
 
   it('folds a long text into the probe-marked card and expands on click', () => {

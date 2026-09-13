@@ -9,11 +9,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { MAX_ENTRIES, MAX_STAGED_BYTES, countLines } from '../src/client/markers.ts'
 import { StagedStoreError, createStagedStore } from '../src/client/staged-store.ts'
 
-const S1 = 's1'
-const S2 = 's2'
+const S1 = 's1' as SessionId
+const S2 = 's2' as SessionId
 
 /** Map-backed Storage stand-in with an injectable write-failure mode. */
 class FakeStorage {
