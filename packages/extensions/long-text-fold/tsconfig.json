@@ -24,6 +24,12 @@
       "path": "../../client/ui-renderer"
     },
     {
+      "path": "../../client/ui-layout"
+    },
+    {
+      "path": "../../client/ui-chat"
+    },
+    {
       "path": "../../core/session"
     },
     {
