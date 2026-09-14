@@ -24,7 +24,7 @@
  */
 import { Context } from '@deepseek-ai/cordis'
 import InvariantRegistry from '@deepseek-ai/dsh-invariants'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { cleanup, fireEvent, render, within } from '@testing-library/react'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
@@ -156,7 +156,7 @@ function installStorage(instance: FakeStorage): void {
  * seat; the exact copy depends on the runtime locale, so the level is pinned
  * exactly and the body against this package's two dictionaries.
  */
-function expectErrorNotice(input: { notify: ReturnType<typeof vi.fn> }, key: 'error.storage' | 'error.missing'): void {
+function expectErrorNotice(input: Pick<FakeInput, 'notify'>, key: 'error.storage' | 'error.missing'): void {
   expect(input.notify).toHaveBeenCalledOnce()
   expect(input.notify.mock.calls[0]?.[0]).toBe('error')
   expect([zh[key], en[key]]).toContain(String(input.notify.mock.calls[0]?.[1]))
@@ -168,8 +168,8 @@ interface InputSnapshot {
 }
 
 interface FakeInput {
-  setDraft: ReturnType<typeof vi.fn>
-  notify: ReturnType<typeof vi.fn>
+  setDraft: Mock<(text: string) => void>
+  notify: Mock<(level: 'info' | 'error', text: string) => void>
   state: ReturnType<typeof createSnapshotStore<InputSnapshot>>
 }
 
@@ -216,7 +216,7 @@ async function bench(over: BenchOptions = {}): Promise<Bench> {
   // submit plane reads, so idempotency across a gesture is observable.
   const input: FakeInput = {
     setDraft: vi.fn((text: string) => { state.update((snapshot) => { snapshot.draft = text }) }),
-    notify: vi.fn(),
+    notify: vi.fn((_level: 'info' | 'error', _text: string) => {}),
     state,
   }
   const list = createSnapshotStore<SessionListState>(listState(over.noSession === true ? undefined : SESSION))
