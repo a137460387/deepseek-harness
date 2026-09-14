@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-13-long-text-fold.md
-2026-09-13-long-text-fold.md: fe240f98cecb347c2997ee617325d3e52f4c3c16
-2026-09-13-long-text-fold.zh.md: 2f5c905c388db183229ab41c2d8078aa50abe98f
+2026-09-13-long-text-fold.md: 51888dfcdc0f7a56c4bc7d1b26fc3d0c2d88b720
+2026-09-13-long-text-fold.zh.md: 61a8c439b1b22ee0812e4fc49591263f58668999

@@ -27,7 +27,7 @@ Long-text paste staging cards for the Web UI: pasting a plain-text clip past the
 
 ## Staging model
 
-A staged text is persisted WHOLE in localStorage under `dsh-long-text-fold:v1:s:<sessionId>:<seq>`, mirrored into a registrant-owned snapshot store that rides the dock registration's `hooks` compartment. Recency is bumped at staging and again at submit-time expansion; additions prune entries of sessions that no longer exist. Any storage refusal (oversized, quota, unavailable) propagates as a typed error and the takeover fails OPEN: the event flows on to the native paste — or global-paste — so the full text still lands in the draft, plus a visible error notice; nothing is staged, nothing is lost, nothing blocks. A page reload keeps staged texts (localStorage), and a reload-evicted marker degrades to the literal short text, which the chat side renders as-is because the fold decision is length-based.
+A staged text is persisted WHOLE in localStorage under `dsh-long-text-fold:v1:s:<sessionId>:<seq>`, mirrored into a registrant-owned snapshot store that rides the dock registration's `hooks` compartment. Recency is bumped at staging and again at submit-time expansion; additions prune entries of sessions that no longer exist. Staged entries also retire with the send: submit-time expansion arms the sequence numbers it consumed, and once the expanded draft clears — the input machine's commit-draft, read through the public `input.state` store — the armed entries are removed, so the dock card leaves with the message. The input paths that keep the draft (adjudication fallthrough, a failed command settlement, a release during the flight) never see the clear and keep their entries; a draft that moved onto other content without clearing disarms the arm instead. Entries no draft references fall to the LRU. Any storage refusal (oversized, quota, unavailable) propagates as a typed error and the takeover fails OPEN: the event flows on to the native paste — or global-paste — so the full text still lands in the draft, plus a visible error notice; nothing is staged, nothing is lost, nothing blocks. A page reload keeps staged texts (localStorage), and a reload-evicted marker degrades to the literal short text, which the chat side renders as-is because the fold decision is length-based.
 
 -----
 
@@ -73,6 +73,7 @@ None; the package never assembles or sends provider requests.
 - **Mixed clips pass through** — a clipboard carrying files together with long text is not taken over; the files keep the first-party intake and the text inlines natively.
 - **Fixed ceilings** — the client-plugin loading chain carries no per-row `config`, so the thresholds and store budgets are package constants, not deployment configuration.
 - **Staged-entry loss degrades to verbatim markers** — LRU eviction, a cleared origin store, or a different browser leaves the marker unrestorable; the submit notifies and sends the literal marker rather than blocking the draft.
+- **Cleanup follows any draft clear** — the submit cleanup fires when the expanded draft clears, whatever cleared it: a draft that retained the submitted text through a failed command path and was then cleared by hand retires its staged entries too. Entries whose draft never clears (a swallowed submit gesture, a diverging edit) stay staged until the LRU retires them.
 
 -----
 

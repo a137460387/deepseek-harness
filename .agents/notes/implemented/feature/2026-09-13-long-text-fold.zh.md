@@ -18,11 +18,12 @@ Status: implemented
 - **提交拦截、同步还原**:composer 手势上游的捕获 keydown/click 监听——composer 上的 Enter,或以 `aria-label` 对照经公开 locale 服务读取的上游 `input.send` / `input.send.steer` / `input.send.queue` 识别的主发送按钮——经公开 `setDraft`(discrete,刷新后的投影正是 `facade.ts:397` 读到的那份)展开每条暂存标记,然后放行原生提交。提交面只有一处草稿读取、没有第二次读取(`packages/client/ui-conversation/src/client/input/machine.ts:145-160`),`inputActions.submit()` 无生产调用方,两个手势即完整的旁路面。
 - **聊天折叠按长度判定,不按标记**:替换 `conversation.chat.node` 的 `'user'`/`'steering'` keyed 渲染器(目录文档化的 occupant 替换机制),达到渲染阈值的文本块原位折叠——真实气泡经 CSS max-height 限高、底部渐隐遮罩上浮着展开按钮,展开体经公开 `projectUserText` 原语投影消息自身文本。伪造或失效的标记发出短字面文本、短到无法折叠,渲染器因此永不信任标记、永不触碰存储;打字或他端而来的长文本同样折叠。
 - **两处失败点都开放失败**:无法暂存的粘贴(超限、配额、无存储)继续流向原生粘贴并给出错误提示;条目被逐出的标记只通知、不阻塞,字面短文本照常发送。暂存仓以 LRU 限容(50 条 / 200 万字符),带死会话修剪与 localStorage 的重载持久化。
+- **提交期清理**(2026-09-14 增补,即用户上报的残留卡修复):展开会登记它消费的序号与展开后的草稿,`ctx.effect` 监听 sessions.list 与当前会话的公开 `input.state` 仓,展开后的草稿一旦清空即移除被登记条目——这正是输入机 `commit-draft` 的可观察投影,恰好在消费路径上触发(Enter 手势内的 detached 提交 `machine.ts:141`;命令结算成功 `machine.ts:200`),永不保留草稿的路径上触发(裁定落空、命令结算失败、release)。清空信号胜过两个备选:持久 `user/message` 无公开面(`SessionSnapshot` 契约排除会话内容,聊天数据在视图层 Chat store),冻结面 `SessionInput.submit` 返回 void。保留草稿的路径与改写为其它内容的草稿只解除登记、不删条目;不再被任何草稿引用的条目由 LRU 兜底回收。
 - **常量而非 Config**:阈值与预算是带依据说明的包常量——text-file-cards 先例(`MAX_FILE_BYTES`);Config 表面会引入浏览器 fork 包从未携带的 config-catalog 面。
 
 ## Testing
 
-`tests/markers.client.spec.ts` 钉文法(往返、不与命令裁定的 `/` 前缀相撞、与门面占位符消毒正则 facade.ts:112 不相交、无 `lastIndex` 漂移)与展开语义。`tests/staged-store.client.spec.ts` 以 fake localStorage 驱动往返、会话隔离、重载持久化、序号续接、移除、三种拒绝原因、按条目上限与按种子超预算源头的 LRU 逐出、提交期新旧度、死会话修剪。`tests/browser-plugin.client.spec.tsx` 在真实 Context/SlotRegistry/LocaleRuntime(挂真实上游 `conversation` 词典)加 fake 会话/对话面上启动浏览器半:承重时序(聚焦粘贴向 composer 转发仅含标记的事件且原事件未达、非聚焦追加、Enter 经镜像真实状态提交的 fake 门面收到全文)、完整守卫矩阵、两条 fail-open 路径、缺条目通知不阻塞、损坏标记惰性、Shift/组合排除、keydown+click 幂等、teardown,以及经探针属性的 dock/预览/折叠组件。`tests/contract.client.spec.tsx` 对真实上游代码钉防漂移契约:Lexical discrete 更新同步性与非 discrete 反差、上游 keymap 的 paste→`pasteText` / 文件→`intakeFiles` / Enter→`submit` 路由、主按钮五个 locale 键、六条镜像文案与上游 `chat` 词典逐字节相等、生成物 slot catalog 携带全部三处注册。`apps/web/tests/long-text-fold.e2e.ts` 落地浏览器泳道(种子两轮会话上按探针属性的折叠/展开断言),在已登记的 web-e2e scaffold 议题下运行;视觉证据按既有交接由演示 GIF 承接。
+`tests/markers.client.spec.ts` 钉文法(往返、不与命令裁定的 `/` 前缀相撞、与门面占位符消毒正则 facade.ts:112 不相交、无 `lastIndex` 漂移)与展开语义。`tests/staged-store.client.spec.ts` 以 fake localStorage 驱动往返、会话隔离、重载持久化、序号续接、移除、三种拒绝原因、按条目上限与按种子超预算源头的 LRU 逐出、提交期新旧度、死会话修剪。`tests/browser-plugin.client.spec.tsx` 在真实 Context/SlotRegistry/LocaleRuntime(挂真实上游 `conversation` 词典)加 fake 会话/对话面上启动浏览器半:承重时序(聚焦粘贴向 composer 转发仅含标记的事件且原事件未达、非聚焦追加、Enter 经镜像真实状态提交的 fake 门面收到全文)、完整守卫矩阵、两条 fail-open 路径、缺条目通知不阻塞、损坏标记惰性、Shift/组合排除、keydown+click 幂等、teardown,以及经探针属性的 dock/预览/折叠组件;六条提交清理用例钉死监听(草稿清空时被登记条目离开暂存仓与其 localStorage 行;保留草稿的机器路径与偏航编辑保留条目;保留后清空的草稿耗掉登记;携带一条暂存标记与一条缺条目标记的草稿只移除被携带的条目;全缺失草稿不登记;监听随 fiber teardown 停止)。`tests/contract.client.spec.tsx` 对真实上游代码钉防漂移契约:Lexical discrete 更新同步性与非 discrete 反差、上游 keymap 的 paste→`pasteText` / 文件→`intakeFiles` / Enter→`submit` 路由、主按钮五个 locale 键、六条镜像文案与上游 `chat` 词典逐字节相等、生成物 slot catalog 携带全部三处注册。`apps/web/tests/long-text-fold.e2e.ts` 落地浏览器泳道(种子两轮会话上按探针属性的折叠/展开断言),在已登记的 web-e2e scaffold 议题下运行;视觉证据按既有交接由演示 GIF 承接。
 
 ## Alternatives considered
 
@@ -34,7 +35,7 @@ Status: implemented
 
 ## Consequences
 
-- 长文本粘贴者得到紧凑的 composer、带预览的暂存条目 dock,以及长消息原位折叠为限高可展开区域的聊天历史——模型可见形状与内联粘贴逐字节一致(`user/message` 内一个逐字文本块)。
+- 长文本粘贴者得到紧凑的 composer、带预览的暂存条目 dock,以及长消息原位折叠为限高可展开区域的聊天历史——模型可见形状与内联粘贴逐字节一致(`user/message` 内一个逐字文本块)。被消费的提交经清理监听主动退役其 dock 卡片,不再被任何草稿引用的条目由 LRU 兜底。
 - long-text-fold 是 fork 第十个扩展包:第七个纯浏览器成员、第五个 `conversation.input.dock` 消费者、首个 `conversation.chat.node` keyed 替换(`replaceRisk: 'shadows-shipped-ui'` 席位——上游用户气泡改动须在每次同步时与 `fold-view.tsx` 对照,已列为 FORK_NOTES 核查项),以及把 composer-guards 带到第五个消费者的包。
 - 契约 spec 把上游漂移(Lexical 更新语义、keymap 路由、locale 键、镜像文案、slot catalog)变成同步时的可见测试失败。
 - 提交回显在准入前的短暂窗口按上游构造显示全文,折叠区随持久化节点出现。若上游原生落地长文本卡片化,本插件退役而非竞争(第 7 步既行规则)。

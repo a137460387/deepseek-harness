@@ -181,6 +181,8 @@
 
 - **long-text-fold 真实浏览器 boot 修复（keyed 注册同 priority 相撞）**（commit `a36cfe5024` fix）：本轮同步的浏览器肉眼验证首次在真实组合中 boot 该插件，暴露 `conversation.chat.node` keyed 注册与上游 shipped 渲染器同 key 同 priority 0 相撞——loader 占位硬检查拒绝、整个客户端插件图加载失败（"Failed to load plugins"）。双盲区成因：jsdom bench 的 root children 未声明 chat.node 槽（注入的注册空操作、冲突不可见），web e2e 泳道又因 directory-picker scaffold 议题停摆（见上方待办登记），交付验收从未在真实组合 boot 过该插件。修复按 `ui-slots` 契约（同 key 不同 priority 即 shadow、lowest renders）将 user/steering 两笔 keyed 注册改为 priority -1；回归钉死测试在 bench 声明该槽并预置 shipped 占位者、断言我方以更低 priority 阴影（包套件 75/75）；修复后真实浏览器 boot 全绿，四态截图验证通过（composer dock 卡片、折叠遮罩+浮动展开按钮、原位展开+右对齐收起按钮、收起回路）。
 
+- **long-text-fold 提交成功后 dock 暂存卡主动清除**（commits `d7e89903ce` fix + `d524d8989e` test + docs 笔）：修复用户上报的「提交成功后 composer 上方 dock 暂存卡残留」——归因钉死提交链路（`maybeExpand` 同步展开 → `setDraft` discrete 提交 → 原生 submit 同栈读全文）确无任何提交侧 `staged.remove` 调用，dock 卡片随 staged-store 快照渲染故永驻至 LRU。信号裁决：输入机的 `commit-draft`（detached 发送在 Enter 手势内乐观清草稿 `machine.ts:141`、命令结算成功 `machine.ts:200`；裁定落空/结算失败/release 均保留草稿不触发）是「提交已消费草稿」的唯一公开可观察投影，经公开 `input.state` 仓订阅（draft-keeper 同缝先例）；持久 `user/message` 无公开面（`SessionSnapshot` 契约排除会话内容、聊天数据在视图层 Chat store）、冻结面 `submit` 返回 void，均被否。修复为 `maybeExpand` 登记 armed 序号 + `ctx.effect` 订阅 sessions.list 与当前会话 input.state（teardown 随 fiber），草稿清空即移除 armed 条目、dock 随快照刷新；保留草稿的机器路径与偏航编辑不删（条目可重试/预览），不再被引用的条目由 LRU 兜底——README 双语暂存模型与已知限制、Note 双语 Decision/Testing/后果段同步改写。包套件 81/81（原 75 + 清理 6 例）；登记面（cordis.patch.yml、slot-catalog.ts、locale 键、`dsh.client.external`）零变化。
+
 ## 上游 FR 与 endorsement 登记（fork 发起的上游互动，2026-08-23 立册）
 
 登记格式沿用「已知本地补丁」的上报状态条款；区别在于这些是 fork 主动发起的上游请求或对上游线程的应答，不附本地修改。路线图「两个上游 FR」当日双双落地（其一因查重改为 endorsement 形态）。
