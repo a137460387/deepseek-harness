@@ -13,7 +13,10 @@
  * synchronously (Enter on the composer, the upstream-labeled primary button,
  * idempotent across the pair) while missing entries notify without blocking,
  * corrupted markers stay inert, and Shift/composition Enter never submits.
- * The dock renders staged cards and drives preview/remove; the preview popup
+ * The submit-cleanup watch removes the armed entries once the expanded draft
+ * clears, keeps them through draft-retaining machine paths and diverging
+ * edits, removes only the entries the draft carried, and stops with the
+ * fiber. The dock renders staged cards and drives preview/remove; the preview popup
  * closes on an outside press; the chat renderer folds long texts into the
  * probe-marked card and mirrors the shipped bubble for short texts.
  * Registration disposal rides the plugin fiber (HMR safety). The node half
@@ -511,6 +514,84 @@ describe('long-text-fold submit interception', () => {
     const event = dispatchPaste(LONG_TEXT)
     expect(event.defaultPrevented).toBe(false)
     expect(input.setDraft).not.toHaveBeenCalled()
+  })
+})
+
+describe('long-text-fold submit cleanup', () => {
+  it('removes the staged entry when the submitted draft clears', async () => {
+    const { input, composer, stagedState } = await bench({ draft: 'keep' })
+    dispatchPaste(LONG_TEXT)
+    composer!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    expect(stagedState().bySession[SESSION]).toHaveLength(1)
+    // The input machine's commit-draft: the consumed submit's public projection.
+    input.state.update((snapshot) => { snapshot.draft = '' })
+    expect(stagedState().bySession[SESSION]).toBeUndefined()
+    // The full text is gone from storage, not just the dock snapshot.
+    expect(fake.getItem(`dsh-long-text-fold:v1:s:${SESSION}:1`)).toBeNull()
+  })
+
+  it('keeps the entry while the draft retains the submitted text and after a diverging edit', async () => {
+    const { input, composer, stagedState } = await bench({ draft: 'keep' })
+    dispatchPaste(LONG_TEXT)
+    composer!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    // A machine path that retains the draft (command flight, failed command
+    // settlement) churns the phase without ever clearing it.
+    input.state.update((snapshot) => { snapshot.phase = 'submitting' })
+    input.state.update((snapshot) => { snapshot.phase = 'plain' })
+    expect(stagedState().bySession[SESSION]).toHaveLength(1)
+    // A draft that moved to other content without clearing disarms: a later
+    // clear spends nothing, and the entry stays until the LRU retires it.
+    input.state.update((snapshot) => { snapshot.draft = 'rewritten' })
+    input.state.update((snapshot) => { snapshot.draft = '' })
+    expect(stagedState().bySession[SESSION]).toHaveLength(1)
+  })
+
+  it('spends the arm when a retained draft is later cleared', async () => {
+    const { input, composer, stagedState } = await bench({ draft: 'keep' })
+    dispatchPaste(LONG_TEXT)
+    composer!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    // The retention itself never fires the clear...
+    expect(stagedState().bySession[SESSION]).toHaveLength(1)
+    // ...but once the draft clears by any route, the arm is spent: the
+    // expanded text left the composer, so the staged entry has no consumer.
+    input.state.update((snapshot) => { snapshot.draft = '' })
+    expect(stagedState().bySession[SESSION]).toBeUndefined()
+  })
+
+  it('removes only the entries the draft carried (missing marker fails open)', async () => {
+    const { input, composer, stagedState } = await bench({ draft: 'keep' })
+    dispatchPaste(LONG_TEXT)
+    dispatchPaste(LONG_TEXT)
+    expect(stagedState().bySession[SESSION]).toHaveLength(2)
+    // Rewrite the draft to carry only marker #1 plus a missing #42: entry #2
+    // lost its marker and must not ride the cleanup.
+    input.setDraft(`x${MARKER_1} y${markerOf(42)}`)
+    composer!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    expectErrorNotice(input, 'error.missing')
+    input.state.update((snapshot) => { snapshot.draft = '' })
+    const staged = stagedState().bySession[SESSION] ?? []
+    expect(staged).toHaveLength(1)
+    expect(staged[0]!.seq).toBe(2)
+  })
+
+  it('arms nothing when every marker is missing', async () => {
+    const { input, composer, stagedState } = await bench({ draft: `x ${markerOf(42)} y` })
+    composer!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    expectErrorNotice(input, 'error.missing')
+    input.state.update((snapshot) => { snapshot.draft = '' })
+    expect(stagedState().bySession[SESSION]).toBeUndefined()
+  })
+
+  it('stops cleaning up after fiber teardown (HMR safety)', async () => {
+    const { fiber, input, composer, dockInject } = await bench({ draft: 'keep' })
+    dispatchPaste(LONG_TEXT)
+    composer!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    // Capture the store before the dispose: the dock entry itself is gone.
+    const staged = dockInject().hooks.staged
+    await fiber.dispose()
+    activeBench = undefined
+    input.state.update((snapshot) => { snapshot.draft = '' })
+    expect(staged.getSnapshot().bySession[SESSION]).toHaveLength(1)
   })
 })
 
