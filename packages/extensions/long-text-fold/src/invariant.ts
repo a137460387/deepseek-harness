@@ -16,7 +16,8 @@ export const inject = ['invariants']
 
 /**
  * No runtime invariant: this package mounts document-level paste/keydown/click
- * capture listeners and slot registrations (input dock, chat-node keys,
+ * capture listeners, session/input-state store subscriptions (the submit
+ * cleanup watch), and slot registrations (input dock, chat-node keys,
  * overlay preview) through ctx.effect; every disposal rides the plugin fiber
  * (HMR safety), proven by the browser-half spec. Staged long texts live in
  * localStorage entries keyed per session, never a cordis event or cross-plugin

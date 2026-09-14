@@ -104,7 +104,8 @@ export interface StagedStore {
    */
   text(sessionId: SessionId, seq: number): string | undefined
   /**
-   * Drop one staged entry (dock remove).
+   * Drop one staged entry (the dock remove button, and the submit-time
+   * cleanup once the submitted draft cleared).
    * @param sessionId - session that owns the staged text.
    * @param seq - the marker sequence number.
    */
