@@ -141,8 +141,13 @@ export interface DeepSeekAdapterOptions {
   prepareExtensions: (request: DeepSeekLlmApiExtensionRequest) => Promise<PreparedDeepSeekLlmApiExtensions>
 }
 
-/** Default maximum idle interval while an adapter stream read is outstanding. */
-export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000
+/**
+ * Default maximum idle interval while an adapter stream read is outstanding.
+ * Long-context reasoning requests routed through a gateway can stay silent for
+ * minutes before the first token, so this is deliberately generous: it matches
+ * the 600s the gateway itself waits on its upstream.
+ */
+export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 600_000
 /** Default combined request/response context capacity. */
 export const DEFAULT_CONTEXT_WINDOW = 1_000_000
 /** Default per-request output-token cap. */
