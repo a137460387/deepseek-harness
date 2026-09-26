@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/extensions/composer-guards/README.md
-README.md: 9f6915320c36ebcd165b0e485afceeb8b00403cb
-README.zh.md: 2ebef3720b199459fe2fb02643a5859955f9eaad
+/:
+  en: 36752d5bf09b5e33
+  zh: ac672cad00a04b0a
+/deepseek-ai-dsh-client-composer-guards:
+  en: b10ce2333ede91eb
+  zh: b173c4144d3a0842
+/deepseek-ai-dsh-client-composer-guards/summary:
+  en: 1e5cb32a67293373
+  zh: d8feb5b9a9abbbdb
+/deepseek-ai-dsh-client-composer-guards/table-of-contents:
+  en: 8e50c2f3e02fe916
+  zh: 2b1b1caaec0237ca
+/deepseek-ai-dsh-client-composer-guards/details:
+  en: 7ef9e711ba3632bb
+  zh: cf5f109d48500a90
+/deepseek-ai-dsh-client-composer-guards/model-experience:
+  en: 908696465ba70f79
+  zh: 6ced7bfd0bb2bc3e
+/deepseek-ai-dsh-client-composer-guards/model-experience/kv-cache-effect:
+  en: 47f982e326fe77fd
+  zh: a6ae94e79754a5b5
+/deepseek-ai-dsh-client-composer-guards/known-limitations-and-deferred-work:
+  en: 7830bcf206d7579e
+  zh: d5e00e9a5950c72b
+/deepseek-ai-dsh-client-composer-guards/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: e88aeb617ffb74ea

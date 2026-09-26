@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-03-directory-picker-service-session0.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-03-directory-picker-service-session0.md
-2026-09-03-directory-picker-service-session0.md: e51fb037de8746037a5c38546901dcdad1e13104
-2026-09-03-directory-picker-service-session0.zh.md: 717539c565ae009eb0f68301c82f4f544dd2b4f8
+/agent-note-web-composition-pins-the-browse-directory-picker-pair-session-0-service:
+  en: 158a6c86e5549db3
+  zh: 158a6c86e5549db3
+/agent-note-web-composition-pins-the-browse-directory-picker-pair-session-0-service/problem:
+  en: d223ebff09bbdc7b
+  zh: 3ab7c9c4e82b038f
+/agent-note-web-composition-pins-the-browse-directory-picker-pair-session-0-service/decision:
+  en: b28d218053ffa06e
+  zh: 4f737694ce763487
+/agent-note-web-composition-pins-the-browse-directory-picker-pair-session-0-service/verification:
+  en: 2e2d415a5ae9465a
+  zh: a7c0e1147907b37b
+/agent-note-web-composition-pins-the-browse-directory-picker-pair-session-0-service/alternatives-considered:
+  en: f706c254991c39f2
+  zh: 9c8329f6ddf273a8
+/agent-note-web-composition-pins-the-browse-directory-picker-pair-session-0-service/consequences:
+  en: 0d6cf7dc59bd8115
+  zh: fc10ac9a17d67f3c

@@ -17,6 +17,8 @@
  * @module @deepseek-ai/dsh-client-find-in-chat/client/find-controller
  */
 
+import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
+import { mainViewSessionIdOf } from '@deepseek-ai/dsh-client-composer-guards/client'
 import { countSearchedRows, findChatMatches, hasEarlierPages, type ChatTextMatch } from './find-engine.ts'
 
 /** Highlight registry names (CSS Custom Highlight API). */
@@ -35,12 +37,12 @@ const HIGHLIGHT_CSS = [
   `::highlight(${HIGHLIGHT_ACTIVE}) { background-color: rgba(250, 204, 21, 0.65); }`,
 ].join('\n')
 
-/** The session-list share the controller needs: the current session id. */
+/** The session-list share the controller needs: the displayed session's id. */
 export interface FindSessionsSource {
   /** Subscribe to list changes; returns the disposer. */
   subscribe(listener: () => void): () => void
-  /** Latest list snapshot; only `current` is read. */
-  getSnapshot(): { readonly current: unknown }
+  /** Latest list snapshot; only the `mainView` retain counts are read. */
+  getSnapshot(): SessionListState
 }
 
 /** Dependencies for {@link createFindController}. */
@@ -299,9 +301,9 @@ export function createFindController(deps: FindControllerDeps): FindController {
     }, RESCAN_DEBOUNCE_MS)
   }
 
-  let lastCurrent = deps.sessions.getSnapshot().current
+  let lastCurrent = mainViewSessionIdOf(deps.sessions.getSnapshot())
   const offSessions = deps.sessions.subscribe(() => {
-    const next = deps.sessions.getSnapshot().current
+    const next = mainViewSessionIdOf(deps.sessions.getSnapshot())
     if (next !== lastCurrent) {
       lastCurrent = next
       if (state.open) close()

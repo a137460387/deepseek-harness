@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-25-usage-stats-data-surface.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-25-usage-stats-data-surface.md
-2026-08-25-usage-stats-data-surface.md: 481284c5ac00589156302cbe2017a07563c61b61
-2026-08-25-usage-stats-data-surface.zh.md: b22b2aee995c3d5c9fdaa4b65ff06075136b5eb6
+/agent-note-usage-statistics-data-surface-monthly-breakdown-and-csv-export:
+  en: a8936a5928ba5692
+  zh: 8bb3f968face0a87
+/agent-note-usage-statistics-data-surface-monthly-breakdown-and-csv-export/problem:
+  en: db4b58b72596eb4f
+  zh: fed2b833062de49c
+/agent-note-usage-statistics-data-surface-monthly-breakdown-and-csv-export/decision:
+  en: 33f2d22ed7f12df8
+  zh: f1ca1cc8daf67159
+/agent-note-usage-statistics-data-surface-monthly-breakdown-and-csv-export/testing:
+  en: fcbdec5cc4c00946
+  zh: 21a991445289629c
+/agent-note-usage-statistics-data-surface-monthly-breakdown-and-csv-export/alternatives-considered:
+  en: 0538d3a3b4d45e97
+  zh: 4144de7bc8d21ee3
+/agent-note-usage-statistics-data-surface-monthly-breakdown-and-csv-export/consequences:
+  en: 024cab7a3f1e96b3
+  zh: f9f236e5524c3c9a

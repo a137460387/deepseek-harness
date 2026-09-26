@@ -79,12 +79,14 @@ function bench(over: BenchOptions = {}) {
   const input = { state: createSnapshotStore<InputSnapshot>({ draft: 'draft', phase: over.phase ?? 'plain' }) }
   const list = createSnapshotStore<SessionListState>({
     ids: over.ids ?? (over.noSession === true ? [] : [SESSION]),
-    byId: {},
-    current: over.noSession === true ? undefined : SESSION,
+    byId: over.noSession === true ? {} : {
+      [SESSION]: {
+        id: SESSION,
+        retainedBy: { mainView: 1 },
+      } as unknown as SessionListState['byId'][SessionId],
+    },
     phase: 'ready',
-    subagentsByParent: {},
-    jobsBySession: {},
-    currentAddress: undefined,
+    projectionsBySession: {},
   })
   const sessionSnapshot: SessionLockSnapshot = {
     removed: over.removed === true,

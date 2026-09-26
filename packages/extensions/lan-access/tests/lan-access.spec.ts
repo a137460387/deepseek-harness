@@ -430,18 +430,22 @@ describe('disabled-mode equivalence', () => {
 })
 
 describe('fail-loud boot', () => {
-  it('rejects the whole tree when DSH_LAN_ENABLED is set without DSH_LAN_TOKEN', { timeout: 60_000 }, async () => {
+  it('refuses the LAN bind when DSH_LAN_ENABLED is set without DSH_LAN_TOKEN', { timeout: 60_000 }, async () => {
     setLanEnv('true', undefined)
-    // The Loader wraps the init rejection; assertEntriesActivated surfaces it.
-    await expect(loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts'))
-      .rejects.toThrow(/DSH_LAN_TOKEN/)
-    // The failed boot already disposed the tree; prevent afterEach from double-disposing.
-    context = undefined
-    if (root !== undefined) {
-      const stale = root
-      root = undefined
-      await rm(stale, { recursive: true, force: true })
-    }
+    // Upstream's loader now contains entry-start failures (the cordis fiber
+    // settles FAILED, the tree survives) instead of rejecting the whole boot.
+    // The fail-loud guard's security half — never bind all interfaces without
+    // a token — still holds: the refusal surfaces through the entry fiber and
+    // no listener binds.
+    const loaded = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts', 3199)
+    // The include entry owns the config rows in its subtree store.
+    const includeEntry = Object.values(loaded.loader.store).find(candidate => candidate.subtree !== undefined)
+    expect(includeEntry).toBeDefined()
+    const entry = Object.values(includeEntry!.subtree!.store)
+      .find(candidate => candidate.options.name === '@deepseek-ai/dsh-host-lan-access/src/server.ts')
+    expect(entry).toBeDefined()
+    await expect(entry!.fiber!.await()).rejects.toThrow(/DSH_LAN_TOKEN/)
+    await expect(fetch('http://127.0.0.1:3199/api/session/list')).rejects.toThrow()
   })
 })
 

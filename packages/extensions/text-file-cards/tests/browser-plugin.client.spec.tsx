@@ -42,12 +42,14 @@ const SESSION = 'session' as SessionId
 function listState(current: SessionId | undefined): SessionListState {
   return {
     ids: current === undefined ? [] : [current],
-    byId: {},
-    current,
+    byId: current === undefined ? {} : {
+      [current]: {
+        id: current,
+        retainedBy: { mainView: 1 },
+      } as unknown as SessionListState['byId'][SessionId],
+    },
     phase: 'ready',
-    subagentsByParent: {},
-    jobsBySession: {},
-    currentAddress: undefined,
+    projectionsBySession: {},
   }
 }
 

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-23-composer-draft-budget.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-23-composer-draft-budget.md
-2026-08-23-composer-draft-budget.md: 55509ae42d00c7e53ff7a76eb24bec3c733d63cd
-2026-08-23-composer-draft-budget.zh.md: da217cf4d1884b2c12cb5e478dfee8518de2a09f
+/agent-note-draft-token-budget-as-a-fork-browser-plugin:
+  en: 9a088453234d79be
+  zh: bf498065984a95cf
+/agent-note-draft-token-budget-as-a-fork-browser-plugin/problem:
+  en: a45286d73b2c11ae
+  zh: 26b815a540548bc0
+/agent-note-draft-token-budget-as-a-fork-browser-plugin/decision:
+  en: d9ca9594df2fb171
+  zh: d14c4772dd6c96b6
+/agent-note-draft-token-budget-as-a-fork-browser-plugin/testing:
+  en: 27b2308fa6fd46d8
+  zh: 254384aef9059370
+/agent-note-draft-token-budget-as-a-fork-browser-plugin/alternatives-considered:
+  en: acb8f56e770db6f2
+  zh: 4dbaf077a816241f
+/agent-note-draft-token-budget-as-a-fork-browser-plugin/consequences:
+  en: b75a87e0c3ba447c
+  zh: a2f2d24e5414d8bd

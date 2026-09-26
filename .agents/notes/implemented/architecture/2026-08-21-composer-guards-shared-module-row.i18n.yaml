@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-21-composer-guards-shared-module-row.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-21-composer-guards-shared-module-row.md
-2026-08-21-composer-guards-shared-module-row.md: 15a2c87ab5d99e332fe595cfcea905b83c7f780c
-2026-08-21-composer-guards-shared-module-row.zh.md: 829682a302a2585d44eaff495df583608db16724
+/agent-note-shared-composer-guards-as-the-first-module-request-row:
+  en: b0ccee32a1c70ced
+  zh: e451946f404df8c6
+/agent-note-shared-composer-guards-as-the-first-module-request-row/problem:
+  en: 4e28e28edb58c518
+  zh: 30722b6434129b12
+/agent-note-shared-composer-guards-as-the-first-module-request-row/decision:
+  en: 808ff499d680d12e
+  zh: 997c15d1bddfc4f4
+/agent-note-shared-composer-guards-as-the-first-module-request-row/testing:
+  en: cc1bdc843953404e
+  zh: dada88745f5c265c
+/agent-note-shared-composer-guards-as-the-first-module-request-row/alternatives-considered:
+  en: ef1407e85db33e14
+  zh: b4788e0b9d55e15e
+/agent-note-shared-composer-guards-as-the-first-module-request-row/consequences:
+  en: a06b6ea94965a1cd
+  zh: b3396750fa4455c9

@@ -15,7 +15,7 @@
 
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
-  FileTypeIcon, IconCheckOutline16, IconCopyOutline16, JsonBlock, Tooltip,
+  FileTypeIcon, IconCheckOutlineMedium, IconCopyOutlineMedium, JsonBlock, Tooltip,
   fileExtension, fileSizeText, projectUserText, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { UserMessageNode } from '@deepseek-ai/dsh-client-ui-chat/client'
@@ -144,7 +144,7 @@ function LongTextFoldActions({ text, time, t }: {
           upstream locale contract spec. */}
       <Tooltip label={copied ? t('copied') : t('copy')} side="bottom">
         <button type="button" className={css.action} aria-label={copied ? t('copied') : t('copy')} onClick={onCopy}>
-          {copied ? <IconCheckOutline16 /> : <IconCopyOutline16 />}
+          {copied ? <IconCheckOutlineMedium /> : <IconCopyOutlineMedium />}
         </button>
       </Tooltip>
       {/* jscpd:ignore-end */}

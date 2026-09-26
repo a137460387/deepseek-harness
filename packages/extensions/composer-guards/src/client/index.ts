@@ -18,7 +18,7 @@
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type { SessionFace } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionFace, SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 // Type-only: pulls the conversation service's Context merge (ctx.conversation)
 // and names the input facade contract the resolution returns.
@@ -95,6 +95,19 @@ export interface EditableInput {
 }
 
 /**
+ * The session the workspace view displays, derived the way upstream's own
+ * WorkspaceBrowser does: the session carrying a positive `mainView` retain
+ * count on its list row. The list state no longer carries a `current` field;
+ * navigation ownership lives with the view owner, and this read-only
+ * derivation stays on the public `sessions.list` seam.
+ * @param list - the sessions-list snapshot.
+ * @returns the displayed session's id, or undefined when no session is displayed.
+ */
+export function mainViewSessionIdOf(list: SessionListState): SessionId | undefined {
+  return Object.values(list.byId).find(session => (session.retainedBy.mainView ?? 0) > 0)?.id
+}
+
+/**
  * Resolve the current session's input facade when it can accept a draft edit:
  * a current session exists, its scope resolves, every session-level composer
  * lock stands open, and the input machine is not in a submit/adjudication
@@ -108,7 +121,7 @@ export interface EditableInput {
  */
 export function resolveEditableInput(ctx: ClientContext): EditableInput | undefined {
   const list = ctx.sessions.list.getSnapshot()
-  const current = list.current
+  const current = mainViewSessionIdOf(list)
   if (current === undefined) return undefined
   const actx = ctx.sessions.scope(current)
   if (actx === undefined) return undefined

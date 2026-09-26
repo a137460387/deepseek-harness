@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/extensions/lan-access/README.md
-README.md: 75f5749d27c0f5b9637576b7484b385941cffeca
-README.zh.md: 02f737237ea46c100a83c521057eaddb5c255fa1
+/:
+  en: f1ec5cfa5cc7fc9b
+  zh: 39f6e069d94ff9ff
+/deepseek-ai-dsh-host-lan-access:
+  en: 5e2667f6eb02b26d
+  zh: c4366c072ae5ca75
+/deepseek-ai-dsh-host-lan-access/summary:
+  en: 944e271ff373f7c6
+  zh: 4c3658b3dbc86b4c
+/deepseek-ai-dsh-host-lan-access/table-of-contents:
+  en: f198f5aa88fa3c17
+  zh: 1dd9dce76180bff2
+/deepseek-ai-dsh-host-lan-access/configuration:
+  en: 854a8a3ddfee90d7
+  zh: 6fab86fed4c67fe8
+/deepseek-ai-dsh-host-lan-access/authentication-flow-all-paths-gated:
+  en: f410e3aaa7f397b9
+  zh: 280c73d7215f101f
+/deepseek-ai-dsh-host-lan-access/security-warnings:
+  en: 615cbf717a12759e
+  zh: 388c46be894eaa51
+/deepseek-ai-dsh-host-lan-access/direct-ts-source-reference:
+  en: 612fd36402b2056a
+  zh: c9022ff5a309931d
+/deepseek-ai-dsh-host-lan-access/verification:
+  en: 5b179e3c5d95aa6b
+  zh: 3d85dfc555a1bee8
+/deepseek-ai-dsh-host-lan-access/model-experience:
+  en: 5a85edcfc5b560cd
+  zh: 9e7e50bd1ad17f70
+/deepseek-ai-dsh-host-lan-access/model-experience/kv-cache-effect:
+  en: ca75c51c89c2c9b0
+  zh: 3eeb7ebebcd2be23
+/deepseek-ai-dsh-host-lan-access/known-limitations-and-deferred-work:
+  en: b1bd51ee7da7dde2
+  zh: 83ae7349dfd2fc64
+/deepseek-ai-dsh-host-lan-access/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: e88aeb617ffb74ea

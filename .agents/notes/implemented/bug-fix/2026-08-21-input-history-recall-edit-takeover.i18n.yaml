@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-21-input-history-recall-edit-takeover.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-21-input-history-recall-edit-takeover.md
-2026-08-21-input-history-recall-edit-takeover.md: 2ff90e36cefbc74e3da8747243e20ad6e396b10a
-2026-08-21-input-history-recall-edit-takeover.zh.md: 9665c09425de58ddc2082c557dc59e1115a29b6c
+/agent-note-history-recall-yields-to-a-user-edited-draft:
+  en: 2fa05e06a2c2b17b
+  zh: b4d19536d3e57f70
+/agent-note-history-recall-yields-to-a-user-edited-draft/problem:
+  en: 26625a6cdf64df65
+  zh: b20ec684f6be2993
+/agent-note-history-recall-yields-to-a-user-edited-draft/decision:
+  en: 2024b4b16db2b9c4
+  zh: aa657fb88e540460
+/agent-note-history-recall-yields-to-a-user-edited-draft/testing:
+  en: 0b2601f6f8181e2e
+  zh: ff53420f07233d44
+/agent-note-history-recall-yields-to-a-user-edited-draft/alternatives-considered:
+  en: 83e242535b33814d
+  zh: f3eb3aa1f1ceb3eb
+/agent-note-history-recall-yields-to-a-user-edited-draft/consequences:
+  en: d308ab5001dd4e2a
+  zh: f8795461a8b096af

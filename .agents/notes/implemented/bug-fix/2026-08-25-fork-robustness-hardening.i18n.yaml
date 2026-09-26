@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-25-fork-robustness-hardening.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-25-fork-robustness-hardening.md
-2026-08-25-fork-robustness-hardening.md: 0bc698a402ba9251edec614334aa43662cff49e4
-2026-08-25-fork-robustness-hardening.zh.md: 836c32387266e49318a2dc802f5ea0dbbc29a3aa
+/agent-note-fork-robustness-closure-quota-latch-clearing-export-fail-soft-find-debouncing:
+  en: c0f26feefd1e3d72
+  zh: d2074023b372e63c
+/agent-note-fork-robustness-closure-quota-latch-clearing-export-fail-soft-find-debouncing/problem:
+  en: 893edd219b932a22
+  zh: 0c7c325e03d35242
+/agent-note-fork-robustness-closure-quota-latch-clearing-export-fail-soft-find-debouncing/decision:
+  en: 1a44f37fedacea2a
+  zh: 7f125af026e65f14
+/agent-note-fork-robustness-closure-quota-latch-clearing-export-fail-soft-find-debouncing/testing:
+  en: 254fb35f886e9ac0
+  zh: 498696558f9a4a3c
+/agent-note-fork-robustness-closure-quota-latch-clearing-export-fail-soft-find-debouncing/alternatives-considered:
+  en: 229c81302c85b4b9
+  zh: 7ac9d050cfd0d935
+/agent-note-fork-robustness-closure-quota-latch-clearing-export-fail-soft-find-debouncing/consequences:
+  en: d32395bc80e833d4
+  zh: dae2adb3138a45de

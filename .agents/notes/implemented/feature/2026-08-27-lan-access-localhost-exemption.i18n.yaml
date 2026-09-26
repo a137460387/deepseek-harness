@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-27-lan-access-localhost-exemption.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-27-lan-access-localhost-exemption.md
-2026-08-27-lan-access-localhost-exemption.md: 4fc9ebcff49b8269345b54a6f828b177d02f2092
-2026-08-27-lan-access-localhost-exemption.zh.md: 2b2dd8fed9ee0cdb2f36aa00c354c791d4229993
+/agent-note-opt-in-localhost-token-exemption-for-the-lan-access-gate:
+  en: 9e69951f04657224
+  zh: 8ac139c5fe9afa65
+/agent-note-opt-in-localhost-token-exemption-for-the-lan-access-gate/problem:
+  en: 4bcdd070d96fb260
+  zh: a2d9e79837ec7c00
+/agent-note-opt-in-localhost-token-exemption-for-the-lan-access-gate/decision:
+  en: 70c1477b227e31e3
+  zh: a513234eb9905a57
+/agent-note-opt-in-localhost-token-exemption-for-the-lan-access-gate/testing:
+  en: 089cdd94fbc963e8
+  zh: 12ad8dc0e67919c3
+/agent-note-opt-in-localhost-token-exemption-for-the-lan-access-gate/alternatives-considered:
+  en: 59fee33ad5c95a3e
+  zh: dc8a1296b0a7b79c
+/agent-note-opt-in-localhost-token-exemption-for-the-lan-access-gate/consequences:
+  en: aedb8f67e04c53df
+  zh: 98ac9a0887bdb645

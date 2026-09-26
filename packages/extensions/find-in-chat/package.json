@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-client-find-in-chat",
   "description": "In-conversation find bar: Ctrl/Cmd+F opens a top find bar over the active chat view, matching the loaded window's text case-insensitively with wrap-around navigation, center scrolling, and range highlights",
-  "version": "0.1.5-rc.2",
+  "version": "0.1.7-rc.2",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -29,6 +29,9 @@
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-locale"
       ],
+      "external": [
+        "@deepseek-ai/dsh-client-composer-guards/client"
+      ],
       "platform": "web"
     }
   },
@@ -46,6 +49,7 @@
     "access": "public"
   },
   "peerDependencies": {
+    "@deepseek-ai/dsh-client-composer-guards": "workspace:^",
     "@deepseek-ai/dsh-client-locale": "workspace:^",
     "@deepseek-ai/dsh-client-store": "workspace:^",
     "@deepseek-ai/dsh-client-ui-layout": "workspace:^",
@@ -55,6 +59,7 @@
     "react": "^18.2.0"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-client-composer-guards": "workspace:^",
     "@deepseek-ai/dsh-client-locale": "workspace:^",
     "@deepseek-ai/dsh-client-store": "workspace:^",
     "@deepseek-ai/dsh-client-ui-layout": "workspace:^",

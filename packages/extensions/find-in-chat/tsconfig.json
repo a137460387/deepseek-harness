@@ -12,7 +12,10 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../client/locale"
+      "path": "../composer-guards"
+    },
+    {
+      "path": "../../client/locale/tsconfig.client.json"
     },
     {
       "path": "../../client/store"

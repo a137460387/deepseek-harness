@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { IconCloseOutline16, IconPaperclipOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCloseOutlineMedium, IconPaperclipOutlineMedium, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   HostObservable, PropsLocale, PropsRuntime, SnapshotSelectorHook,
 } from '@deepseek-ai/dsh-client-ui-slots'
@@ -61,7 +61,7 @@ export function LongTextFoldDock({ sessionId, preview, remove, useStaged, t }: L
               onClick={() => { preview(entry.seq) }}
               aria-label={t('card.preview')}
             >
-              <span className={css.glyph}><IconPaperclipOutline16 size={14} /></span>
+              <span className={css.glyph}><IconPaperclipOutlineMedium size={14} /></span>
               <span className={css.name}>{entry.preview}</span>
               <span className={css.size}>{t('card.meta', { chars: entry.chars, lines: entry.lines })}</span>
             </button>
@@ -72,7 +72,7 @@ export function LongTextFoldDock({ sessionId, preview, remove, useStaged, t }: L
                 onClick={() => { remove(entry.seq) }}
                 aria-label={t('card.remove')}
               >
-                <IconCloseOutline16 size={12} />
+                <IconCloseOutlineMedium size={12} />
               </button>
             </Tooltip>
           </div>
@@ -148,7 +148,7 @@ export function PreviewPopup({ useRequest, text, close, t }: PreviewPopupProps) 
         <span className={css.previewTitle}>{t('preview.title', { seq: request.seq })}</span>
         <Tooltip label={t('preview.close')} side="bottom">
           <button type="button" className={css.previewClose} aria-label={t('preview.close')} onClick={close}>
-            <IconCloseOutline16 size={12} />
+            <IconCloseOutlineMedium size={12} />
           </button>
         </Tooltip>
       </div>

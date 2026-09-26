@@ -16,6 +16,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { createFindController, type FindController, type FindState } from '../src/client/find-controller.ts'
 import { apply as applyNode } from '../src/index.ts'
 import * as FindInChatInvariant from '../src/invariant.ts'
@@ -45,9 +47,26 @@ interface Bench {
   states: FindState[]
 }
 
-/** Fake session list: a snapshot store over just the `current` id. */
+/** A full list snapshot whose `mainView` retention names `current`. */
+function fakeList(current: string): SessionListState {
+  const sessionId = current as SessionId
+  return {
+    ids: [sessionId],
+    byId: { [sessionId]: { id: sessionId, retainedBy: { mainView: 1 } } as unknown as SessionListState['byId'][SessionId] },
+    phase: 'ready',
+    projectionsBySession: {},
+  }
+}
+
+/** Fake session list: one session carrying the `mainView` retain count. */
 function createFakeSessions(current: string) {
-  return createSnapshotStore<{ current: string }>({ current })
+  const sessionId = current as SessionId
+  return createSnapshotStore<SessionListState>({
+    ids: [sessionId],
+    byId: { [sessionId]: { id: sessionId, retainedBy: { mainView: 1 } } as unknown as SessionListState['byId'][SessionId] },
+    phase: 'ready',
+    projectionsBySession: {},
+  })
 }
 
 /** Every bench built in this file, disposed together so one test's failure cannot leak listeners into the next. */
@@ -421,7 +440,7 @@ describe('find controller session and mutation wiring', () => {
     addRow(b.flow, 'needle')
     key('f', { ctrl: true })
     expect(b.controller.getSnapshot().open).toBe(true)
-    b.list.set({ current: 's2' })
+    b.list.set(fakeList('s2'))
     expect(b.controller.getSnapshot().open).toBe(false)
     b.controller.dispose()
   })
@@ -430,7 +449,7 @@ describe('find controller session and mutation wiring', () => {
     const b = bench()
     addRow(b.flow, 'needle')
     key('f', { ctrl: true })
-    b.list.set({ current: 's1' })
+    b.list.set(fakeList('s1'))
     expect(b.controller.getSnapshot().open).toBe(true)
     b.controller.dispose()
   })
@@ -579,7 +598,7 @@ describe('find controller dispose', () => {
     expect(document.querySelector('style[data-find-in-chat-highlights]')).toBeNull()
     const notified = vi.fn()
     b.controller.subscribe(notified)
-    b.list.set({ current: 's2' })
+    b.list.set(fakeList('s2'))
     expect(notified).not.toHaveBeenCalled()
   })
 })

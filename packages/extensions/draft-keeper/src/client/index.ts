@@ -45,7 +45,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { IConversation } from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: pulls the locale service's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import { resolveEditableInput } from '@deepseek-ai/dsh-client-composer-guards/client'
+import { mainViewSessionIdOf, resolveEditableInput } from '@deepseek-ai/dsh-client-composer-guards/client'
 import { createDraftStore } from './draft-store.ts'
 import { en, zh, type DraftKeeperKey } from './locales.ts'
 
@@ -212,7 +212,8 @@ export function apply(ctx: ClientContext): void {
     /** React to the session list: switch the watched session, prune the mirror. */
     const onList = (): void => {
       const list = ctx.sessions.list.getSnapshot()
-      if (watch === null || watch.sessionId !== list.current) {
+      const current = mainViewSessionIdOf(list)
+      if (watch === null || watch.sessionId !== current) {
         // Flush BEFORE unsubscribing: the write for the session being left
         // completes synchronously, so a switch loses nothing.
         flush()
@@ -220,7 +221,7 @@ export function apply(ctx: ClientContext): void {
           watch.off()
           watch = null
         }
-        if (list.current !== undefined) watchSession(list.current)
+        if (current !== undefined) watchSession(current)
       }
       // Prune only against an arrived list: the pending phase's empty id
       // list is a load state, not a sessionless world.

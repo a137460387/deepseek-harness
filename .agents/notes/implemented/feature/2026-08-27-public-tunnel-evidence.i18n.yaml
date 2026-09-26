@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-27-public-tunnel-evidence.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-27-public-tunnel-evidence.md
-2026-08-27-public-tunnel-evidence.md: d752dc3581185358cfadff3a45dc7c8905d9bb1a
-2026-08-27-public-tunnel-evidence.zh.md: 3b219a52dc15b523d2833df1ad84f47fba63bf05
+/agent-note-public-tunnel-exposure-evidence-for-the-stock-and-gated-web-stacks:
+  en: cb0784836e0e9c80
+  zh: f0839814d25d2cfb
+/agent-note-public-tunnel-exposure-evidence-for-the-stock-and-gated-web-stacks/problem:
+  en: 5a0719aaa521d6be
+  zh: 3489f378ae09f87c
+/agent-note-public-tunnel-exposure-evidence-for-the-stock-and-gated-web-stacks/decision:
+  en: 8aad2b0cb5436e1c
+  zh: 07e2792971117048
+/agent-note-public-tunnel-exposure-evidence-for-the-stock-and-gated-web-stacks/alternatives-considered:
+  en: db6c88c60f9e2415
+  zh: 2e5e65ee61d400ce
+/agent-note-public-tunnel-exposure-evidence-for-the-stock-and-gated-web-stacks/consequences:
+  en: e9733318c3e249d4
+  zh: ba083ddcd25dd49a

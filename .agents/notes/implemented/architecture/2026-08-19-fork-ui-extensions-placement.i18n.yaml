@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-19-fork-ui-extensions-placement.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-19-fork-ui-extensions-placement.md
-2026-08-19-fork-ui-extensions-placement.md: da4a717284c9852b44c97a1ff4e7b3f8629d9ca6
-2026-08-19-fork-ui-extensions-placement.zh.md: 24c72648c0f6ab37a37e09d31c6369faa234af60
+/agent-note-fork-web-ui-input-extensions-live-in-extensions-as-self-contained-plugins:
+  en: 7eb83b409c5377fa
+  zh: a9195ec6b36336bd
+/agent-note-fork-web-ui-input-extensions-live-in-extensions-as-self-contained-plugins/problem:
+  en: 8a36c646e8b928c6
+  zh: 2e780040b286aa61
+/agent-note-fork-web-ui-input-extensions-live-in-extensions-as-self-contained-plugins/decision:
+  en: 1ebc3c2ea77fef79
+  zh: 900c8b815ca4f9df
+/agent-note-fork-web-ui-input-extensions-live-in-extensions-as-self-contained-plugins/alternatives-considered:
+  en: 11e1058590fe0e5d
+  zh: 5ceb159e0302327c
+/agent-note-fork-web-ui-input-extensions-live-in-extensions-as-self-contained-plugins/consequences:
+  en: 562e2e4cdf54d528
+  zh: 5ed186d2edee1a07

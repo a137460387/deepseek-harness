@@ -39,7 +39,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: pulls the input-trigger service's Context merge (ctx.inputTriggers).
 import type {} from '@deepseek-ai/dsh-client-ui-input-trigger/client'
-import { sessionAcceptsEdits } from '@deepseek-ai/dsh-client-composer-guards/client'
+import { mainViewSessionIdOf, sessionAcceptsEdits } from '@deepseek-ai/dsh-client-composer-guards/client'
 
 /** Selector for the composer input surface (marked by InputBar via data-dsh-composer). */
 const COMPOSER_SELECTOR = '[data-dsh-composer]'
@@ -116,7 +116,7 @@ export function apply(ctx: ClientContext): void {
     // notifies synchronously (default flush), so a keypress can never
     // observe a slot left over from a previous current session.
     const offList = ctx.sessions.list.subscribe(() => {
-      const current = ctx.sessions.list.getSnapshot().current
+      const current = mainViewSessionIdOf(ctx.sessions.list.getSnapshot())
       if (active !== null && active.sessionId !== current) active = null
     })
 
@@ -129,7 +129,7 @@ export function apply(ctx: ClientContext): void {
       const composer = document.querySelector<HTMLElement>(COMPOSER_SELECTOR)
       if (composer === null || document.activeElement !== composer) return
 
-      const current = ctx.sessions.list.getSnapshot().current
+      const current = mainViewSessionIdOf(ctx.sessions.list.getSnapshot())
       if (current === undefined) return
       const binding = ctx.sessions.binding(current)
       if (binding === undefined || !sessionAcceptsEdits(binding.session)) return

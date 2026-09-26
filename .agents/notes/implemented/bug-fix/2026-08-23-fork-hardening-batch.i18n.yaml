@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-23-fork-hardening-batch.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-23-fork-hardening-batch.md
-2026-08-23-fork-hardening-batch.md: 962be177b8ee7116d3079ecdb6f6d5743d03d7a2
-2026-08-23-fork-hardening-batch.zh.md: 769149f77a368cf15dfe7ddc8ddc17f998a78006
+/agent-note-harden-the-fork-extension-batch-against-audit-findings:
+  en: c2fbfe7c6387e0db
+  zh: 0e32ab4da2218fc7
+/agent-note-harden-the-fork-extension-batch-against-audit-findings/problem:
+  en: 3b68153b8816570b
+  zh: fb194ba2ede3dad8
+/agent-note-harden-the-fork-extension-batch-against-audit-findings/decision:
+  en: beae5ff141edc5d1
+  zh: 4c27a97d37ea9de7
+/agent-note-harden-the-fork-extension-batch-against-audit-findings/alternatives-considered:
+  en: 128607293be71a35
+  zh: 979d590258992a85
+/agent-note-harden-the-fork-extension-batch-against-audit-findings/verification:
+  en: 130ad4a798f0a9dd
+  zh: 4b5b1b0692044c21
+/agent-note-harden-the-fork-extension-batch-against-audit-findings/consequences:
+  en: 119cc1d2715ab3ca
+  zh: 73e5057038923c96

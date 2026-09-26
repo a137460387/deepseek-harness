@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-22-composer-draft-persistence.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-22-composer-draft-persistence.md
-2026-08-22-composer-draft-persistence.md: b28865a9e2a17e06e5d6e4f10b1f6f845b5c7a41
-2026-08-22-composer-draft-persistence.zh.md: c3bd3151c03a7068944134ba6de48bdcec271585
+/agent-note-composer-draft-persistence-as-a-fork-browser-plugin:
+  en: 1616cf617539fba2
+  zh: 0bfbef8498645669
+/agent-note-composer-draft-persistence-as-a-fork-browser-plugin/problem:
+  en: 6be0dfd967acd1fa
+  zh: e3945e183be9ce0c
+/agent-note-composer-draft-persistence-as-a-fork-browser-plugin/decision:
+  en: 49203cf7c3c4ed3e
+  zh: 542013d6d4ef922a
+/agent-note-composer-draft-persistence-as-a-fork-browser-plugin/testing:
+  en: 43364d7a419bee33
+  zh: a6da5e69e6e13d3e
+/agent-note-composer-draft-persistence-as-a-fork-browser-plugin/alternatives-considered:
+  en: 6068a01c3469bc73
+  zh: ada6d9e075724747
+/agent-note-composer-draft-persistence-as-a-fork-browser-plugin/consequences:
+  en: f982300a414d5f33
+  zh: 672347a17f164e3b

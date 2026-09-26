@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-19-fork-ui-composer-lock-mirroring.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-19-fork-ui-composer-lock-mirroring.md
-2026-08-19-fork-ui-composer-lock-mirroring.md: 851fca53dcffea6b35f18229d552c2b224fb872d
-2026-08-19-fork-ui-composer-lock-mirroring.zh.md: 3b61f1e0875f1cf62a5136955e8b37b3d9237378
+/agent-note-fork-ui-input-extensions-mirror-the-composer-s-session-level-locks:
+  en: 23f92df8e51e8588
+  zh: 436f52d7acf386c6
+/agent-note-fork-ui-input-extensions-mirror-the-composer-s-session-level-locks/problem:
+  en: f4703dcbb8744a6d
+  zh: eda53408dd176dbd
+/agent-note-fork-ui-input-extensions-mirror-the-composer-s-session-level-locks/decision:
+  en: 8b8b792b7b42a59e
+  zh: 7cbbd33d67d69f66
+/agent-note-fork-ui-input-extensions-mirror-the-composer-s-session-level-locks/verification:
+  en: 1773eccefce99f9b
+  zh: 6b88aaf523c76479
+/agent-note-fork-ui-input-extensions-mirror-the-composer-s-session-level-locks/alternatives-considered:
+  en: 04680692771d3d7f
+  zh: 85d6c346dcef41cb
+/agent-note-fork-ui-input-extensions-mirror-the-composer-s-session-level-locks/consequences:
+  en: 9a58df3843db6a1b
+  zh: e8d628c4b45e9923

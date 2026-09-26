@@ -76,12 +76,14 @@ interface BenchOptions {
 function listState(current: string | undefined, ids: readonly string[], phase: 'pending' | 'ready' = 'ready'): SessionListState {
   return {
     ids: ids.map(id => id as SessionId),
-    byId: {},
-    current: current === undefined ? undefined : (current as SessionId),
+    byId: current === undefined ? {} : {
+      [current as SessionId]: {
+        id: current as SessionId,
+        retainedBy: { mainView: 1 },
+      } as unknown as SessionListState['byId'][SessionId],
+    },
     phase,
-    subagentsByParent: {},
-    jobsBySession: {},
-    currentAddress: undefined,
+    projectionsBySession: {},
   }
 }
 

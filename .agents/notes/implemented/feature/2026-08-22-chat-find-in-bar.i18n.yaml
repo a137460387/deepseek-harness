@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-22-chat-find-in-bar.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-22-chat-find-in-bar.md
-2026-08-22-chat-find-in-bar.md: 3318256d910bb91040b34d63f625938db968b4b4
-2026-08-22-chat-find-in-bar.zh.md: b30e7cb80b5b43a57fb42273bd4e676e936c65ef
+/agent-note-in-conversation-find-as-a-fork-browser-plugin:
+  en: a17a4e143518fa87
+  zh: e60aec48957c9b66
+/agent-note-in-conversation-find-as-a-fork-browser-plugin/problem:
+  en: 2bab26ecbf0aaa93
+  zh: c297b7ca293d7450
+/agent-note-in-conversation-find-as-a-fork-browser-plugin/decision:
+  en: 7338502e7faac63d
+  zh: 9ef2298f1fb89bc4
+/agent-note-in-conversation-find-as-a-fork-browser-plugin/testing:
+  en: 85aa24cc2fc91c88
+  zh: a39ed4cc0a1acd7d
+/agent-note-in-conversation-find-as-a-fork-browser-plugin/alternatives-considered:
+  en: 14afedf2579c5d55
+  zh: 1d2867f47c690f88
+/agent-note-in-conversation-find-as-a-fork-browser-plugin/consequences:
+  en: 96c25558ac5d5af9
+  zh: e004373390303f7a

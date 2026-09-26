@@ -66,12 +66,14 @@ function assistantNode(text: string): NodeLike {
 function listState(ids: readonly SessionId[], current: SessionId | undefined): SessionListState {
   return {
     ids: [...ids],
-    byId: {},
-    current,
+    byId: current === undefined ? {} : {
+      [current]: {
+        id: current,
+        retainedBy: { mainView: 1 },
+      } as unknown as SessionListState['byId'][SessionId],
+    },
     phase: 'ready',
-    subagentsByParent: {},
-    jobsBySession: {},
-    currentAddress: undefined,
+    projectionsBySession: {},
   }
 }
 

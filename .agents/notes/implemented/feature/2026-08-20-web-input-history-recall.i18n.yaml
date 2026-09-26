@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-20-web-input-history-recall.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-20-web-input-history-recall.md
-2026-08-20-web-input-history-recall.md: b4af85e17fe342b7cc88e862c1372b166b56095c
-2026-08-20-web-input-history-recall.zh.md: 62bc88adf5c19821a795484e572f0c3afef67e5b
+/agent-note-composer-history-recall-as-a-pure-browser-plugin:
+  en: 978f08a7ad0d8eb2
+  zh: 061e3447135ec819
+/agent-note-composer-history-recall-as-a-pure-browser-plugin/problem:
+  en: 7795c1a77f6d964b
+  zh: 53b3825a0f0b62bd
+/agent-note-composer-history-recall-as-a-pure-browser-plugin/decision:
+  en: a546a88a84ca2cf2
+  zh: 5e6c3c789f3a6e83
+/agent-note-composer-history-recall-as-a-pure-browser-plugin/testing:
+  en: 4d58a7be3b12a083
+  zh: 7f6a1e917e7a7f6d
+/agent-note-composer-history-recall-as-a-pure-browser-plugin/alternatives-considered:
+  en: 43276502fd36f7d9
+  zh: 094d67bea4024b79
+/agent-note-composer-history-recall-as-a-pure-browser-plugin/consequences:
+  en: 5da0c93208d541f5
+  zh: d2fab87dcf4a0b72

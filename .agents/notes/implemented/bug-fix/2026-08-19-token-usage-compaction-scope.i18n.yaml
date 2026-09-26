@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-19-token-usage-compaction-scope.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-19-token-usage-compaction-scope.md
-2026-08-19-token-usage-compaction-scope.md: 477dfb74a8f4a7c8e58a44a4458c224c780b0dd2
-2026-08-19-token-usage-compaction-scope.zh.md: b4bba8c6182f99edf58466f2005137d4907cee6a
+/agent-note-tokenusage-counts-compaction-summarizer-usage:
+  en: ce24050fba8d957e
+  zh: 4ade37afb1caf86e
+/agent-note-tokenusage-counts-compaction-summarizer-usage/problem:
+  en: cd12d70c02ff8938
+  zh: 11669b88d39da4fe
+/agent-note-tokenusage-counts-compaction-summarizer-usage/decision:
+  en: 5eec802a4302ea94
+  zh: f82093c0aab0fb07
+/agent-note-tokenusage-counts-compaction-summarizer-usage/alternatives-considered:
+  en: f34b67e3f7c443ba
+  zh: 33213178d2966038
+/agent-note-tokenusage-counts-compaction-summarizer-usage/consequences:
+  en: afc1b7bd5d9b760b
+  zh: a285a40e50f7e17e

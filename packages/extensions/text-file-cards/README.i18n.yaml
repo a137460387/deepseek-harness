@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/extensions/text-file-cards/README.md
-README.md: 9cb327b4cfcc606608e4e614861ce0842b8902f3
-README.zh.md: c5020c7603a3661dcbd5315184b79580796c37a7
+/:
+  en: 00da475def851f65
+  zh: 9f73ed0c46ce4ded
+/deepseek-ai-dsh-client-text-file-cards:
+  en: dc3535581b884d11
+  zh: 7468c97b4df9a5e7
+/deepseek-ai-dsh-client-text-file-cards/summary:
+  en: e53b4eeb296d9538
+  zh: 6dcba1c12ae0eaad
+/deepseek-ai-dsh-client-text-file-cards/table-of-contents:
+  en: 54025a5d68d47551
+  zh: ad5317163feae13d
+/deepseek-ai-dsh-client-text-file-cards/ceilings:
+  en: 6837c08234efe8e8
+  zh: 892300591695fc59
+/deepseek-ai-dsh-client-text-file-cards/staging-model:
+  en: 293218fd6877e538
+  zh: a65699ddd18f7ffe
+/deepseek-ai-dsh-client-text-file-cards/details:
+  en: 50603160f9e8ba5b
+  zh: facaf9ef76582bbd
+/deepseek-ai-dsh-client-text-file-cards/model-experience:
+  en: 2fc9a00bd676d836
+  zh: 55c4d474844b9fd1
+/deepseek-ai-dsh-client-text-file-cards/model-experience/kv-cache-effect:
+  en: 47f982e326fe77fd
+  zh: 94739702843eb1c4
+/deepseek-ai-dsh-client-text-file-cards/known-limitations-and-deferred-work:
+  en: 42523f489c156d6a
+  zh: 5b60daaa1170e2c1
+/deepseek-ai-dsh-client-text-file-cards/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: e88aeb617ffb74ea

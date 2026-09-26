@@ -105,7 +105,7 @@ function appendSummaryMeter(
 function replaceWithSummary(session: Session, start: SessionSeq, end: SessionSeq, sourceSeqs: SessionSeq[]): void {
   session.append('user/message', createUserMessage({
     content: [{ type: 'text', text: 'compacted' }],
-    source: { kind: 'plugin', plugin: 'test' },
+    source: { kind: 'test' },
   }), {
     surfaceOp: { op: 'replace', startSeq: start, endSeq: end },
     sourceEventSeqs: sourceSeqs,
@@ -532,7 +532,7 @@ describe('contextPressure session projection', () => {
     const checkpoint = JSON.parse(JSON.stringify(
       ctx.sessionProjections.checkpoint(session),
     )) as ReturnType<typeof ctx.sessionProjections.checkpoint>
-    expect(checkpoint.contextPressure?.ver).toBe(4)
+    expect(checkpoint.contextPressure?.ver).toBe(5)
 
     await meterFiber.dispose()
     expect(ctx.sessionProjections.snapshot(session).values).not.toHaveProperty('contextPressure')
@@ -569,7 +569,7 @@ describe('contextPressure session projection', () => {
     appendSummaryMeter(ctx, session, question, grown)
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'summary' }],
-      source: { kind: 'plugin', plugin: 'test' },
+      source: { kind: 'test' },
     }), {
       surfaceOp: { op: 'replace', startSeq: question, endSeq: grown },
       sourceEventSeqs: [question, answer, grown],
@@ -587,7 +587,7 @@ describe('contextPressure session projection', () => {
       appendSummaryMeter(ctx, session, first, last)
       const target = endpoint === 'start' ? last : first
       session.append('user/message', createUserMessage({
-        content: [{ type: 'text', text: 'summary' }], source: { kind: 'plugin', plugin: 'test' },
+        content: [{ type: 'text', text: 'summary' }], source: { kind: 'test' },
       }), { surfaceOp: { op: 'replace', startSeq: target, endSeq: target }, sourceEventSeqs: [target] })
       expect(() => pressure(ctx, session)).toThrow('has no adjacent shadow price')
     } finally {
@@ -605,7 +605,7 @@ describe('contextPressure session projection', () => {
 
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'summary without a preceding claim' }],
-      source: { kind: 'plugin', plugin: 'test' },
+      source: { kind: 'test' },
     }), {
       surfaceOp: { op: 'replace', startSeq: question, endSeq: question },
       sourceEventSeqs: [question],
@@ -626,7 +626,7 @@ describe('contextPressure session projection', () => {
     appendSummaryMeter(ctx, session, question, question)
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: '.' }],
-      source: { kind: 'plugin', plugin: 'test' },
+      source: { kind: 'test' },
     }), {
       surfaceOp: { op: 'replace', startSeq: question, endSeq: question },
       sourceEventSeqs: [question],

@@ -5,7 +5,7 @@
  * the draft. No staged files renders nothing.
  */
 
-import { IconCloseOutline16, IconPaperclipOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCloseOutlineMedium, IconPaperclipOutlineMedium, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   HostObservable, PropsLocale, PropsRuntime, SnapshotSelectorHook,
 } from '@deepseek-ai/dsh-client-ui-slots'
@@ -59,7 +59,7 @@ export function TextFileCardsDock({ sessionId, expand, remove, useStagedFiles, t
               onClick={() => { void expand(entry.id) }}
               aria-label={t('card.insert', { name: entry.name })}
             >
-              <span className={css.glyph}><IconPaperclipOutline16 size={14} /></span>
+              <span className={css.glyph}><IconPaperclipOutlineMedium size={14} /></span>
               <span className={css.name}>{entry.name}</span>
               <span className={css.size}>{formatBytes(entry.size)}</span>
             </button>
@@ -70,7 +70,7 @@ export function TextFileCardsDock({ sessionId, expand, remove, useStagedFiles, t
                 onClick={() => { remove(entry.id) }}
                 aria-label={t('card.remove', { name: entry.name })}
               >
-                <IconCloseOutline16 size={12} />
+                <IconCloseOutlineMedium size={12} />
               </button>
             </Tooltip>
           </div>

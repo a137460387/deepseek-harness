@@ -50,7 +50,7 @@ describe('estimate mirror contract', () => {
         role: 'user',
         content: [{ type: 'text', text }],
         source: { provider: 'contract', model: 'contract' },
-      } as Parameters<typeof estimateMessage>[0]
+      } as unknown as Parameters<typeof estimateMessage>[0]
       expect(estimateDraftTokens(text)).toBe(estimateMessage(message))
     }
   })

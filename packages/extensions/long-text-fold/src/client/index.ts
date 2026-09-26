@@ -46,7 +46,7 @@ import type { IConversation } from '@deepseek-ai/dsh-client-ui-conversation/clie
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { composerVisible, resolveEditableInput } from '@deepseek-ai/dsh-client-composer-guards/client'
+import { composerVisible, mainViewSessionIdOf, resolveEditableInput } from '@deepseek-ai/dsh-client-composer-guards/client'
 import {
   LongTextFoldDock, PreviewPopup,
   type LongTextFoldDockInjected, type PreviewInjected, type PreviewRequest,
@@ -214,7 +214,8 @@ export function apply(ctx: ClientContext): void {
     }
     const onList = (): void => {
       const list = ctx.sessions.list.getSnapshot()
-      if (list.current !== undefined) watchSession(list.current)
+      const current = mainViewSessionIdOf(list)
+      if (current !== undefined) watchSession(current)
       else if (watched !== null) {
         watched.off()
         watched = null

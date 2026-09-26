@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-13-long-text-fold.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-13-long-text-fold.md
-2026-09-13-long-text-fold.md: 51888dfcdc0f7a56c4bc7d1b26fc3d0c2d88b720
-2026-09-13-long-text-fold.zh.md: 61a8c439b1b22ee0812e4fc49591263f58668999
+/agent-note-long-text-paste-folding-as-a-fork-browser-plugin:
+  en: d93ea15166e55fb9
+  zh: 844cadd8b4b085b2
+/agent-note-long-text-paste-folding-as-a-fork-browser-plugin/problem:
+  en: c9e2d6225c0a1105
+  zh: c72eb5fd0590d100
+/agent-note-long-text-paste-folding-as-a-fork-browser-plugin/decision:
+  en: 31c439519c8aa8fb
+  zh: 0a05456d26186409
+/agent-note-long-text-paste-folding-as-a-fork-browser-plugin/testing:
+  en: 736d71c114e61d30
+  zh: d7935e84e6986ebc
+/agent-note-long-text-paste-folding-as-a-fork-browser-plugin/alternatives-considered:
+  en: 8536010320b0af9b
+  zh: 224ee28941de10e4
+/agent-note-long-text-paste-folding-as-a-fork-browser-plugin/consequences:
+  en: e8349b989de3b4f4
+  zh: df109fc132ae55e7
