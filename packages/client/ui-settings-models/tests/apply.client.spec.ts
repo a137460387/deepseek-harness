@@ -237,8 +237,20 @@ describe('ui-settings-models apply', () => {
     expect(() => b.locale.register('settings.models', 'en', {})).not.toThrow()
   })
 
-  it('keeps remote-browser acknowledgement in process memory', async () => {
-    const b = await bench(false)
+  it('keeps remote-browser acknowledgement durable through the Host document', async () => {
+    // Host persistence no longer exempts non-loopback pages: the
+    // acknowledgement reads the served section on the wire.
+    const mock = RemoteMock.create().load(remoteDefaultResponses)
+    const namespace = {
+      ns: WELCOME_NOTICE_SETTINGS_NAMESPACE,
+      schema: JSON.parse(JSON.stringify(Schema.object({ [WELCOME_NOTICE_ACK_FIELD]: Schema.string() }).toJSON())) as JsonValue,
+      value: {},
+      autoGenerate: true, applies: 'live' as const,
+      secrets: [],
+      revision: 0,
+    }
+    mock.remote.settings.describe.mockResolvedValue(ok({ writable: true, hasDocument: false, namespaces: [namespace] }))
+    const b = await bench(false, mock)
     declare(b.slots)
     await b.ctx.plugin({ inject: [...inject], apply }).await()
     const entry = b.slots.entries('settings.onboarding')

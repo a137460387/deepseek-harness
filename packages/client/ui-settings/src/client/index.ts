@@ -35,8 +35,12 @@ export const inject = ['remote', 'remote.settings']
  */
 export function apply(ctx: Context): void {
   const schema = new SettingsSchemaService(ctx)
-  // Every form uses the persistence mode resolved from the connected Host.
-  const persistence = ctx.remote.$host.isLoopback ? 'host' : 'memory'
+  // Host persistence on every origin. BrowserAuth already authenticates any
+  // session that loaded this bundle, so the former non-loopback memory mode
+  // kept remote preferences session-local without adding protection.
+  // Fork patch reversing upstream's loopback gate — see FORK_NOTES.md
+  // 「已知本地补丁」; an upstream correction retires it.
+  const persistence = 'host'
   const mirror = new SettingsDescribeMirror(ctx, persistence)
   ctx.effect(() => {
     const disposers = [

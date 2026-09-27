@@ -195,9 +195,12 @@ describe('ui-settings-general apply', () => {
     const { c } = await client(mock, start)
     expect(c.connection.isLoopback).toBe(false)
     expect(ownEntries(c, 'settings.action')).toEqual([])
-    // Off-loopback settings stay process-local: no describe read, so the browser language stands.
-    expect(c.mock.log.calls('settings/describe')).toEqual([])
-    expect(c.ctx.locale.getSnapshot().active).toBe('en')
+    // Off-loopback pages ride Host persistence now, so the describe read fires
+    // (mirror ensure at apply, then the first connection's reset) and the Host
+    // language lands exactly as on loopback; the document action stays
+    // loopback-only.
+    expect(c.mock.log.calls('settings/describe')).toHaveLength(2)
+    expect(c.ctx.locale.getSnapshot().active).toBe('zh')
     await c.unload(SELF)
     await c.flush()
     for (const [name] of SEATS) expect(ownEntries(c, name)).toEqual([])
