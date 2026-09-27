@@ -1,6 +1,8 @@
 # DEPLOY_TUNNEL.md — dsh web 公网部署配方(named tunnel + NSSM 服务化)
 
-本机实际部署的完整配方。目标形态:`https://dsh.lgyu.cloud`(Cloudflare named tunnel,域名固定)→ cloudflared Windows 服务 → `http://localhost:3080` → dsh web(NSSM 服务 `dsh-web`,开机自启 + 崩溃自愈,token 门禁)。
+本机实际部署的完整配方。目标形态:`https://dsh.lgyu.top`(Cloudflare named tunnel,域名固定)→ cloudflared Windows 服务 → `http://localhost:3080` → dsh web(NSSM 服务 `dsh-web`,开机自启 + 崩溃自愈,token 门禁)。
+
+- **两台部署对照(2026-09-27 订正)**:本文档只覆盖**本机**这台部署,隧道域名 `https://dsh.lgyu.top`(本机 cloudflared 配置 `~\.cloudflared\config.yml` 的 ingress 即此域名,隧道 UUID 见下)。另一台电脑的独立部署走 `https://dsh.lgyu.cloud`,拥有自己的隧道、启动令牌与 `DSH_HOME`,不在本文档范围内。两台互不共享令牌、cookie 与数据根:入场 URL、验收请求与令牌不可跨机混用(此前本文档误写 cloud 域名,2026-09-27 重启窗口经隧道实测订正——cloud 域名上的本机启动令牌被另一台部署拒绝属预期行为)。
 
 - 适用:本仓库 fork、Windows、master 分支。
 - DSH 源码零改动:token 门禁与信任域全部走既有环境变量机制(`DSH_LAN_TOKEN`、`DSH_LAN_ENABLED`、`DSH_LAN_EXTRA_AUTHORITIES`),不引入任何新代码路径。
@@ -9,16 +11,16 @@
 ## 1. 架构总览
 
 ```
-浏览器 ──HTTPS──> Cloudflare Edge (dsh.lgyu.cloud, CNAME → tunnel)
+浏览器 ──HTTPS──> Cloudflare Edge (dsh.lgyu.top, CNAME → tunnel)
                     │
-                    ▼ named tunnel 1eebfaa3-c108-4cac-ad1d-67b57aa3aa6a
+                    ▼ named tunnel 4ff92660-a5f7-4da1-afd9-e51379411ca5
               cloudflared 服务 (Windows 服务, Automatic)
                     │
                     ▼ http://localhost:3080
               dsh-web 服务 (NSSM, LocalSystem, Automatic)
               LanAccessWebServer: 0.0.0.0:3080, token 门禁
                     │
-                    ▼ DSH_HOME=C:\Users\luoguangyu\.dsh
+                    ▼ DSH_HOME=C:\Users\HUAWEI\.dsh
               sessions / settings / credentials
 ```
 
@@ -48,15 +50,15 @@ cloudflared tunnel login
 cloudflared tunnel create dsh
 ```
 
-输出 Tunnel UUID 与凭据文件路径(本机为 `1eebfaa3-c108-4cac-ad1d-67b57aa3aa6a`,`~\.cloudflared\<UUID>.json`)。记录两者,后续两处引用。
+输出 Tunnel UUID 与凭据文件路径(本机为 `4ff92660-a5f7-4da1-afd9-e51379411ca5`,`~\.cloudflared\<UUID>.json`)。记录两者,后续两处引用。
 
 ### 3.3 配置文件 `~\.cloudflared\config.yml`
 
 ```yaml
-tunnel: 1eebfaa3-c108-4cac-ad1d-67b57aa3aa6a
-credentials-file: C:\Users\luoguangyu\.cloudflared\1eebfaa3-c108-4cac-ad1d-67b57aa3aa6a.json
+tunnel: 4ff92660-a5f7-4da1-afd9-e51379411ca5
+credentials-file: C:\Users\HUAWEI\.cloudflared\4ff92660-a5f7-4da1-afd9-e51379411ca5.json
 ingress:
-  - hostname: dsh.lgyu.cloud
+  - hostname: dsh.lgyu.top
     service: http://localhost:3080
   - service: http_status:404
 ```
@@ -66,7 +68,7 @@ ingress:
 ### 3.4 安装 cloudflared 服务(管理员)
 
 ```powershell
-cloudflared tunnel route dns dsh dsh.lgyu.cloud   # CNAME 绑定,一次性
+cloudflared tunnel route dns dsh dsh.lgyu.top   # CNAME 绑定,一次性
 cloudflared service install                       # 默认以无参自启
 ```
 
@@ -74,7 +76,7 @@ cloudflared service install                       # 默认以无参自启
 
 ```powershell
 Set-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Services\cloudflared' -Name ImagePath `
-  -Value '"C:\Program Files (x86)\cloudflared\cloudflared.exe" --config "C:\Users\luoguangyu\.cloudflared\config.yml" tunnel run'
+  -Value '"C:\Program Files (x86)\cloudflared\cloudflared.exe" --config "C:\Users\HUAWEI\.cloudflared\config.yml" tunnel run'
 Set-Service cloudflared -StartupType Automatic
 Restart-Service cloudflared
 ```
@@ -101,8 +103,8 @@ $node = "C:\Program Files\nodejs\node.exe"
 & $nssm set dsh-web AppParameters "--import tsx/esm apps/cli/src/bin.ts --profile web --port 3080 --no-open"
 & $nssm set dsh-web AppDirectory "<REPO_DIR>"
 & $nssm set dsh-web AppEnvironmentExtra "DSH_LAN_ENABLED=true" `
-    "DSH_LAN_EXTRA_AUTHORITIES=dsh.lgyu.cloud" `
-    "DSH_HOME=C:\Users\luoguangyu\.dsh" `
+    "DSH_LAN_EXTRA_AUTHORITIES=dsh.lgyu.top" `
+    "DSH_HOME=C:\Users\HUAWEI\.dsh" `
     "DSH_LAN_TOKEN=<TOKEN>"
 & $nssm set dsh-web AppStdout  "<REPO_DIR>\.logs\dsh-web-out.log"
 & $nssm set dsh-web AppStderr  "<REPO_DIR>\.logs\dsh-web-err.log"
@@ -127,20 +129,20 @@ $node = "C:\Program Files\nodejs\node.exe"
 
 ## 4. Token 管理
 
-- **入场为一步式(2026-08-29 起单层认证)**:浏览器直接打开 `https://dsh.lgyu.cloud/?token=<启动令牌>`,303 应答种下 `dsh-auth-*` cookie(宿主 BrowserAuth,HttpOnly; SameSite=Strict),随后 `GET /` 返回 200 应用加载。启动令牌取自 `.logs\dsh-web-out.log` 中 `dsh web: ...?token=...` 行,每次进程重启更新,仅本机日志可得;无凭据请求 401 由 BrowserAuth 承担。
-- **门禁层已禁用**:`packages/bundle/web-app/cordis.patch.yml` 中 stock `webserver` 行恢复启用、`lan-access-webserver` 行 `disabled: true`,服务绑定回到 `127.0.0.1:3080`;cloudflared 转发目标 `http://localhost:3080` 不受影响。公网 Host 信任不依赖 webserver 行:同一 patch 文件 connection 行的 `DSH_LAN_EXTRA_AUTHORITIES=dsh.lgyu.cloud` 继续为 `/api` 浏览器信任栅栏追加公网域,换行后公网链路实测正常(303/200)。
+- **入场为一步式(2026-08-29 起单层认证)**:浏览器直接打开 `https://dsh.lgyu.top/?token=<启动令牌>`,303 应答种下 `dsh-auth-*` cookie(宿主 BrowserAuth,HttpOnly; SameSite=Strict),随后 `GET /` 返回 200 应用加载。启动令牌取自 `.logs\dsh-web-out.log` 中 `dsh web: ...?token=...` 行,每次进程重启更新,仅本机日志可得;无凭据请求 401 由 BrowserAuth 承担。
+- **门禁层已禁用**:`packages/bundle/web-app/cordis.patch.yml` 中 stock `webserver` 行恢复启用、`lan-access-webserver` 行 `disabled: true`,服务绑定回到 `127.0.0.1:3080`;cloudflared 转发目标 `http://localhost:3080` 不受影响。公网 Host 信任不依赖 webserver 行:同一 patch 文件 connection 行的 `DSH_LAN_EXTRA_AUTHORITIES=dsh.lgyu.top` 继续为 `/api` 浏览器信任栅栏追加公网域,换行后公网链路实测正常(303/200)。
 - **服务环境变量现状**:`AppEnvironmentExtra` 中 `DSH_LAN_TOKEN` 与 `DSH_LAN_ENABLED` 残留但闲置(唯一消费者是已禁用的 lan-access 行),`DSH_HOME` 与 `DSH_LAN_EXTRA_AUTHORITIES` 仍必需;下次管理员操作服务时可顺手清理前两者。
 
 ### 回退到双层认证(备注)
 
 - **恢复方法**:把 `packages/bundle/web-app/cordis.patch.yml` 两行 `disabled` 翻回(stock `webserver` 行加回 `disabled: true`,`lan-access-webserver` 行移除 `disabled: true`)后 `Restart-Service dsh-web`;或不动 bundle,用用户 patch 层 overlay(`~\.dsh\profiles\web\cordis.patch.yml`)热切换,无须重启。热切换必须分两步:先禁用当前持有 3080 的行并等端口释放,再启用另一行——loader 应用更新时先启新行后停旧行,一次翻两行会触发 EADDRINUSE 回滚。回退后 `DSH_LAN_TOKEN` 必须仍在服务环境变量里(当前残留保留,恰好满足)。
-- **旧两段式入场(双层形态描述,留档)**:第一段访问 `https://dsh.lgyu.cloud/?token=<DSH_LAN_TOKEN>`,302 应答种下门禁 HttpOnly cookie(`dsh-lan-token`);第二段携带该 cookie 访问 `/?token=<启动令牌>`,上游交换种下 `dsh-auth-*` cookie 后应用加载。门禁 cookie 是外层边界:无门禁 cookie 时启动令牌过不了第一层。门禁 token 轮换仅双层形态适用(`nssm set AppEnvironmentExtra` 为整体覆盖,必须重设全部条目——若启用了可选的 `DSH_LAN_TRUST_LOCALHOST` 须一并重写;漏一个 `DSH_HOME` 就触发数据根漂移;前台手动运行双层形态时同步更新用户级 `DSH_LAN_TOKEN`):
+- **旧两段式入场(双层形态描述,留档)**:第一段访问 `https://dsh.lgyu.top/?token=<DSH_LAN_TOKEN>`,302 应答种下门禁 HttpOnly cookie(`dsh-lan-token`);第二段携带该 cookie 访问 `/?token=<启动令牌>`,上游交换种下 `dsh-auth-*` cookie 后应用加载。门禁 cookie 是外层边界:无门禁 cookie 时启动令牌过不了第一层。门禁 token 轮换仅双层形态适用(`nssm set AppEnvironmentExtra` 为整体覆盖,必须重设全部条目——若启用了可选的 `DSH_LAN_TRUST_LOCALHOST` 须一并重写;漏一个 `DSH_HOME` 就触发数据根漂移;前台手动运行双层形态时同步更新用户级 `DSH_LAN_TOKEN`):
 
 ```powershell
 $newToken = [Convert]::ToBase64String((New-Object byte[] 32))   # 自行记录,勿打印到共享日志
 & "<REPO_DIR>\tools\nssm.exe" set dsh-web AppEnvironmentExtra `
-    "DSH_LAN_ENABLED=true" "DSH_LAN_EXTRA_AUTHORITIES=dsh.lgyu.cloud" `
-    "DSH_HOME=C:\Users\luoguangyu\.dsh" "DSH_LAN_TOKEN=$newToken"
+    "DSH_LAN_ENABLED=true" "DSH_LAN_EXTRA_AUTHORITIES=dsh.lgyu.top" `
+    "DSH_HOME=C:\Users\HUAWEI\.dsh" "DSH_LAN_TOKEN=$newToken"
 Restart-Service dsh-web   # 浏览器用新 token 重新登录,旧 cookie 失效
 ```
 
@@ -152,8 +154,8 @@ Restart-Service dsh-web   # 浏览器用新 token 重新登录,旧 cookie 失效
 |---|---|---|---|
 | 1 | `Get-Service dsh-web` | Running | Running / Automatic |
 | 2 | `Restart-Service dsh-web`;5s 后再查 | 仍 Running(NSSM 拉起子进程) | Running,3080 由新 PID 重新绑定 |
-| 3 | `https://dsh.lgyu.cloud` 无 token | 401 | 401(门禁先于 Host 栅栏) |
-| 4 | 两段式入场:① `https://dsh.lgyu.cloud/?token=<TOKEN>` 种门禁 cookie;② 携带门禁 cookie 访问 `/?token=<启动令牌>`(启动令牌取自 `.logs\dsh-web-out.log` 的 `dsh web: ...?token=...` 行) | ① 302 + Set-Cookie(`dsh-lan-token`,HttpOnly; SameSite=Lax);② 303 + Set-Cookie(`dsh-auth-*`,上游 BrowserAuth 种),应用加载 | 2026-08-29 回环实测:① 302 + 门禁 cookie;② 303 + 上游 cookie;双 cookie `GET /` → 200;无门禁 cookie 时外来令牌 401(上游层独立有效) |
+| 3 | `https://dsh.lgyu.top` 无 token | 401 | 401(门禁先于 Host 栅栏) |
+| 4 | 两段式入场:① `https://dsh.lgyu.top/?token=<TOKEN>` 种门禁 cookie;② 携带门禁 cookie 访问 `/?token=<启动令牌>`(启动令牌取自 `.logs\dsh-web-out.log` 的 `dsh web: ...?token=...` 行) | ① 302 + Set-Cookie(`dsh-lan-token`,HttpOnly; SameSite=Lax);② 303 + Set-Cookie(`dsh-auth-*`,上游 BrowserAuth 种),应用加载 | 2026-08-29 回环实测:① 302 + 门禁 cookie;② 303 + 上游 cookie;双 cookie `GET /` → 200;无门禁 cookie 时外来令牌 401(上游层独立有效) |
 | 5 | `.logs\dsh-web-err.log` | 无致命报错 | 0 字节(另做 token 泄漏扫描:无) |
 | 6 | `.gitignore` 覆盖 `tools/`、`.logs/` | 已覆盖 | 已提交(6c9c7690ad) |
 | 7 | 强杀 node 子进程后 | NSSM 自动拉起(崩溃自愈) | 旧 PID 7348 被杀 → 服务保持 Running → 新 PID 28748 重新绑定 |
