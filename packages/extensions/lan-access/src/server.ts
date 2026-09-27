@@ -159,11 +159,42 @@ function unauthorizedPage(reason: string): string {
   ].join('\n')
 }
 
-/** Respond 401 with the placeholder page. */
+/** Respond 401 with the placeholder page. The denial is dynamic (it names the gate state), never cacheable. */
 function deny(res: ServerResponse, reason: string): void {
   const body = unauthorizedPage(reason)
-  res.writeHead(401, { 'content-type': 'text/html; charset=utf-8', 'content-length': String(Buffer.byteLength(body)) })
+  res.writeHead(401, {
+    'cache-control': 'no-store',
+    'content-type': 'text/html; charset=utf-8',
+    'content-length': String(Buffer.byteLength(body)),
+  })
   res.end(body)
+}
+
+/**
+ * Mark the response uncacheable before the base handlers run. LAN deployments
+ * front the server with reverse proxies and tunnels whose edge may cache HTML
+ * under an explicit cache rule, and the rendered index embeds live Host state
+ * (the boot theme and content font size), so a cached document would serve
+ * stale preferences to every reader. Assets are content-hashed and keep their
+ * caching. `setHeader` merges with the handlers' own `writeHead` headers, and
+ * the name never collides with a base header key.
+ * @param req The gated request about to reach the base dispatch.
+ * @param res The response the base handlers will write.
+ */
+function markDocumentUncacheable(req: IncomingMessage, res: ServerResponse): void {
+  const method = req.method ?? 'GET'
+  if (method !== 'GET' && method !== 'HEAD') return
+  let pathname = req.url ?? '/'
+  const queryAt = pathname.indexOf('?')
+  if (queryAt !== -1) pathname = pathname.slice(0, queryAt)
+  try {
+    pathname = decodeURIComponent(pathname)
+  } catch (_malformedEscape) {
+    // A path with an invalid escape sequence cannot name the index; judge the raw form below.
+  }
+  if (pathname === '/' || pathname.toLowerCase().endsWith('.html')) {
+    res.setHeader('cache-control', 'no-store')
+  }
 }
 
 /**
@@ -249,6 +280,7 @@ export class LanAccessWebServer extends WebServer {
           if (tokenMatches(presented, digest)) {
             const pathname = url.slice(0, queryAt)
             res.writeHead(302, {
+              'cache-control': 'no-store',
               'set-cookie': `${DSH_LAN_COOKIE}=${presented}; HttpOnly; SameSite=Lax; Path=/`,
               location: pathname === '' ? ROOT_PATH : pathname,
             })
@@ -275,6 +307,7 @@ export class LanAccessWebServer extends WebServer {
         deny(res, 'no-token')
         return
       }
+      markDocumentUncacheable(req, res)
       for (const handler of originalRequest) handler(req, res)
     })
     server.on('upgrade', (req, socket, head) => {
@@ -312,6 +345,7 @@ export class LanAccessWebServer extends WebServer {
       return
     }
     res.writeHead(302, {
+      'cache-control': 'no-store',
       'set-cookie': `${DSH_LAN_COOKIE}=${presented}; HttpOnly; SameSite=Lax; Path=/`,
       location: ROOT_PATH,
     })

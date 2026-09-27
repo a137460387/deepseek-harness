@@ -34,10 +34,10 @@ With LAN mode off, the row's `host` expression is the stock `ctx.webStartup.host
 
 Every request — static assets, `index.html`, `/api`, websocket upgrades — passes the token gate before any registered handler runs:
 
-- No credential → 401 with an inline placeholder page (no script, no asset path; the real dist is never named).
+- No credential → 401 with an inline placeholder page (no script, no asset path; the real dist is never named). Denials, the `?token=` redirect, and `/auth-set` are marked `Cache-Control: no-store`.
 - `?token=<secret>` on any path → validates, sets the session cookie (same attributes as `/auth-set`), 302 to the same path with the query cleared.
 - `/auth-set?token=<secret>` → validates, sets `dsh-lan-token=<secret>` cookie (`HttpOnly; SameSite=Lax; Path=/`, no `Secure` — plain HTTP), 302 to `/`.
-- Valid cookie → request passes through to the stock dispatch.
+- Valid cookie → request passes through to the stock dispatch. Document paths (the dist root and `*.html`, GET/HEAD) additionally carry `Cache-Control: no-store`: the rendered index embeds live Host state (the boot theme and font size), so a cache sitting in front — a Cloudflare tunnel with cache rules, say — must never store the shell. Hashed assets and writes are untouched.
 - Valid cookie plus a foreign `?token=` → passes through untouched (no redirect, no gate cookie): see the two-stage entry below.
 - With `DSH_LAN_TRUST_LOCALHOST=1/true`, requests whose TCP peer and Host header are both loopback forms skip the token judgment and pass directly (pages and websocket upgrades share one decision point); the `/auth-set` and `?token=` cookie-exchange flows are unchanged.
 - Invalid token → 401 (with or without a foreign `?token=`, unless the valid gate cookie is present).
@@ -77,7 +77,7 @@ The startup line prints the LAN URL. From another device on the same LAN:
 - `http://<LAN-IP>:3180/?token=<random>` should load the full UI (the token is exchanged for a cookie on first entry and the query is cleared).
 - `curl -i http://<LAN-IP>:3180/api/session/list` without credentials should return `401`.
 
-Tests: `packages/extensions/lan-access/tests/lan-access.spec.ts` (16 cases: the gate over `/api`, websocket rejection, the auth-set chain, the `?token=` dead-loop closure, placeholder-page opacity, disabled-mode byte-for-byte equivalence against the stock server — unset and explicit `false` — fail-loud missing token, log hygiene, the localhost exemption's loopback peer + loopback Host double for pages and websocket upgrades, the reverse-tunnel and LAN shape denials, the exemption switch parsing, and the loopback classification predicates).
+Tests: `packages/extensions/lan-access/tests/lan-access.spec.ts` (19 cases: the gate over `/api`, websocket rejection, the auth-set chain, the `?token=` dead-loop closure, placeholder-page opacity, document `no-store` marking — documents, denials, and exchanges carry it; assets and writes do not — disabled-mode byte-for-byte equivalence against the stock server — unset and explicit `false`, headers included — fail-loud missing token, log hygiene, the localhost exemption's loopback peer + loopback Host double for pages and websocket upgrades, the reverse-tunnel and LAN shape denials, the exemption switch parsing, and the loopback classification predicates).
 
 <a id="model-experience"></a>
 ## Model Experience

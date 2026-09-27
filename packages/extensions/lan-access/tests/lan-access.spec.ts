@@ -344,6 +344,58 @@ describe('LAN token gate', () => {
     expect(observedUrls).toEqual(['/?token=foreign-launch-token'])
   })
 
+  it('marks document responses and gate denials uncacheable, leaves hashed assets cacheable', { timeout: 60_000 }, async () => {
+    setLanEnv('true', TOKEN)
+    const loaded = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts')
+    const server = loaded.webServer
+    server.registerFallback((req, res) => {
+      // Mirror the real fallback's split: the dist root and *.html documents carry
+      // state (the boot theme injection); hashed assets keep their caching.
+      if ((req.url ?? '/').startsWith('/assets/')) {
+        res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' })
+        res.end('export {}')
+        return
+      }
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+      res.end('<html><body>shell</body></html>')
+    })
+    const cookie = { headers: { cookie: `dsh-lan-token=${TOKEN}` } }
+
+    for (const path of ['/', '/index.html', '/notes.html?ref=x']) {
+      const document = await request(server.port, path, cookie)
+      expect(document.status).toBe(200)
+      expect(document.headers.get('cache-control')).toBe('no-store')
+    }
+    const headDocument = await request(server.port, '/', { ...cookie, method: 'HEAD' })
+    expect(headDocument.headers.get('cache-control')).toBe('no-store')
+
+    // Writes are never cacheable anyway; the document judgment skips them.
+    const write = await request(server.port, '/', { ...cookie, method: 'POST' })
+    expect(write.status).toBe(200)
+    expect(write.headers.get('cache-control')).toBeNull()
+
+    const asset = await request(server.port, '/assets/index-ABC123.js', cookie)
+    expect(asset.status).toBe(200)
+    expect(asset.headers.get('cache-control')).toBeNull()
+
+    const denied = await request(server.port, '/')
+    expect(denied.status).toBe(401)
+    expect(denied.headers.get('cache-control')).toBe('no-store')
+
+    const entryRedirect = await request(server.port, `/?token=${TOKEN}`)
+    expect(entryRedirect.status).toBe(302)
+    expect(entryRedirect.headers.get('cache-control')).toBe('no-store')
+    const authSet = await request(server.port, `/auth-set?token=${TOKEN}`)
+    expect(authSet.status).toBe(302)
+    expect(authSet.headers.get('cache-control')).toBe('no-store')
+
+    // A malformed escape cannot name the index; the raw form is judged, so the
+    // (never-cached-in-production) 404 shape carries no document header.
+    const malformed = await request(server.port, '/%zz', cookie)
+    expect(malformed.status).toBe(200)
+    expect(malformed.headers.get('cache-control')).toBeNull()
+  })
+
   it('serves a placeholder 401 page that leaks no real dist path or asset name', { timeout: 60_000 }, async () => {
     setLanEnv('true', TOKEN)
     const loaded = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts')
@@ -426,6 +478,18 @@ describe('disabled-mode equivalence', () => {
     // The token env is present but inert: no gate was installed.
     const withToken = await request(subclass.webServer.port, '/probe')
     expect(withToken.status).toBe(200)
+  })
+
+  it('adds no cache-control header in disabled mode: the stock byte-for-byte contract covers headers', { timeout: 60_000 }, async () => {
+    setLanEnv(undefined, undefined)
+    const subclass = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts')
+    subclass.webServer.registerFallback((_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+      res.end('<html><body>shell</body></html>')
+    })
+    const plain = await request(subclass.webServer.port, '/')
+    expect(plain.status).toBe(200)
+    expect(plain.headers.get('cache-control')).toBeNull()
   })
 })
 

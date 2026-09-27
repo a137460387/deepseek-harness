@@ -34,10 +34,10 @@ LAN 模式关闭时，行的 `host` 表达式就是原版的 `ctx.webStartup.hos
 
 每个请求——静态资源、`index.html`、`/api`、websocket 升级——都在任何已注册 handler 运行之前过 token 门禁：
 
-- 无凭据 → 401，返回内联占位页（无脚本、无资源路径；不暴露真实 dist 的任何路径）。
+- 无凭据 → 401，返回内联占位页（无脚本、无资源路径；不暴露真实 dist 的任何路径）。拒绝响应、`?token=` 重定向与 `/auth-set` 均标记 `Cache-Control: no-store`。
 - 任意路径带 `?token=<secret>` → 校验通过后设置会话 cookie（属性同 `/auth-set`），302 到同路径并清除查询参数。
 - `/auth-set?token=<secret>` → 校验通过后设置 `dsh-lan-token=<secret>` cookie（`HttpOnly; SameSite=Lax; Path=/`，不加 `Secure`——明文 HTTP 场景），302 回 `/`。
-- 有效 cookie → 请求放行到原版分派。
+- 有效 cookie → 请求放行到原版分派。文档路径（dist 根与 `*.html`，GET/HEAD）额外携带 `Cache-Control: no-store`：渲染后的 index 内嵌实时 Host 状态（boot 主题与字号），前置缓存层——比如带缓存规则的 Cloudflare 隧道——绝不能缓存这个壳页面。内容哈希命名的资源与写请求不受影响。
 - 有效 cookie 且带外来 `?token=` → 原样放行（不重定向、不种门禁 cookie）：见下方两段式入场。
 - `DSH_LAN_TRUST_LOCALHOST=1/true` 时，TCP 对端与 Host 头均为回环形态的请求跳过 token 判定直接放行（普通请求与 websocket 升级走同一判定点）；`/auth-set` 与 `?token=` 换取 cookie 的流程不变。
 - 无效 token → 401（无论是否携带外来 `?token=`，除非同时持有有效门禁 cookie）。
@@ -77,7 +77,7 @@ DSH_LAN_ENABLED=true DSH_LAN_TOKEN=<random> pnpm dsh --profile web --port 3180 -
 - `http://<LAN-IP>:3180/?token=<random>` 应完整加载 UI（token 首次进入时换取 cookie 并清参）。
 - 无凭据的 `curl -i http://<LAN-IP>:3180/api/session/list` 应返回 `401`。
 
-测试：`packages/extensions/lan-access/tests/lan-access.spec.ts`（16 个用例：`/api` 门禁、websocket 拒绝、auth-set 链路、`?token=` 死循环闭环、占位页不泄露、disabled 模式与原版逐字节对照——未设与显式 `false` 两态——缺 token fail-loud、日志卫生、localhost 豁免的双条件与 websocket 升级、隧道与 LAN 形态的维持门禁、豁免开关取值解析、回环分类谓词）。
+测试：`packages/extensions/lan-access/tests/lan-access.spec.ts`（19 个用例：`/api` 门禁、websocket 拒绝、auth-set 链路、`?token=` 死循环闭环、占位页不泄露、文档 `no-store` 标记——文档、拒绝与换取响应携带；资源与写请求不带——disabled 模式与原版逐字节对照——未设与显式 `false` 两态，含响应头——缺 token fail-loud、日志卫生、localhost 豁免的双条件与 websocket 升级、隧道与 LAN 形态的维持门禁、豁免开关取值解析、回环分类谓词）。
 
 <a id="model-experience"></a>
 ## 模型体验
