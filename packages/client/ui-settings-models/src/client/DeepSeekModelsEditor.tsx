@@ -74,7 +74,7 @@ export interface DeepSeekModelsValidationFailure {
   index: number
   /** Message key owned by the Models settings section. */
   key: 'modelIdRequired' | 'modelIdDuplicate' | 'modelNameInvalid' | 'modelContextInvalid'
-  | 'modelMaxTokensInvalid'
+  | 'modelMaxTokensInvalid' | 'modelReasoningInvalid'
 }
 
 /** Convert a schema-validated catalog value into records without dropping hidden fields. */
@@ -117,6 +117,26 @@ export function validateDeepSeekModels(value: unknown): DeepSeekModelsValidation
     if (maxTokens !== undefined
       && (typeof maxTokens !== 'number' || !Number.isInteger(maxTokens) || maxTokens <= 0)) {
       return { index, key: 'modelMaxTokensInvalid' }
+    }
+    // The declared-efforts shape the pi-ai resolver enforces: only `off` may
+    // carry no wire value, every declared value must be a non-empty string,
+    // and a declaration naming no level beyond `off` declares nothing
+    // serviceable. Unknown keys are left to the section schema, whose key
+    // union refuses them at the same write.
+    const efforts = model['reasoningEfforts']
+    if (efforts !== undefined && efforts !== false) {
+      if (typeof efforts !== 'object' || efforts === null || Array.isArray(efforts)) {
+        return { index, key: 'modelReasoningInvalid' }
+      }
+      const declared = Object.entries(efforts)
+      for (const [level, wire] of declared) {
+        if (wire === null ? level !== 'off' : typeof wire !== 'string' || wire.length === 0) {
+          return { index, key: 'modelReasoningInvalid' }
+        }
+      }
+      if (!declared.some(([level, wire]) => level !== 'off' && typeof wire === 'string' && wire.length > 0)) {
+        return { index, key: 'modelReasoningInvalid' }
+      }
     }
   }
   return undefined

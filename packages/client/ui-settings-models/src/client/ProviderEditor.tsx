@@ -11,11 +11,13 @@
  * display name and wire protocol of a pi-ai route the adapter does not ship —
  * the two fields the create card asked that route for, editable here for the
  * same reason).
- * Reasoning effort is deliberately absent: it is a per-MODEL capability, and
- * the models under one provider disagree about it, so a provider-scoped
- * control can only be set to a value some of them reject. The composer's
- * model picker offers each model its own levels; `settings.yaml` keeps the
- * profile field for a deployment that knows its route. Everything else stays
+ * Reasoning effort has no provider-scoped control: it is a per-MODEL
+ * capability, and the models under one provider disagree about it, so a
+ * route-level value could only be set to one some of them reject. Each pi-ai
+ * model row edits its own `reasoningEfforts` instead — inherit the installed
+ * catalog, declare a non-reasoning model, or declare the offered levels — and
+ * the composer's model picker offers those levels per model; the route-level
+ * `reasoning` default stays owned by `settings.yaml`. Everything else stays
  * owned by `settings.yaml`. Profile edits land as minimal `settings.mutate`
  * path ops against the stored section — the card names only the fields it can
  * see instead of rebuilding the whole subtree from a partial descriptor.
@@ -33,7 +35,7 @@ import {
 import { apiKeyFailure } from './apiKey.ts'
 import { EditorFooter } from './EditorFooter.tsx'
 import { ModelListEditor } from './ModelListEditor.tsx'
-import { deriveKeyRef, protocolChoices } from './store.ts'
+import { deriveKeyRef, protocolChoices, reasoningLevels } from './store.ts'
 import type { ModelsOperations } from './operations.ts'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
 import type { en } from './locales.ts'
@@ -181,6 +183,12 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   // it rehydrates the whole section schema, so the other layouts skip it.
   const protocols = useMemo(
     () => layout === 'pi-ai' ? protocolChoices(namespace, schema) : [],
+    [layout, namespace, schema],
+  )
+  // The reasoning levels a model row may declare, from the same schema read:
+  // the offered vocabulary and the accepted one cannot drift apart.
+  const levels = useMemo(
+    () => layout === 'pi-ai' ? reasoningLevels(namespace, schema) : [],
     [layout, namespace, schema],
   )
 
@@ -464,6 +472,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
               : (
                 <ModelListEditor
                   {...catalogProps}
+                  reasoningLevels={levels}
                   probe={probe}
                   probeBlocked={keyFailure}
                   operations={operations}

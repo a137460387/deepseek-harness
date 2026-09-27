@@ -9,9 +9,9 @@ import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import { ModelsSection, providerCopy } from '../src/client/ModelsSection.tsx'
 import type { ModelsSectionInjected, ModelsSectionProps } from '../src/client/ModelsSection.tsx'
 import { CustomProviderCard } from '../src/client/CustomProviderCard.tsx'
-import { formatCapacity, parseCapacity } from '../src/client/DeepSeekModelsEditor.tsx'
 import { SettingsDescribeMirror } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-mirror.ts'
-import { ModelsSettingsStore, deriveKeyRef, protocolChoices } from '../src/client/store.ts'
+import { ModelsSettingsStore, deriveKeyRef, protocolChoices, reasoningLevels } from '../src/client/store.ts'
+import { formatCapacity, parseCapacity, validateDeepSeekModels } from '../src/client/DeepSeekModelsEditor.tsx'
 import { createModelsOperations } from '../src/client/operations.ts'
 import type { ModelsOperations } from '../src/client/operations.ts'
 import { en } from '../src/client/locales.ts'
@@ -22,6 +22,7 @@ afterEach(cleanup)
 const t: ModelsSectionInjected['t'] = key => en[key]
 
 const PROTOCOLS = ['openai-completions', 'openai-responses', 'anthropic-messages']
+const REASONING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
 
 /** The pi-ai profile shape as the host serializes it, including the layer-1 fields. */
 const PiAiConfig = Schema.object({
@@ -36,6 +37,12 @@ const PiAiConfig = Schema.object({
       name: Schema.string(),
       contextWindow: Schema.number(),
       maxTokens: Schema.number(),
+      // Keyed by level, valued by wire spelling — the same union of `false`
+      // and a level-keyed dict the adapter's own Config declares.
+      reasoningEfforts: Schema.union([
+        Schema.const(false),
+        Schema.dict(Schema.union([Schema.string(), Schema.const(null)]), Schema.union(REASONING_LEVELS)),
+      ]),
     })),
     reasoning: Schema.union(['off', 'high']),
   })),
@@ -252,6 +259,124 @@ describe('protocolChoices', () => {
     const plain = { ...namespace, schema: JSON.parse(JSON.stringify(Schema.object({}).toJSON())) as JsonValue }
     expect(protocolChoices(plain, settingsSchema)).toEqual([])
     await Promise.resolve()
+  })
+})
+
+describe('reasoningLevels', () => {
+  it('reads the level vocabulary out of the namespace schema and nothing else', () => {
+    const { namespace } = scriptedFace()
+    expect(reasoningLevels(namespace, settingsSchema)).toEqual(REASONING_LEVELS)
+    expect(reasoningLevels(undefined, settingsSchema)).toEqual([])
+    const plain = { ...namespace, schema: JSON.parse(JSON.stringify(Schema.object({}).toJSON())) as JsonValue }
+    expect(reasoningLevels(plain, settingsSchema)).toEqual([])
+  })
+})
+
+describe('model reasoning efforts', () => {
+  it('declares levels from the custom mode, refusing a declaration of only off', async () => {
+    const { mutate } = await mountSection()
+    openEditor('openai')
+
+    fireEvent.click(screen.getByRole('button', { name: en.addModel }))
+    fireEvent.change(screen.getByLabelText(`${en.modelId} 1`), { target: { value: 'thinker' } })
+    expandModel(1)
+    // A fresh custom declaration declares off with no wire value, which alone
+    // offers nothing selectable — the same refusal the resolver raises.
+    fireEvent.change(screen.getByLabelText(`${en.modelReasoning} 1`), { target: { value: 'custom' } })
+    expect(screen.getByText(`${en.model} 1: ${en.modelReasoningInvalid}`)).toBeTruthy()
+    expect(buttonNamed(en.apply).disabled).toBe(true)
+    expect(mutate).not.toHaveBeenCalled()
+
+    fireEvent.change(screen.getByLabelText(`${en.modelReasoning} 1: high`), { target: { value: 'high' } })
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value)
+      .toEqual([{ id: 'thinker', reasoningEfforts: { off: null, high: 'high' } }])
+  })
+
+  it('edits a stored declaration: renders spellings, trims on blur, drops cleared levels', async () => {
+    const { mutate } = await mountSection({
+      providers: {
+        openai: {
+          baseURL: 'https://proxy.example/v1',
+          models: [{ id: 'kept', reasoningEfforts: { off: null, high: 'high' } }],
+        },
+      },
+    })
+    openEditor('openai')
+    expandModel(1)
+
+    // A stored null spelling renders empty; a stored string renders as itself.
+    expect(screen.getByLabelText<HTMLInputElement>(`${en.modelReasoning} 1: off`).value).toBe('')
+    expect(screen.getByLabelText<HTMLInputElement>(`${en.modelReasoning} 1: high`).value).toBe('high')
+
+    fireEvent.change(screen.getByLabelText(`${en.modelReasoning} 1: high`), { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText(`${en.modelReasoning} 1: max`), { target: { value: ' max ' } })
+    fireEvent.change(screen.getByLabelText(`${en.modelReasoning} 1: off`), { target: { value: 'none' } })
+    fireEvent.blur(screen.getByLabelText(`${en.modelReasoning} 1: max`))
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value)
+      .toEqual([{ id: 'kept', reasoningEfforts: { off: 'none', max: 'max' } }])
+  })
+
+  it('writes false from the disable mode and removes the field from inherit', async () => {
+    const { mutate } = await mountSection({
+      providers: {
+        openai: {
+          baseURL: 'https://proxy.example/v1',
+          models: [{ id: 'flat', reasoningEfforts: { off: null, high: 'high' } }],
+        },
+      },
+    })
+    openEditor('openai')
+    expandModel(1)
+    fireEvent.change(screen.getByLabelText(`${en.modelReasoning} 1`), { target: { value: 'disable' } })
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{ id: 'flat', reasoningEfforts: false }])
+  })
+
+  it('returns a disabled model to the catalog capability by clearing the field', async () => {
+    const { mutate } = await mountSection({
+      providers: {
+        openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'flat', reasoningEfforts: false }] },
+      },
+    })
+    openEditor('openai')
+    expandModel(1)
+    expect(screen.getByLabelText<HTMLSelectElement>(`${en.modelReasoning} 1`).value).toBe('disable')
+
+    fireEvent.change(screen.getByLabelText(`${en.modelReasoning} 1`), { target: { value: 'inherit' } })
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{ id: 'flat' }])
+  })
+
+  it('reads a valueless stored declaration as custom and refuses it', async () => {
+    await mountSection({
+      providers: {
+        openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'drift', reasoningEfforts: null }] },
+      },
+    })
+    openEditor('openai')
+    expandModel(1)
+
+    expect(screen.getByLabelText<HTMLSelectElement>(`${en.modelReasoning} 1`).value).toBe('custom')
+    expect(screen.getByText(`${en.model} 1: ${en.modelReasoningInvalid}`)).toBeTruthy()
+    expect(buttonNamed(en.apply).disabled).toBe(true)
+  })
+
+  it('mirrors the resolver on shapes the editor never writes', () => {
+    expect(validateDeepSeekModels([{ id: 'm', reasoningEfforts: false }])).toBeUndefined()
+    expect(validateDeepSeekModels([{ id: 'm', reasoningEfforts: { off: 'none', max: 'max' } }])).toBeUndefined()
+    const refused = { index: 0, key: 'modelReasoningInvalid' } as const
+    expect(validateDeepSeekModels([{ id: 'm', reasoningEfforts: { off: null } }])).toEqual(refused)
+    expect(validateDeepSeekModels([{ id: 'm', reasoningEfforts: { off: null, low: null } }])).toEqual(refused)
+    expect(validateDeepSeekModels([{ id: 'm', reasoningEfforts: { high: '' } }])).toEqual(refused)
+    expect(validateDeepSeekModels([{ id: 'm', reasoningEfforts: { high: 4 } }])).toEqual(refused)
+    expect(validateDeepSeekModels([{ id: 'm', reasoningEfforts: ['off'] }])).toEqual(refused)
+    expect(validateDeepSeekModels([{ id: 'm', reasoningEfforts: 'no' }])).toEqual(refused)
   })
 })
 

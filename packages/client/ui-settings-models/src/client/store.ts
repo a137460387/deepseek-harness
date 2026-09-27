@@ -97,6 +97,13 @@ export interface ModelsSettingsState {
   credentialError: string | null
   /** Whether the settings provider accepts writes. */
   writable: boolean
+  /**
+   * Settings namespaces the provider directory references but the describe
+   * answer does not carry — the host-side registration of each failed, so the
+   * routes they configure are dormant while no row can render them. Surfaced as
+   * a page-level diagnostic instead of reading as an unconfigured fresh install.
+   */
+  missingNamespaces: readonly string[]
   /** Every configurable provider joined with its configured/credential state. */
   rows: readonly ProviderRow[]
   /** Namespace views by ns, for the editor's schema/layers/secrets. */
@@ -134,6 +141,42 @@ export function protocolChoices(
   return list.list.map(entry => entry.value).filter((value): value is string => typeof value === 'string')
 }
 
+/**
+ * The reasoning levels a model may declare efforts for, read out of the owning
+ * namespace's own schema. This stays a schema read rather than a client copy so
+ * the levels the page offers cannot drift from the ones the adapter resolves:
+ * both come from the same `Config`. The vocabulary is the key schema of the
+ * `reasoningEfforts` dict — the dict member of the field's `false | dict` union.
+ * @param namespace - the namespace view whose schema declares the profile shape.
+ * @param schema - settings schema operations.
+ * @returns the level identifiers in declaration order, empty when the schema has none.
+ */
+export function reasoningLevels(
+  namespace: SettingsNamespaceView | undefined,
+  schema: SettingsSchemaOperations,
+): string[] {
+  if (namespace === undefined) return []
+  const node = schema.nodeAtPath(
+    schema.rehydrate(namespace.schema),
+    // The `models` segment steps into the array, so an element position is
+    // named (and ignored) before the field key: nodeAtPath spends one segment
+    // per container, and every position shares the element schema.
+    ['providers', PROBE_ROUTE, 'models', '0', 'reasoningEfforts'],
+  )
+  const union = node as {
+    type?: string
+    list?: readonly {
+      type?: string
+      sKey?: { type?: string; list?: readonly { value?: unknown }[] }
+    }[]
+  } | undefined
+  if (union?.type !== 'union' || union.list === undefined) return []
+  const dict = union.list.find(member => member.type === 'dict')
+  const keys = dict?.sKey
+  if (keys?.type !== 'union' || keys.list === undefined) return []
+  return keys.list.map(entry => entry.value).filter((value): value is string => typeof value === 'string')
+}
+
 /** The credential reference a resolved profile names (its `apiKeyEnv` field). */
 function apiKeyEnvOf(
   namespace: SettingsNamespaceView | undefined,
@@ -151,7 +194,7 @@ function apiKeyEnvOf(
 export class ModelsSettingsStore {
   /** The snapshot the section renders from (uSES-safe store). */
   readonly store: SnapshotStore<ModelsSettingsState> = createSnapshotStore<ModelsSettingsState>({
-    status: 'idle', error: null, credentialError: null, writable: false, rows: [], namespaces: new Map(),
+    status: 'idle', error: null, credentialError: null, writable: false, missingNamespaces: [], rows: [], namespaces: new Map(),
   })
 
   /** Latest load wins; an older response never overwrites a newer one. */
@@ -196,6 +239,15 @@ export class ModelsSettingsStore {
     const writable = mirrored.view.writable
     const views: readonly SettingsNamespaceView[] = mirrored.view.namespaces
     const namespaces = new Map(views.map(view => [view.ns, view]))
+    // A directory entry naming a namespace the describe answer lacks means the
+    // namespace's host-side registration failed (an invalid stored section
+    // rejects at registration, where the seam has no last-good value to keep).
+    // Its rows cannot render, so the fact surfaces as one page-level list.
+    const missingNamespaces = [...new Set(
+      providers
+        .map(entry => entry.settingsNs)
+        .filter(ns => ns !== '' && !namespaces.has(ns)),
+    )]
     const rows: ProviderRow[] = providers.map((entry) => {
       const namespace = namespaces.get(entry.settingsNs)
       const configured = namespace !== undefined
@@ -229,6 +281,7 @@ export class ModelsSettingsStore {
       s.error = null
       s.credentialError = credentialError
       s.writable = writable
+      s.missingNamespaces = missingNamespaces
       s.rows = rows.map((row) => {
         const named = row.apiKeyEnv === undefined ? undefined : credentials[row.apiKeyEnv]
         const derived = row.apiKeyEnv !== undefined ? undefined : credentials[deriveKeyRef(row.entry.provider)]

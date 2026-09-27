@@ -310,6 +310,13 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
       <h2 className={styles['title']}>{t('title')}</h2>
       <p className={styles['intro']}>{t('intro')}</p>
       {!state.writable && state.status === 'ready' ? <p className={styles['notice']}>{t('readOnly')}</p> : null}
+      {state.missingNamespaces.length === 0
+        ? null
+        : (
+          <p className={styles['error']} role="alert">
+            {t('namespacesUnavailable').replace('{namespaces}', () => state.missingNamespaces.join(', '))}
+          </p>
+        )}
       {savedIdentity === undefined
         ? null
         : (

@@ -146,6 +146,29 @@ describe('request-level dynamic profiles', () => {
     expect(server.requests).toHaveLength(2)
   })
 
+  it('fails loud on stderr and stays dormant when the stored section fails registration validation', async () => {
+    const dir = await home()
+    // A reasoningEfforts key outside THINKING_LEVELS (the production drift was a
+    // YAML-1.1 rewrite turning `off:` into the boolean-backed `false:`) rejects
+    // the whole section at registration, where the seam has no last-good value.
+    await writeFile(join(dir, 'settings.yaml'), JSON.stringify({ [NS]: { providers: { openrouter: {
+      api: 'openai-completions', models: [{ id: '111', reasoningEfforts: { 'false': null, max: 'max' } }],
+    } } } }))
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      const ctx = await boot(dir, {})
+      expect(ctx.settings.describe().map(section => section.ns)).not.toContain(NS)
+      expect(ctx.llm.listProviders()).toEqual([])
+      expect(ctx.llm.listConfigurableProviders().length).toBeGreaterThan(0)
+      expect(spy).toHaveBeenCalledWith(
+        expect.stringContaining(`the "${NS}" settings section failed validation`),
+        expect.any(Error),
+      )
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
   it('allows removing an obsolete override and deleting a route whose catalog cannot be built', async () => {
     const dir = await home()
     await writeFile(join(dir, 'settings.yaml'), JSON.stringify({ [NS]: { providers: {

@@ -147,6 +147,27 @@ describe('ModelsSettingsStore', () => {
     expect(byProvider.get('anthropic')?.apiKeyEnv).toBeUndefined()
     expect(byProvider.get('ghost')).toMatchObject({ configured: false, removable: false })
     expect(state.namespaces.get('llm-pi-ai')?.ns).toBe('llm-pi-ai')
+    expect(state.missingNamespaces).toEqual([])
+  })
+
+  it('names directory-referenced namespaces missing from the settings answer', async () => {
+    const { ctx, mirror } = api({
+      describeSettings: () => Promise.resolve(remoteOk({
+        writable: true,
+        hasDocument: false,
+        namespaces: NAMESPACES.filter(view => view.ns !== 'llm-pi-ai'),
+      })),
+    })
+    const store = new ModelsSettingsStore(ctx, settingsSchema, mirror)
+    await store.load()
+    const state = store.store.getSnapshot()
+    expect(state.status).toBe('ready')
+    // The llm-pi-ai registration failed host-side, so its profiles are hidden
+    // (every row reads unconfigured); the page names the gap instead of
+    // reading as a fresh install.
+    expect(state.missingNamespaces).toEqual(['llm-pi-ai'])
+    expect(state.rows.map(row => row.entry.provider)).toEqual(['deepseek-official', 'openai', 'anthropic', 'ghost'])
+    expect(state.rows.filter(row => row.entry.settingsNs === 'llm-pi-ai').every(row => !row.configured)).toBe(true)
   })
 
   it('degrades the credential badge, not the page, when the credential domain fails', async () => {

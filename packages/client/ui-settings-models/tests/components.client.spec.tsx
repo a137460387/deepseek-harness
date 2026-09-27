@@ -315,6 +315,17 @@ describe('ModelsSection', () => {
     expect(screen.queryByRole('button', { name: en.customAdd })).toBeNull()
   })
 
+  it('names the missing settings namespaces in a page-level alert', async () => {
+    const scripted = scriptedFace()
+    scripted.face.settings.describe.mockResolvedValue(remoteOk({
+      writable: true, hasDocument: false,
+      namespaces: wireNamespaces().filter(view => view.ns !== 'llm-pi-ai'),
+    }))
+    await mountFace(scripted)
+    expect(screen.getByRole('alert').textContent)
+      .toBe(en.namespacesUnavailable.replace('{namespaces}', 'llm-pi-ai'))
+  })
+
   it('offers only providers whose settings namespace can open an editor', async () => {
     const scripted = scriptedFace()
     scripted.face.settings.describe.mockResolvedValue(remoteOk({
@@ -629,6 +640,15 @@ describe('ModelsSection', () => {
       [{ op: 'set', path: ['baseURL'], value: 'https://next2' }],
       0,
     ])
+  })
+
+  it('offers the deepseek catalog rows no reasoning control', async () => {
+    await mountDeepSeekCard()
+    fireEvent.click(screen.getByText(en.customized))
+    expandRow(1)
+    // The efforts field is a pi-ai model capability; the deepseek catalog rows
+    // carry no such field and the control is hidden rather than inert.
+    expect(screen.queryByLabelText(`${en.modelReasoning} 1`)).toBeNull()
   })
 
   it('materializes inherited models and adds an arbitrary DeepSeek id', async () => {

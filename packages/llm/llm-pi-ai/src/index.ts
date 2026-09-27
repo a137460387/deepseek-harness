@@ -294,44 +294,62 @@ export function apply(ctx: Context, config: Config): void {
 
   ctx.inject(['settings'], (settingsCtx) => {
     let registering = true
-    settingsCtx.settings.installSection(ctx, NS, Config, config, {
-      validate: (value) => {
-        // Stored catalog drift must not prevent registration of the repair UI.
-        if (registering) {
-          resolveProfiles(value.providers, 'deferred')
-        } else {
-          assertServiceable(value, current())
-        }
-      },
-      setSource: (source) => {
-        current = source
-      },
-      onChange: () => {
-        // Named here rather than left to the settings watcher: `assertServiceable`
-        // cannot see the llm registry, so a profile claiming a route another
-        // adapter family owns is stored successfully and only fails at this swap.
-        // Without its own diagnostic that refusal reaches the operator as a
-        // generic "settings: watcher failed", naming neither the route nor why it
-        // is not serving. The previous routes keep serving either way.
-        try {
-          ensureRegistrationFacts()
-        } catch (error) {
-          ctx.logger.error('llm-pi-ai: keeping the previously registered routes after a refused update')
-          ctx.logger.error(error)
-        }
-        // The directory follows the profiles the registry accepted, so a route
-        // that failed to register is not advertised as configurable. A refused
-        // directory swap is contained here for the same reason the registry's
-        // is: the previous entries keep serving, and `directoryFacts` stays put
-        // so returning to a working configuration re-applies.
-        try {
-          ensureDirectory()
-        } catch (error) {
-          ctx.logger.error('llm-pi-ai: keeping the previous configurable-provider directory after a refused update')
-          ctx.logger.error(error)
-        }
-      },
-    })
-    registering = false
+    try {
+      settingsCtx.settings.installSection(ctx, NS, Config, config, {
+        validate: (value) => {
+          // Stored catalog drift must not prevent registration of the repair UI.
+          if (registering) {
+            resolveProfiles(value.providers, 'deferred')
+          } else {
+            assertServiceable(value, current())
+          }
+        },
+        setSource: (source) => {
+          current = source
+        },
+        onChange: () => {
+          // Named here rather than left to the settings watcher: `assertServiceable`
+          // cannot see the llm registry, so a profile claiming a route another
+          // adapter family owns is stored successfully and only fails at this swap.
+          // Without its own diagnostic that refusal reaches the operator as a
+          // generic "settings: watcher failed", naming neither the route nor why it
+          // is not serving. The previous routes keep serving either way.
+          try {
+            ensureRegistrationFacts()
+          } catch (error) {
+            ctx.logger.error('llm-pi-ai: keeping the previously registered routes after a refused update')
+            ctx.logger.error(error)
+          }
+          // The directory follows the profiles the registry accepted, so a route
+          // that failed to register is not advertised as configurable. A refused
+          // directory swap is contained here for the same reason the registry's
+          // is: the previous entries keep serving, and `directoryFacts` stays put
+          // so returning to a working configuration re-applies.
+          try {
+            ensureDirectory()
+          } catch (error) {
+            ctx.logger.error('llm-pi-ai: keeping the previous configurable-provider directory after a refused update')
+            ctx.logger.error(error)
+          }
+        },
+      })
+    } catch (error) {
+      // A stored section the schema rejects fails the registration itself: the
+      // settings seam keeps no last-good value for a namespace that never
+      // registered, so every configured route stays dormant and the Models page
+      // reads as a fresh install — while hot reloads never retry the
+      // registration. The fiber's own logger report black-holes in a
+      // composition with no console exporter, so write the diagnostic to stderr
+      // directly before letting the fiber fail.
+      console.error(
+        `llm-pi-ai: the "${NS}" settings section failed validation; the namespace was not registered,`
+        + ' every provider route it declares stays dormant, and fixing the document takes a restart'
+        + ' to take effect',
+        error,
+      )
+      throw error
+    } finally {
+      registering = false
+    }
   })
 }

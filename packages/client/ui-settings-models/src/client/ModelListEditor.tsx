@@ -9,6 +9,12 @@
  * adding a provider is one pass instead of save-then-return; the reply is
  * candidates the user picks from, never configuration written behind them.
  *
+ * Each row's disclosure also edits its `reasoningEfforts`: follow the installed
+ * catalog, declare the model non-reasoning, or declare the offered levels with
+ * the wire value each dispatches. The level vocabulary arrives from the caller,
+ * read out of the adapter's own schema, so the page offers nothing the section
+ * schema would refuse.
+ *
  * A provider that cannot be interrogated (an unreachable endpoint, a protocol
  * with no readable listing) is not a dead end: the failure is shown next to the
  * rows the user can still fill in by hand.
@@ -42,6 +48,24 @@ function numberOf(model: ModelDraft, key: string): number | undefined {
   return typeof value === 'number' ? value : undefined
 }
 
+/** The three editable states of one row's `reasoningEfforts` field. */
+type EffortsMode = 'inherit' | 'disable' | 'custom'
+
+/** The mode a row's stored efforts render as: absent inherits, `false` disables, anything else declares. */
+function effortsModeOf(model: ModelDraft): EffortsMode {
+  const value = model['reasoningEfforts']
+  if (value === undefined) return 'inherit'
+  return value === false ? 'disable' : 'custom'
+}
+
+/** A row's stored efforts when they are a declared dict, else an empty one. */
+function effortsDictOf(model: ModelDraft): Record<string, unknown> {
+  const value = model['reasoningEfforts']
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+}
+
 /** What an interrogation needs, taken from the live form. */
 export interface ProbeTarget {
   /** Settings namespace whose adapter family answers. */
@@ -66,6 +90,12 @@ export interface ModelListEditorProps {
   models: readonly ModelDraft[]
   /** Whether the user layer currently owns the whole array; absent on a create. */
   overridden?: boolean
+  /**
+   * The reasoning levels a row may declare efforts for, in escalation order,
+   * read out of the owning namespace's schema. Absent or empty — a family
+   * whose models carry no such field — hides the control entirely.
+   */
+  reasoningLevels?: readonly string[]
   /** Replace the drafted rows. */
   onChange: (models: ModelDraft[]) => void
   /** Remove the user-owned array and return to inheritance; absent on a create. */
@@ -185,6 +215,77 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
   /** What a capacity field shows: the buffer while typing, else the stored count. */
   const capacityText = (model: ModelDraft, index: number, field: CapacityField): string =>
     editing.get(bufferKey(index, field)) ?? capacitySpelling(numberOf(model, field))
+
+  const levels = props.reasoningLevels ?? []
+
+  /** One level's wire text: the stored spelling, or empty when absent or null. */
+  const wireText = (model: ModelDraft, level: string): string => {
+    const wire = effortsDictOf(model)[level]
+    return typeof wire === 'string' ? wire : ''
+  }
+
+  /** Write one row's `reasoningEfforts`, keeping every other field on the row. */
+  const writeEfforts = (index: number, next: Record<string, unknown> | false | undefined): void => {
+    onChange(models.map((model, at) => {
+      if (at !== index) return model
+      const copy = { ...model }
+      if (next === undefined) Reflect.deleteProperty(copy, 'reasoningEfforts')
+      else copy['reasoningEfforts'] = next
+      return copy
+    }))
+  }
+
+  const changeEffortsMode = (index: number, mode: string): void => {
+    if (mode === 'inherit') {
+      writeEfforts(index, undefined)
+      return
+    }
+    if (mode === 'disable') {
+      writeEfforts(index, false)
+      return
+    }
+    const model = models[index]
+    // A fresh declaration starts from the stored dict when it is one; otherwise
+    // it declares `off` with no wire value — the spelling every dispatch reads
+    // as "supported, send nothing".
+    writeEfforts(index, { off: null, ...effortsDictOf(model ?? {}) })
+  }
+
+  /**
+   * Rewrite the declared dict from the schema's level vocabulary instead of
+   * spreading over the stored value: a hand-written key outside the vocabulary,
+   * or a non-off level left valueless, is drift the adapter refuses, and an
+   * edit through this editor is the moment to shed it. `off` stays declared —
+   * an empty spelling means "supported, send nothing", which is what a stored
+   * null renders as.
+   */
+  const editWire = (index: number, level: string, raw: string): void => {
+    const wire = raw.trim()
+    onChange(models.map((model, at) => {
+      if (at !== index) return model
+      const stored = effortsDictOf(model)
+      const next: Record<string, unknown> = {}
+      for (const name of levels) {
+        if (name === level) continue
+        const kept = stored[name]
+        if (name === 'off') {
+          next['off'] = typeof kept === 'string' && kept.length > 0 ? kept : null
+          continue
+        }
+        if (typeof kept === 'string' && kept.length > 0) next[name] = kept
+      }
+      if (level === 'off') next['off'] = wire.length > 0 ? wire : null
+      else if (wire.length > 0) next[level] = wire
+      return { ...model, reasoningEfforts: next }
+    }))
+  }
+
+  /** Settle one level's spelling on blur, the way a pasted id settles. */
+  const settleWire = (index: number, level: string): void => {
+    const model = models[index]
+    if (model === undefined) return
+    editWire(index, level, wireText(model, level).trim())
+  }
 
   /** Drop one row's entries and shift the rows after it down, in one pass. */
   const reindexOnRemove = (
@@ -406,34 +507,82 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
           </div>
           {expanded.has(index)
             ? (
-              <div className={styles['modelAdvanced']}>
-                <label className={styles['modelField']}>
-                  <span className={styles['modelFieldLabel']}>{t('modelContextWindow')}</span>
-                  <input
-                    className={styles['input']}
-                    type="text"
-                    inputMode="numeric"
-                    value={capacityText(model, index, 'contextWindow')}
-                    placeholder={CAPACITY_HINT.contextWindow}
-                    aria-label={`${t('modelContextWindow')} ${index + 1}`}
-                    disabled={disabled}
-                    onChange={(event) => { editCapacity(index, 'contextWindow', event.target.value) }}
-                  />
-                </label>
-                <label className={styles['modelField']}>
-                  <span className={styles['modelFieldLabel']}>{t('modelMaxTokens')}</span>
-                  <input
-                    className={styles['input']}
-                    type="text"
-                    inputMode="numeric"
-                    value={capacityText(model, index, 'maxTokens')}
-                    placeholder={CAPACITY_HINT.maxTokens}
-                    aria-label={`${t('modelMaxTokens')} ${index + 1}`}
-                    disabled={disabled}
-                    onChange={(event) => { editCapacity(index, 'maxTokens', event.target.value) }}
-                  />
-                </label>
-              </div>
+              <>
+                <div className={styles['modelAdvanced']}>
+                  <label className={styles['modelField']}>
+                    <span className={styles['modelFieldLabel']}>{t('modelContextWindow')}</span>
+                    <input
+                      className={styles['input']}
+                      type="text"
+                      inputMode="numeric"
+                      value={capacityText(model, index, 'contextWindow')}
+                      placeholder={CAPACITY_HINT.contextWindow}
+                      aria-label={`${t('modelContextWindow')} ${index + 1}`}
+                      disabled={disabled}
+                      onChange={(event) => { editCapacity(index, 'contextWindow', event.target.value) }}
+                    />
+                  </label>
+                  <label className={styles['modelField']}>
+                    <span className={styles['modelFieldLabel']}>{t('modelMaxTokens')}</span>
+                    <input
+                      className={styles['input']}
+                      type="text"
+                      inputMode="numeric"
+                      value={capacityText(model, index, 'maxTokens')}
+                      placeholder={CAPACITY_HINT.maxTokens}
+                      aria-label={`${t('modelMaxTokens')} ${index + 1}`}
+                      disabled={disabled}
+                      onChange={(event) => { editCapacity(index, 'maxTokens', event.target.value) }}
+                    />
+                  </label>
+                </div>
+                {levels.length > 0
+                  ? (
+                    <div className={styles['modelReasoning']}>
+                      <label className={styles['modelField']}>
+                        <span className={styles['modelFieldLabel']}>{t('modelReasoning')}</span>
+                        <select
+                          className={`${styles['input']} ${styles['selectInput']}`}
+                          value={effortsModeOf(model)}
+                          aria-label={`${t('modelReasoning')} ${index + 1}`}
+                          disabled={disabled}
+                          onChange={(event) => { changeEffortsMode(index, event.target.value) }}
+                        >
+                          <option value="inherit">{t('modelReasoningInherit')}</option>
+                          <option value="disable">{t('modelReasoningDisable')}</option>
+                          <option value="custom">{t('modelReasoningCustom')}</option>
+                        </select>
+                      </label>
+                      {effortsModeOf(model) !== 'custom'
+                        ? null
+                        : (
+                          <>
+                            <div className={styles['modelReasoningLevels']}>
+                              {levels.map(level => (
+                                <label key={level} className={styles['modelField']}>
+                                  <span className={styles['modelFieldLabel']}>{level}</span>
+                                  <input
+                                    className={styles['input']}
+                                    type="text"
+                                    value={wireText(model, level)}
+                                    placeholder={level === 'off'
+                                      ? t('modelReasoningOffPlaceholder')
+                                      : t('modelReasoningWirePlaceholder')}
+                                    aria-label={`${t('modelReasoning')} ${index + 1}: ${level}`}
+                                    disabled={disabled}
+                                    onChange={(event) => { editWire(index, level, event.target.value) }}
+                                    onBlur={() => { settleWire(index, level) }}
+                                  />
+                                </label>
+                              ))}
+                            </div>
+                            <p className={styles['modelReasoningHint']}>{t('modelReasoningHint')}</p>
+                          </>
+                        )}
+                    </div>
+                  )
+                  : null}
+              </>
             )
             : null}
         </div>
