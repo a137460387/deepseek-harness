@@ -59,6 +59,7 @@ packages/    @deepseek-ai/dsh-<pkg> workspaces at packages/<group>/<pkg>/
   storage/              non-session storage
   workspace/            workspace entities
   feedback/             human feedback
+  telemetry/            shared Cordis OTel reporting channels
   identity/             anonymous identity
   settings/             user settings
   credentials/          credentials/authorization

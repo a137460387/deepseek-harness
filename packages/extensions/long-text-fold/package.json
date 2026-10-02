@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-client-long-text-fold",
   "description": "Long-text paste staging cards: a long plain-text paste stages as a card over the composer, submission restores the full text, and the sent message folds into an expandable chat card",
-  "version": "0.1.7-rc.2",
+  "version": "0.2.0-rc.2",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
