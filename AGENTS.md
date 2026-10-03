@@ -10,6 +10,8 @@ Public APIs are pre-stable; update every consumer. Follow [version/status](docs/
 
 Acknowledge [declared persistence-type changes](docs/cookbook/reviewing-persistence-type-changes.md).
 
+Record each externally perceptible breaking change immediately in an [upgrade guide](.agents/skills/dsh-create-upgrade-guide/SKILL.md).
+
 **Application launch.** Only `dsh` profiles launch supported Node apps; package bins, demos, and public SDK argv escapes are forbidden ([rule](docs/architecture.md#application-launch)).
 
 ## Repository layout
@@ -57,6 +59,7 @@ packages/    @deepseek-ai/dsh-<pkg> workspaces at packages/<group>/<pkg>/
   storage/              non-session storage
   workspace/            workspace entities
   feedback/             human feedback
+  telemetry/            shared Cordis OTel reporting channels
   identity/             anonymous identity
   settings/             user settings
   credentials/          credentials/authorization
