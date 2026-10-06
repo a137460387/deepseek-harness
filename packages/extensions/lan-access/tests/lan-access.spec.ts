@@ -22,8 +22,6 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import HttpServer from '@deepseek-ai/dsh-host-webserver'
 import { isLoopbackHostHeader, isLoopbackTcpPeer, LanAccessWebServer } from '../src/server.ts'
-import * as LanAccessInvariant from '../src/invariant.ts'
-import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 
 const TOKEN = 'test-lan-token-3f9a'
 
@@ -96,8 +94,6 @@ async function loadComposition(
   const modules = new Map<string, unknown>([
     ['@deepseek-ai/dsh-host-lan-access/src/server.ts', plugin],
     ['@deepseek-ai/dsh-host-webserver', HttpServer],
-    ['@deepseek-ai/dsh-invariants', InvariantRegistry],
-    ['@deepseek-ai/dsh-host-lan-access/invariant', LanAccessInvariant],
   ])
   context.loader.internal = {
     version: 'v2',
@@ -699,13 +695,3 @@ describe('loopback classification predicates', () => {
   })
 })
 
-describe('invariant companion', () => {
-  it('registers its package name through the invariants service', async () => {
-    const ctx = new Context()
-    await ctx.plugin(InvariantRegistry)
-    await ctx.plugin(LanAccessInvariant)
-    expect(LanAccessInvariant.name).toBe('host-lan-access-invariant')
-    expect(LanAccessInvariant.inject).toEqual(['invariants'])
-    await ctx.fiber.dispose()
-  })
-})

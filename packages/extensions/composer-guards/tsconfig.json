@@ -22,9 +22,6 @@
     },
     {
       "path": "../../client/ui-conversation/tsconfig.client.json"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
     }
   ]
 }

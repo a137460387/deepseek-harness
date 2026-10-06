@@ -20,10 +20,9 @@
  * closes on an outside press; the chat renderer folds long texts into the
  * probe-marked card and mirrors the shipped bubble for short texts.
  * Registration disposal rides the plugin fiber (HMR safety). The node half
- * and the invariant companion are exercised over the same Context.
+ * is exercised over the same Context.
  */
 import { Context } from '@deepseek-ai/cordis'
-import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { cleanup, fireEvent, render, within } from '@testing-library/react'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
@@ -42,7 +41,6 @@ import type { StagedState } from '../src/client/staged-store.ts'
 import { MAX_STAGED_BYTES, RENDER_FOLD_CHARS, RENDER_FOLD_LINES, markerOf } from '../src/client/markers.ts'
 import { en, zh } from '../src/client/locales.ts'
 import { apply as nodeApply } from '../src/index.ts'
-import * as LongTextFoldInvariant from '../src/invariant.ts'
 
 afterEach(cleanup)
 
@@ -749,18 +747,8 @@ describe('LongTextFoldNodeView component', () => {
   })
 })
 
-describe('long-text-fold node half and invariant companion', () => {
+describe('long-text-fold node half', () => {
   it('contributes no host behavior', () => {
     expect(() => nodeApply()).not.toThrow()
-  })
-
-  it('reserves package ownership under its declared companion name', async () => {
-    const ctx = new Context()
-    await ctx.plugin(InvariantRegistry, { enabled: true })
-    const fiber = ctx.plugin(LongTextFoldInvariant)
-    await fiber.await()
-    expect(LongTextFoldInvariant.name).toBe('client-long-text-fold-invariant')
-    expect(LongTextFoldInvariant.inject).toEqual(['invariants'])
-    await fiber.dispose()
   })
 })

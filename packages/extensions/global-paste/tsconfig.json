@@ -25,9 +25,6 @@
     },
     {
       "path": "../composer-guards"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
     }
   ]
 }

@@ -2,8 +2,8 @@
 /**
  * input-history-recall plugin halves: the browser entry's document-level
  * capture-phase keydown listener against faked sessions/conversation/
- * inputTriggers services (with fiber teardown proving removal — HMR safety),
- * the inert node entry, and the invariant companion's ownership reservation.
+ * inputTriggers services (with fiber teardown proving removal — HMR safety)
+ * and the inert node entry.
  * Lock states (removed session, an offline continuable parent, submit/
  * adjudicate/claim phases, an open candidate menu, IME composition) leave the
  * key to native handling like the composer's own read-only states. The
@@ -15,13 +15,11 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { apply, inject } from '../src/client/index.ts'
 import { apply as applyNode } from '../src/index.ts'
-import * as RecallInvariant from '../src/invariant.ts'
 
 /** Input phases the plugin distinguishes (the recall gate accepts plain only). */
 type Phase = 'plain' | 'adjudicating' | 'claimed' | 'submitting'
@@ -552,15 +550,3 @@ describe('input-history-recall node half', () => {
   })
 })
 
-describe('input-history-recall invariant companion', () => {
-  it('reserves package ownership under its declared companion name', async () => {
-    const ctx = new Context()
-    await ctx.plugin(InvariantRegistry, { enabled: true })
-    const fiber = ctx.plugin(RecallInvariant)
-    await fiber.await()
-    expect(RecallInvariant.name).toBe('client-input-history-recall-invariant')
-    expect(RecallInvariant.inject).toEqual(['invariants'])
-    expect(() => { (ctx.emit as (event: string) => void)('slots/changed') }).not.toThrow()
-    await fiber.dispose()
-  })
-})

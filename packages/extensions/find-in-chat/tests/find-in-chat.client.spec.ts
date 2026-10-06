@@ -9,18 +9,14 @@
  * navigation through the conversation scrollport, the session-switch
  * auto-close, the MutationObserver rescan (streaming picks up new nodes,
  * the flow unmounting closes), and the dispose contract (no listener,
- * observer, style, or highlight residue). Plus the inert node entry and
- * the invariant companion's ownership reservation.
+ * observer, style, or highlight residue). Plus the inert node entry.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { createFindController, type FindController, type FindState } from '../src/client/find-controller.ts'
 import { apply as applyNode } from '../src/index.ts'
-import * as FindInChatInvariant from '../src/invariant.ts'
 
 /** The two highlight registry names the controller paints. */
 const HIGHLIGHT_ALL = 'dsh-find-in-chat-all'
@@ -603,18 +599,8 @@ describe('find controller dispose', () => {
   })
 })
 
-describe('find-in-chat node entry and invariant companion', () => {
+describe('find-in-chat node entry', () => {
   it('contributes no host behavior', () => {
     expect(applyNode).not.toThrow()
-  })
-
-  it('reserves package ownership under its declared companion name', async () => {
-    const ctx = new Context()
-    await ctx.plugin(InvariantRegistry, { enabled: true })
-    const fiber = ctx.plugin(FindInChatInvariant)
-    await fiber.await()
-    expect(FindInChatInvariant.name).toBe('client-find-in-chat-invariant')
-    expect(FindInChatInvariant.inject).toEqual(['invariants'])
-    await fiber.dispose()
   })
 })

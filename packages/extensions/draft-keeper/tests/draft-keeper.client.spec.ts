@@ -12,19 +12,16 @@
  * write flushed, restored set rebuilt, storage crossing the reload), the
  * silent degradation when localStorage fails or does not exist, and the
  * best-effort clearing that keeps a quota-latched mirror from resurrecting
- * a draft the user watched disappear. Plus the inert node entry and the
- * invariant companion's ownership reservation.
+ * a draft the user watched disappear. Plus the inert node entry.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
-import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { apply, inject } from '../src/client/index.ts'
 import { apply as applyNode } from '../src/index.ts'
-import * as DraftKeeperInvariant from '../src/invariant.ts'
 
 /** The single storage key the browser half owns. */
 const STORAGE_KEY = 'dsh.draft-keeper'
@@ -431,15 +428,3 @@ describe('draft-keeper node half', () => {
   })
 })
 
-describe('draft-keeper invariant companion', () => {
-  it('reserves package ownership under its declared companion name', async () => {
-    const ctx = new Context()
-    await ctx.plugin(InvariantRegistry, { enabled: true })
-    const fiber = ctx.plugin(DraftKeeperInvariant)
-    await fiber.await()
-    expect(DraftKeeperInvariant.name).toBe('client-draft-keeper-invariant')
-    expect(DraftKeeperInvariant.inject).toEqual(['invariants'])
-    expect(() => { (ctx.emit as (event: string) => void)('slots/changed') }).not.toThrow()
-    await fiber.dispose()
-  })
-})

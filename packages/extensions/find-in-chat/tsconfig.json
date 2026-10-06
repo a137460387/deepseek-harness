@@ -25,9 +25,6 @@
     },
     {
       "path": "../../client/ui-layout"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
     }
   ]
 }

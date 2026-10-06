@@ -2,8 +2,7 @@
 /**
  * global-paste plugin halves: the browser entry's document-level paste
  * listener against faked sessions/conversation services (with fiber teardown
- * proving removal — HMR safety), the inert node entry, and the invariant
- * companion's ownership reservation. Locked sessions (removed, an offline
+ * proving removal — HMR safety) and the inert node entry. Locked sessions (removed, an offline
  * continuable parent) ignore pastes like the composer's own read-only states;
  * the remaining guard leaves pin the whole matrix too — no clipboard data, no
  * mounted composer, a takeover overlay masking the composer, and a focused
@@ -16,13 +15,11 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { apply, inject } from '../src/client/index.ts'
 import { apply as applyNode } from '../src/index.ts'
-import * as GlobalPasteInvariant from '../src/invariant.ts'
 
 /** A clipboard paste event carrying the given text, dispatched on document. */
 function dispatchPaste(text: string, opts: { files?: readonly File[] } = {}): ClipboardEvent {
@@ -411,15 +408,3 @@ describe('global-paste node half', () => {
   })
 })
 
-describe('global-paste invariant companion', () => {
-  it('reserves package ownership under its declared companion name', async () => {
-    const ctx = new Context()
-    await ctx.plugin(InvariantRegistry, { enabled: true })
-    const fiber = ctx.plugin(GlobalPasteInvariant)
-    await fiber.await()
-    expect(GlobalPasteInvariant.name).toBe('client-global-paste-invariant')
-    expect(GlobalPasteInvariant.inject).toEqual(['invariants'])
-    expect(() => { (ctx.emit as (event: string) => void)('slots/changed') }).not.toThrow()
-    await fiber.dispose()
-  })
-})

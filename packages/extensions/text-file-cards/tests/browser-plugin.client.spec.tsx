@@ -13,11 +13,9 @@
  * empty-content file expands to a header-only block). The dock component
  * renders the staged
  * row (empty renders nothing). Registration disposal rides the plugin fiber
- * (HMR safety). The node half and the invariant companion are exercised over
- * the same Context.
+ * (HMR safety). The node half is exercised over the same Context.
  */
 import { Context } from '@deepseek-ai/cordis'
-import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
@@ -32,7 +30,6 @@ import type { StagedFilesState } from '../src/client/text-files.ts'
 import { MAX_BATCH_FILES, MAX_FILE_BYTES } from '../src/client/text-files.ts'
 import { zh } from '../src/client/locales.ts'
 import { apply as nodeApply } from '../src/index.ts'
-import * as TextFileCardsInvariant from '../src/invariant.ts'
 
 afterEach(cleanup)
 
@@ -547,15 +544,3 @@ describe('text-file-cards node half', () => {
   })
 })
 
-describe('text-file-cards invariant companion', () => {
-  it('reserves package ownership under its declared companion name', async () => {
-    const ctx = new Context()
-    await ctx.plugin(InvariantRegistry, { enabled: true })
-    const fiber = ctx.plugin(TextFileCardsInvariant)
-    await fiber.await()
-    expect(TextFileCardsInvariant.name).toBe('client-text-file-cards-invariant')
-    expect(TextFileCardsInvariant.inject).toEqual(['invariants'])
-    expect(() => { (ctx.emit as (event: string) => void)('slots/changed') }).not.toThrow()
-    await fiber.dispose()
-  })
-})

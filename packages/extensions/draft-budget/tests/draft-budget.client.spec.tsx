@@ -7,8 +7,7 @@
  * pressureTokens fallback, degenerate windows, and the 100% cap; the 250 ms
  * trailing debounce and its unmount cleanup; the aria readings), the locale
  * key parity, the plugin boot over a real Context with the real
- * SlotRegistry and LocaleRuntime, the inert node entry, and the invariant
- * companion's ownership reservation.
+ * SlotRegistry and LocaleRuntime, and the inert node entry.
  */
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -16,13 +15,11 @@ import { Context } from '@deepseek-ai/cordis'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import { act } from 'react'
 import { DraftBudgetReadout, type DraftBudgetReadoutProps } from '../src/client/DraftBudgetReadout.tsx'
 import { apply, inject } from '../src/client/index.ts'
 import { en, zh } from '../src/client/locales.ts'
 import { apply as applyNode } from '../src/index.ts'
-import * as DraftBudgetInvariant from '../src/invariant.ts'
 
 /** The replay-lane pressure shape probe established for the type. */
 interface PressureShape {
@@ -195,16 +192,6 @@ describe('draft-budget dictionaries and halves', () => {
     await fiber.await()
     const t = ctx.locale.bind('draftBudget')
     expect(t('chip.tokens', { count: '18' })).toBe('~18 tok')
-    await fiber.dispose()
-  })
-
-  it('reserves package ownership under its declared companion name', async () => {
-    const ctx = new Context()
-    await ctx.plugin(InvariantRegistry, { enabled: true })
-    const fiber = ctx.plugin(DraftBudgetInvariant)
-    await fiber.await()
-    expect(DraftBudgetInvariant.name).toBe('client-draft-budget-invariant')
-    expect(DraftBudgetInvariant.inject).toEqual(['invariants'])
     await fiber.dispose()
   })
 })

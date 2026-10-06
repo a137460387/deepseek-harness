@@ -3,19 +3,15 @@
  * composer-guards browser half: the shared composer predicates against faked
  * sessions/conversation services — the visibility probe's occlusion branches,
  * the session-level lock matrix, and the editable-input resolution's guard
- * order — plus the inert node entry and the invariant companion's ownership
- * reservation.
+ * order — plus the inert node entry.
  */
 import { beforeEach, describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { SessionFace, SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { apply, composerVisible, resolveEditableInput, sessionAcceptsEdits } from '../src/client/index.ts'
 import { apply as applyNode } from '../src/index.ts'
-import * as ComposerGuardsInvariant from '../src/invariant.ts'
 
 const SESSION = 'session' as SessionId
 
@@ -241,18 +237,5 @@ describe('composer-guards halves', () => {
 
   it('contributes no host behavior', () => {
     expect(applyNode).not.toThrow()
-  })
-})
-
-describe('composer-guards invariant companion', () => {
-  it('reserves package ownership under its declared companion name', async () => {
-    const ctx = new Context()
-    await ctx.plugin(InvariantRegistry, { enabled: true })
-    const fiber = ctx.plugin(ComposerGuardsInvariant)
-    await fiber.await()
-    expect(ComposerGuardsInvariant.name).toBe('client-composer-guards-invariant')
-    expect(ComposerGuardsInvariant.inject).toEqual(['invariants'])
-    expect(() => { (ctx.emit as (event: string) => void)('slots/changed') }).not.toThrow()
-    await fiber.dispose()
   })
 })
