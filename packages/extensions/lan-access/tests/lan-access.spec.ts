@@ -13,7 +13,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { once } from 'node:events'
 import { connect } from 'node:net'
-import { networkInterfaces, tmpdir } from 'node:os'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -21,7 +21,8 @@ import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import HttpServer from '@deepseek-ai/dsh-host-webserver'
-import { isLoopbackHostHeader, isLoopbackTcpPeer, LanAccessWebServer } from '../src/server.ts'
+import z from '@deepseek-ai/schemastery'
+import { isLoopbackHostHeader, isLoopbackTcpPeer, lanIpv4Of, LanAccessWebServer, type Config } from '../src/server.ts'
 
 const TOKEN = 'test-lan-token-3f9a'
 
@@ -39,13 +40,6 @@ function setLanEnv(enabled: string | undefined, token: string | undefined): void
 /** Pin the localhost-exemption switch for one test; undefined deletes it (unset). */
 function setTrustLocalhost(value: string | undefined): void {
   vi.stubEnv('DSH_LAN_TRUST_LOCALHOST', value)
-}
-
-/** The machine's first non-internal IPv4; the LAN-peer test fails loudly on a host with none. */
-function lanIpv4(): string {
-  const entry = Object.values(networkInterfaces()).flat().find(info => info !== undefined && !info.internal && info.family === 'IPv4')
-  if (entry === undefined) throw new Error('no non-loopback IPv4 interface on this host: cannot pin the LAN-peer denial')
-  return entry.address
 }
 
 /** Dispose the module-level context and temp root; safe to call between sequential boots in one test. */
@@ -627,22 +621,40 @@ describe('opt-in localhost exemption (DSH_LAN_TRUST_LOCALHOST)', () => {
   it('keeps the gate on for LAN peers even when the Host matches the LAN address', { timeout: 60_000 }, async () => {
     setLanEnv('true', TOKEN)
     setTrustLocalhost('1')
-    const lan = lanIpv4()
-    const loaded = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts', 0, '0.0.0.0')
+    // The base webserver rejects the unspecified address, so the LAN bind names
+    // one concrete interface — this host's own, which the composition row
+    // supplies through DSH_LAN_BIND.
+    const lan = lanIpv4Of()
+    if (lan === undefined) throw new Error('no non-loopback IPv4 interface on this host: cannot pin the LAN-peer denial')
+    const loaded = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts', 0, lan)
     const server = loaded.webServer
     server.registerFallback((_req, res) => {
       res.writeHead(200, { 'content-type': 'text/html' })
       res.end('<html><body>shell</body></html>')
     })
 
-    // Positive control on the same server: loopback peer + loopback Host is
-    // exempt, so the 401 below is the LAN peer's doing, not a missing switch.
-    const control = await rawRequest(server.port, '127.0.0.1', 'localhost:3080', '/')
-    expect(control.status).toBe(200)
+    // The TCP peer is non-loopback, so the exemption's peer half already fails:
+    // the Host naming that same LAN address cannot rescue it, and the gate stands.
+    const control = await rawRequest(server.port, server.host, `${server.host}:${String(server.port)}`, '/')
+    expect(control.status).toBe(401)
+    expect(control.body).toContain('401 Unauthorized')
 
-    // A non-loopback TCP peer with its own address as Host stays gated.
-    const denied = await rawRequest(server.port, lan, `${lan}:${String(server.port)}`, '/')
-    expect(denied.status).toBe(401)
+    // The same non-loopback peer with a loopback Host stays gated too: both
+    // halves must be loopback, and one loopback half is not enough.
+    const localhostHost = await rawRequest(server.port, server.host, 'localhost:3080', '/')
+    expect(localhostHost.status).toBe(401)
+
+    // Control: the exemption really is armed on this run — a loopback bind on
+    // the same switch pair exempts the matching loopback peer, so the denials
+    // above are the peer half's doing rather than a dead exemption.
+    const loopback = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts')
+    loopback.webServer.registerFallback((_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/html' })
+      res.end('<html><body>shell</body></html>')
+    })
+    const exempt = await rawRequest(loopback.webServer.port, '127.0.0.1', 'localhost:3080', '/')
+    expect(exempt.status).toBe(200)
+    expect(exempt.body).toContain('shell')
   })
 
   it('enables the exemption only for 1 and true (case-insensitive); unset, yes, and 2 leave the gate unchanged', { timeout: 240_000 }, async () => {
@@ -692,6 +704,30 @@ describe('loopback classification predicates', () => {
     for (const host of ['dsh.lgyu.cloud', 'dsh.lgyu.cloud:443', '192.168.31.64:3080', '10.0.0.5', 'sub.localhost', 'localhost.', '[2001:db8::1]', '[2001:db8::1]:80', 'localhost:3080x', '']) {
       expect(isLoopbackHostHeader(host), host).toBe(false)
     }
+  })
+
+  it('the row schema keeps the base bind contract: a concrete literal binds, a wildcard is rejected', () => {
+    // The base webserver refuses the unspecified address, which would expose
+    // the port on every interface at once. The LAN row inherits that rule
+    // rather than carving out an exception, so LAN mode must name one concrete
+    // interface — the composition row passes DSH_LAN_BIND, never 0.0.0.0.
+    const [concrete] = z.resolve({ host: '127.0.0.1', port: 0 }, LanAccessWebServer.Config, {}) as [Config]
+    expect(concrete.host).toBe('127.0.0.1')
+
+    expect(() => z.resolve({ host: '0.0.0.0', port: 0 }, LanAccessWebServer.Config, {}))
+      .toThrow(/is an unspecified \(wildcard\) address, which is not supported/)
+  })
+
+  it('the row schema resolves every base field with the base defaults', () => {
+    const [config] = z.resolve(
+      { host: '127.0.0.1', port: 0, compression: 'none' },
+      LanAccessWebServer.Config,
+      {},
+    ) as [Config]
+    expect(config.host).toBe('127.0.0.1')
+    expect(config.compression).toBe('none')
+    expect(config.compressionLevel).toBe(1)
+    expect(config.compressionThresholdBytes).toBe(1024)
   })
 })
 

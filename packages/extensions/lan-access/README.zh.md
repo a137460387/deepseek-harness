@@ -23,7 +23,7 @@ kind: "package-reference"
 | 环境变量 | 默认值 | 含义 |
 |---|---|---|
 | `DSH_LAN_ENABLED` | 未设（关） | 任意非空值开启 LAN 模式；`false`、空串、未设均为关。 |
-| `DSH_LAN_BIND` | `0.0.0.0` | 开启时的绑定地址。schema 只认 `127.0.0.1` 与 `0.0.0.0` 两个字面量；其他值回退 `0.0.0.0`。 |
+| `DSH_LAN_BIND` | 首个非回环 IPv4 | 开启时的绑定地址。取本机任一接口的具体 IPv4/IPv6 字面量；通配地址 `0.0.0.0` 会被提升为本机首个非回环 IPv4——基础 webserver 拒绝一次把所有网卡暴露在外的绑定。 |
 | `DSH_LAN_TOKEN` | — | 开启后必填的共享密钥。缺失时整个插件树 fail-loud 启动中止。 |
 | `DSH_LAN_TRUST_LOCALHOST` | 未设（关） | 可选的 localhost 免 token 豁免；仅 `1`/`true`（大小写不敏感）生效，其余值与未设同为关闭。开启后的边界与代价见「安全警示」。 |
 | `DSH_LAN_EXTRA_AUTHORITIES` | 未设 | 可选的逗号分隔 `host[:port]` 列表，追加到 `/api` 浏览器信任 fence 的 `trustedHosts`。 |

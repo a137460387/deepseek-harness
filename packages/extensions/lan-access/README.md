@@ -23,7 +23,7 @@ LAN-access webserver: a subclass of the plain webserver plugin that binds all in
 | Environment variable | Default | Meaning |
 |---|---|---|
 | `DSH_LAN_ENABLED` | unset (off) | Any non-empty value enables LAN mode. `false`, empty, and unset are all off. |
-| `DSH_LAN_BIND` | `0.0.0.0` | Bind host while enabled. The schema accepts only `127.0.0.1` or `0.0.0.0`; any other value falls back to `0.0.0.0`. |
+| `DSH_LAN_BIND` | first non-loopback IPv4 | Bind host while enabled. Any concrete IPv4 or IPv6 literal of a local interface; the wildcard address `0.0.0.0` is raised to this host's first non-loopback IPv4, because the base webserver rejects a bind that would expose the port on every interface at once. |
 | `DSH_LAN_TOKEN` | — | Required when enabled. The shared secret. Missing token fails the whole tree load loudly. |
 | `DSH_LAN_TRUST_LOCALHOST` | unset (off) | Opt-in localhost token exemption. Only `1`/`true` (case-insensitive) enable it; every other value and unset are equally off. See Security warnings for the boundary and cost once enabled. |
 | `DSH_LAN_EXTRA_AUTHORITIES` | unset | Optional comma-separated `host[:port]` list appended to the `/api` browser-trust fence's `trustedHosts`. |

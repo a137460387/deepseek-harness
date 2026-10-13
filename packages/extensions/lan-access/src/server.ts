@@ -1,12 +1,15 @@
 /**
- * LAN-access webserver: `WebServer` subclass that binds all interfaces behind
- * a token gate. `DSH_LAN_ENABLED=false` (the default) changes nothing — the
- * base `Service.init` runs alone and every byte of behavior stays the base
+ * LAN-access webserver: `WebServer` subclass that binds the host's network
+ * behind a token gate. `DSH_LAN_ENABLED=false` (the default) changes nothing —
+ * the base `Service.init` runs alone and every byte of behavior stays the base
  * server's. `DSH_LAN_ENABLED=true` requires `DSH_LAN_TOKEN`, fails the load
  * loudly when it is missing, and otherwise re-wraps the bound `http.Server`'s
  * `request` and `upgrade` dispatch so every path — static assets and
  * `index.html` included — passes the gate before any registered handler runs.
- * Setting `DSH_LAN_TRUST_LOCALHOST=1` additionally exempts requests whose TCP
+ * The bind names one concrete interface: `DSH_LAN_BIND`, or this host's first
+ * non-loopback IPv4, because the base webserver rejects the unspecified
+ * address, which would expose the port on every interface at once. Setting
+ * `DSH_LAN_TRUST_LOCALHOST=1` additionally exempts requests whose TCP
  * peer and Host header are both loopback from the token judgment; the peer
  * check reads the socket's real remote address, never forwarded headers, so a
  * public hostname riding a loopback peer (the reverse-tunnel shape) stays
@@ -23,6 +26,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { isIPv4 } from 'node:net'
+import { networkInterfaces } from 'node:os'
 import type { Duplex } from 'node:stream'
 import { Service } from '@deepseek-ai/cordis'
 import { Config as BaseConfig, WebServer } from '@deepseek-ai/dsh-host-webserver'
@@ -39,6 +43,25 @@ const DSH_LAN_COOKIE = 'dsh-lan-token'
 const ROOT_PATH = '/'
 /** The token-exchange route: sets the cookie, then redirects with the query cleared. */
 const AUTH_SET_PATH = '/auth-set'
+
+/**
+ * This host's first non-internal IPv4 address, or undefined when every
+ * interface is loopback. The base webserver rejects the unspecified address at
+ * load — binding every interface at once would expose remote code execution
+ * without a single named network — so a LAN deployment names one concrete
+ * interface, and this is the value a deployment uses when it sets no
+ * `DSH_LAN_BIND` of its own.
+ * @returns one non-loopback IPv4 literal, or undefined when none exists.
+ */
+export function lanIpv4Of(): string | undefined {
+  for (const entry of Object.values(networkInterfaces())) {
+    for (const info of entry ?? []) {
+      if (info.internal || info.family !== 'IPv4') continue
+      return info.address
+    }
+  }
+  return undefined
+}
 
 /** Gateway config: the listen address (same fields as the base webserver). */
 export type Config = BaseConfig
