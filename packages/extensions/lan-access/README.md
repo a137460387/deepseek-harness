@@ -1,5 +1,5 @@
 ---
-description: "LAN-access webserver: the stock WebServer subclass that binds all interfaces behind a token gate when enabled and stays byte-for-byte stock otherwise."
+description: "LAN-access webserver: the stock WebServer subclass that binds one concrete LAN interface behind a token gate when enabled and stays byte-for-byte stock otherwise."
 kind: "package-reference"
 ---
 # @deepseek-ai/dsh-host-lan-access
@@ -8,7 +8,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-LAN-access webserver: a subclass of the plain webserver plugin that binds all interfaces behind a token gate when `DSH_LAN_ENABLED` is set, and behaves byte-for-byte like the stock server otherwise. The `web-app` bundle's `cordis.patch.yml` replaces the stock `webserver` row with this package's row; the stock row stays present but disabled, so re-enabling it and disabling this row restores the stock server exactly.
+LAN-access webserver: a subclass of the plain webserver plugin that binds one concrete local interface behind a token gate when `DSH_LAN_ENABLED` is set, and behaves byte-for-byte like the stock server otherwise. The `web-app` bundle's `cordis.patch.yml` replaces the stock `webserver` row with this package's row; the stock row stays present but disabled, so re-enabling it and disabling this row restores the stock server exactly.
 
 ## Table of Contents
 
@@ -23,12 +23,12 @@ LAN-access webserver: a subclass of the plain webserver plugin that binds all in
 | Environment variable | Default | Meaning |
 |---|---|---|
 | `DSH_LAN_ENABLED` | unset (off) | Any non-empty value enables LAN mode. `false`, empty, and unset are all off. |
-| `DSH_LAN_BIND` | first non-loopback IPv4 | Bind host while enabled. Any concrete IPv4 or IPv6 literal of a local interface; the wildcard address `0.0.0.0` is raised to this host's first non-loopback IPv4, because the base webserver rejects a bind that would expose the port on every interface at once. |
+| `DSH_LAN_BIND` | first non-loopback IPv4 | Bind host while enabled. Any concrete IPv4 or IPv6 literal of a local interface, including a loopback literal when serving only this machine is intended. Unset means discovery: the subclass binds this host's first non-loopback IPv4, because the base webserver rejects a bind that would expose the port on every interface at once. A host with no non-loopback IPv4 fails the load loudly rather than binding loopback. |
 | `DSH_LAN_TOKEN` | — | Required when enabled. The shared secret. Missing token fails the whole tree load loudly. |
 | `DSH_LAN_TRUST_LOCALHOST` | unset (off) | Opt-in localhost token exemption. Only `1`/`true` (case-insensitive) enable it; every other value and unset are equally off. See Security warnings for the boundary and cost once enabled. |
 | `DSH_LAN_EXTRA_AUTHORITIES` | unset | Optional comma-separated `host[:port]` list appended to the `/api` browser-trust fence's `trustedHosts`. |
 
-With LAN mode off, the row's `host` expression is the stock `ctx.webStartup.host ?? '127.0.0.1'` — `--host`/`--port` flags behave exactly as before.
+With LAN mode off, the row's `host` expression is the stock `ctx.webStartup.host ?? '127.0.0.1'` — `--host`/`--port` flags behave exactly as before. With it on, `DSH_LAN_BIND` is the bind knob: the row passes a schema-valid loopback placeholder because its `!!js` expression runs against the Loader scope, which carries no imports and so cannot enumerate interfaces, and the subclass replaces that placeholder before listening.
 
 ## Authentication flow (all paths gated)
 
@@ -72,12 +72,13 @@ On the machine running dsh:
 DSH_LAN_ENABLED=true DSH_LAN_TOKEN=<random> pnpm dsh --profile web --port 3180 --no-open
 ```
 
-The startup line prints the LAN URL. From another device on the same LAN:
+The startup line prints the LAN URL from the address the subclass actually bound. Set `DSH_LAN_BIND=<LAN-IP>` when discovery would pick an interface other than the one you mean (a host with virtual adapters enumerates them too). From another device on the same LAN:
 
 - `http://<LAN-IP>:3180/?token=<random>` should load the full UI (the token is exchanged for a cookie on first entry and the query is cleared).
 - `curl -i http://<LAN-IP>:3180/api/session/list` without credentials should return `401`.
+- `curl -i http://127.0.0.1:3180/` on the serving machine should fail to connect: LAN mode binds the named interface, not loopback. Set `DSH_LAN_BIND=127.0.0.1` deliberately if a loopback-only gated server is what you want.
 
-Tests: `packages/extensions/lan-access/tests/lan-access.spec.ts` (19 cases: the gate over `/api`, websocket rejection, the auth-set chain, the `?token=` dead-loop closure, placeholder-page opacity, document `no-store` marking — documents, denials, and exchanges carry it; assets and writes do not — disabled-mode byte-for-byte equivalence against the stock server — unset and explicit `false`, headers included — fail-loud missing token, log hygiene, the localhost exemption's loopback peer + loopback Host double for pages and websocket upgrades, the reverse-tunnel and LAN shape denials, the exemption switch parsing, and the loopback classification predicates).
+Tests: `packages/extensions/lan-access/tests/lan-access.spec.ts` (25 cases: the gate over `/api`, websocket rejection, the auth-set chain, the `?token=` dead-loop closure, placeholder-page opacity, document `no-store` marking — documents, denials, and exchanges carry it; assets and writes do not — disabled-mode byte-for-byte equivalence against the stock server — unset and explicit `false`, headers included — fail-loud missing token, log hygiene, the localhost exemption's loopback peer + loopback Host double for pages and websocket upgrades, the reverse-tunnel and LAN shape denials, the exemption switch parsing, the loopback classification predicates, and the LAN bind resolution: switch-off passthrough, explicit `DSH_LAN_BIND` precedence, non-loopback discovery over the row placeholder, a listener proven to answer on the discovered interface and not on loopback, and the fail-loud refusal when no non-loopback IPv4 exists).
 
 <a id="model-experience"></a>
 ## Model Experience

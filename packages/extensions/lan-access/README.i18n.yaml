@@ -3,20 +3,20 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/extensions/lan-access/README.md
 /:
-  en: f1ec5cfa5cc7fc9b
-  zh: 39f6e069d94ff9ff
+  en: 8abea2b4ed392239
+  zh: c8279e7dc5fa3acb
 /deepseek-ai-dsh-host-lan-access:
   en: 5e2667f6eb02b26d
   zh: c4366c072ae5ca75
 /deepseek-ai-dsh-host-lan-access/summary:
-  en: 944e271ff373f7c6
-  zh: 4c3658b3dbc86b4c
+  en: 9df01297ab5a5933
+  zh: daae8a5f5c7bde39
 /deepseek-ai-dsh-host-lan-access/table-of-contents:
   en: f198f5aa88fa3c17
   zh: 1dd9dce76180bff2
 /deepseek-ai-dsh-host-lan-access/configuration:
-  en: 1e08fb1af2038aee
-  zh: 079730ffa71584f1
+  en: 3b59c9190f26f68d
+  zh: 5c21171c9c873a1e
 /deepseek-ai-dsh-host-lan-access/authentication-flow-all-paths-gated:
   en: e6a84fc63e6b3cc4
   zh: e153c4ff0188833a
@@ -27,8 +27,8 @@
   en: 612fd36402b2056a
   zh: c9022ff5a309931d
 /deepseek-ai-dsh-host-lan-access/verification:
-  en: c9959744957c3b8a
-  zh: e8586c51ad76df72
+  en: 22e6bce5c677d6ea
+  zh: c8409e563f742f25
 /deepseek-ai-dsh-host-lan-access/model-experience:
   en: 5a85edcfc5b560cd
   zh: 9e7e50bd1ad17f70

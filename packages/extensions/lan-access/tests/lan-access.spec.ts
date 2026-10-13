@@ -13,6 +13,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { once } from 'node:events'
 import { connect } from 'node:net'
+import type { NetworkInterfaceInfo } from 'node:os'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -22,9 +23,22 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import HttpServer from '@deepseek-ai/dsh-host-webserver'
 import z from '@deepseek-ai/schemastery'
-import { isLoopbackHostHeader, isLoopbackTcpPeer, lanIpv4Of, LanAccessWebServer, type Config } from '../src/server.ts'
+import { isLoopbackHostHeader, isLoopbackTcpPeer, lanIpv4Of, LanAccessWebServer, resolveLanBind, type Config } from '../src/server.ts'
 
 const TOKEN = 'test-lan-token-3f9a'
+
+// `lanIpv4Of` reads `node:os`'s `networkInterfaces` directly, so the override
+// must replace the module export. `osOverride.current` is undefined for the
+// real enumeration and holds a replacement only for the fail-loud case, which
+// is the one test that needs a host with no non-loopback interface.
+const osOverride: { current: (() => unknown) | undefined } = vi.hoisted(() => ({ current: undefined }))
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>()
+  return {
+    ...actual,
+    networkInterfaces: () => (osOverride.current ?? actual.networkInterfaces)(),
+  }
+})
 
 let root: string | undefined
 let context: Context | undefined
@@ -62,15 +76,29 @@ afterEach(async () => {
   root = undefined
   vi.unstubAllEnvs()
   vi.restoreAllMocks()
+  // The module mock outlives the individual test; restore the real enumeration.
+  osOverride.current = undefined
 })
 
-/** Write a cordis.yml with one webserver-family row, then boot it through the real Loader. */
+/**
+ * Write a cordis.yml with one webserver-family row, then boot it through the
+ * real Loader.
+ *
+ * While LAN mode is on, `resolveLanBind` owns the bind and a loopback row host
+ * is only a placeholder, so a test that probes `127.0.0.1` must name that bind
+ * explicitly the way a deployment would. The requested `host` is therefore
+ * passed through `DSH_LAN_BIND`, unless the test already pinned the variable —
+ * which the discovery and fail-loud cases do.
+ */
 async function loadComposition(
   plugin: unknown,
   pluginName: string,
   port = 0,
   host: string = '127.0.0.1',
 ): Promise<Context> {
+  if ((process.env.DSH_LAN_ENABLED ?? '') !== '' && process.env.DSH_LAN_BIND === undefined) {
+    vi.stubEnv('DSH_LAN_BIND', host)
+  }
   root = await mkdtemp(join(tmpdir(), 'dsh-lan-access-loader-'))
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [
@@ -622,10 +650,12 @@ describe('opt-in localhost exemption (DSH_LAN_TRUST_LOCALHOST)', () => {
     setLanEnv('true', TOKEN)
     setTrustLocalhost('1')
     // The base webserver rejects the unspecified address, so the LAN bind names
-    // one concrete interface — this host's own, which the composition row
-    // supplies through DSH_LAN_BIND.
+    // one concrete interface. While the switch is on the subclass owns that
+    // choice, reading DSH_LAN_BIND first — here it is pinned to this host's own
+    // non-loopback IPv4 so the request target is a real LAN peer.
     const lan = lanIpv4Of()
     if (lan === undefined) throw new Error('no non-loopback IPv4 interface on this host: cannot pin the LAN-peer denial')
+    vi.stubEnv('DSH_LAN_BIND', lan)
     const loaded = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts', 0, lan)
     const server = loaded.webServer
     server.registerFallback((_req, res) => {
@@ -647,6 +677,7 @@ describe('opt-in localhost exemption (DSH_LAN_TRUST_LOCALHOST)', () => {
     // Control: the exemption really is armed on this run — a loopback bind on
     // the same switch pair exempts the matching loopback peer, so the denials
     // above are the peer half's doing rather than a dead exemption.
+    vi.stubEnv('DSH_LAN_BIND', '127.0.0.1')
     const loopback = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts')
     loopback.webServer.registerFallback((_req, res) => {
       res.writeHead(200, { 'content-type': 'text/html' })
@@ -710,7 +741,8 @@ describe('loopback classification predicates', () => {
     // The base webserver refuses the unspecified address, which would expose
     // the port on every interface at once. The LAN row inherits that rule
     // rather than carving out an exception, so LAN mode must name one concrete
-    // interface — the composition row passes DSH_LAN_BIND, never 0.0.0.0.
+    // interface — resolveLanBind supplies a discovered or explicit literal,
+    // never 0.0.0.0.
     const [concrete] = z.resolve({ host: '127.0.0.1', port: 0 }, LanAccessWebServer.Config, {}) as [Config]
     expect(concrete.host).toBe('127.0.0.1')
 
@@ -728,6 +760,84 @@ describe('loopback classification predicates', () => {
     expect(config.compression).toBe('none')
     expect(config.compressionLevel).toBe(1)
     expect(config.compressionThresholdBytes).toBe(1024)
+  })
+})
+
+describe('LAN bind resolution', () => {
+  it('passes the row host through untouched while the switch is off', () => {
+    setLanEnv(undefined, undefined)
+    vi.stubEnv('DSH_LAN_BIND', '10.9.9.9')
+    // The switch is off, so neither the env nor discovery may touch the bind:
+    // disabled mode stays byte-for-byte the stock server's.
+    expect(resolveLanBind('127.0.0.1', false)).toBe('127.0.0.1')
+    expect(resolveLanBind('10.1.2.3', false)).toBe('10.1.2.3')
+  })
+
+  it('binds the explicit DSH_LAN_BIND literal while the switch is on', () => {
+    setLanEnv('true', TOKEN)
+    vi.stubEnv('DSH_LAN_BIND', '10.42.7.9')
+    expect(resolveLanBind('127.0.0.1', true)).toBe('10.42.7.9')
+
+    // An explicitly named loopback is a deliberate loopback-only deployment,
+    // not the silent fallback this contract exists to prevent.
+    vi.stubEnv('DSH_LAN_BIND', '127.0.0.1')
+    expect(resolveLanBind('127.0.0.1', true)).toBe('127.0.0.1')
+  })
+
+  it('discovers a non-loopback IPv4 when the switch is on and DSH_LAN_BIND is unset', () => {
+    setLanEnv('true', TOKEN)
+    vi.stubEnv('DSH_LAN_BIND', '')
+    const discovered = lanIpv4Of()
+    if (discovered === undefined) throw new Error('no non-loopback IPv4 interface on this host: cannot exercise discovery')
+    // The row's loopback placeholder must never survive into LAN mode.
+    const resolved = resolveLanBind('127.0.0.1', true)
+    expect(resolved).toBe(discovered)
+    expect(isLoopbackTcpPeer(resolved)).toBe(false)
+  })
+
+  it('binds the discovered interface for real: the listener answers on it and not on loopback', { timeout: 60_000 }, async () => {
+    setLanEnv('true', TOKEN)
+    const discovered = lanIpv4Of()
+    if (discovered === undefined) throw new Error('no non-loopback IPv4 interface on this host: cannot assert the real bind')
+    vi.stubEnv('DSH_LAN_BIND', discovered)
+    // The row supplies the loopback placeholder, exactly as the composition
+    // does; the subclass must replace it before the base listens.
+    const loaded = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts', 0, '127.0.0.1')
+    const server = loaded.webServer
+    server.registerFallback((_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/html' })
+      res.end('<html><body>shell</body></html>')
+    })
+    // The application-visible bind is the discovered address, not the placeholder.
+    expect(server.host).toBe(discovered)
+
+    // A no-credential request over the real interface reaches the gate: the
+    // concrete-interface bind is proven by the 401 rather than by a predicate.
+    const denied = await rawRequest(server.port, discovered, `${discovered}:${String(server.port)}`, '/api/session/list')
+    expect(denied.status).toBe(401)
+    expect(denied.body).toContain('401 Unauthorized')
+
+    // Loopback carries no listener: the port is reachable only on the named interface.
+    await expect(fetch(`http://127.0.0.1:${String(server.port)}/api/session/list`)).rejects.toThrow()
+  })
+
+  it('fails loud instead of falling back to loopback when discovery finds no non-loopback IPv4', () => {
+    setLanEnv('true', TOKEN)
+    vi.stubEnv('DSH_LAN_BIND', '')
+    // No non-loopback interface exists on this imaginary host, so discovery must
+    // refuse rather than bind loopback and report a LAN mode no LAN peer could
+    // reach. The enumeration is replaced per test because a host with only
+    // loopback cannot otherwise be constructed.
+    osOverride.current = () => ({
+      lo: [{ address: '127.0.0.1', netmask: '255.0.0.0', family: 'IPv4', mac: '00:00:00:00:00:00', internal: true, cidr: '127.0.0.1/8' } as NetworkInterfaceInfo],
+    })
+    expect(() => resolveLanBind('127.0.0.1', true)).toThrow(/no non-loopback IPv4 interface/)
+    expect(() => resolveLanBind('127.0.0.1', true)).toThrow(/refusing to fall back to loopback/)
+    // The switch being off keeps the passthrough contract even with no interface.
+    expect(resolveLanBind('127.0.0.1', false)).toBe('127.0.0.1')
+    // An explicit literal still wins: the mock removes discovery, not configuration.
+    vi.stubEnv('DSH_LAN_BIND', '10.1.2.3')
+    expect(resolveLanBind('127.0.0.1', true)).toBe('10.1.2.3')
   })
 })
 

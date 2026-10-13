@@ -210,16 +210,19 @@
     # Fork LAN-access webserver: a subclass of the plain webserver's plugin;
     # disabled in this deployment (single-layer browser auth, loopback bind).
     # DSH_LAN_ENABLED=false (or unset) leaves it byte-for-byte the stock
-    # server; DSH_LAN_ENABLED=true requires DSH_LAN_TOKEN and binds
-    # DSH_LAN_BIND (unset: the row's loopback placeholder, which the subclass
-    # raises to this host's first non-loopback IPv4 while the switch is on) with
-    # every path behind the token gate.
+    # server; DSH_LAN_ENABLED=true requires DSH_LAN_TOKEN and binds one concrete
+    # interface with every path behind the token gate.
     # Config field-by-field against the base row it replaces:
-    #   host — base: ctx.webStartup.host ?? '127.0.0.1'; here: DSH_LAN_BIND, or
-    #     the same base expression while the LAN switch is off (bind is what the
-    #     switch controls). The base webserver rejects the unspecified address
-    #     at load, so this row never passes `0.0.0.0`: the subclass rewrites the
-    #     placeholder to one concrete interface (normalizeBind) in LAN mode.
+    #   host — base: ctx.webStartup.host ?? '127.0.0.1'; here: the same stock
+    #     expression while the LAN switch is off, and the loopback literal
+    #     '127.0.0.1' while it is on. The literal is only a placeholder that
+    #     satisfies the schema: this row's `!!js` expression runs against the
+    #     Loader scope, which carries no imports, so it cannot enumerate
+    #     interfaces. LanAccessWebServer.resolveLanBind owns the real bind,
+    #     reading DSH_LAN_BIND or discovering this host's first non-loopback
+    #     IPv4 and failing the load when none exists — never falling back to
+    #     loopback. The base webserver rejects the unspecified address at load,
+    #     so no path here ever passes `0.0.0.0`.
     #   port — unchanged: ctx.webStartup.port ?? 3080.
     #   compressionLevel/compressionThresholdBytes — the base row sets 1/1024;
     #     this row omits them, so the subclass keeps its schema defaults
@@ -229,7 +232,7 @@
       inject: [webStartup]
       disabled: true
       config:
-        host: !!js "process.env.DSH_LAN_ENABLED ? (process.env.DSH_LAN_BIND ?? '127.0.0.1') : (ctx.webStartup.host ?? '127.0.0.1')"
+        host: !!js "process.env.DSH_LAN_ENABLED ? '127.0.0.1' : (ctx.webStartup.host ?? '127.0.0.1')"
         port: !!js ctx.webStartup.port ?? 3080
 
     # Web glue owned by this bundle: resolves the built frontend dist (an

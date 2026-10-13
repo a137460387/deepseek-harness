@@ -6,16 +6,22 @@
  * loudly when it is missing, and otherwise re-wraps the bound `http.Server`'s
  * `request` and `upgrade` dispatch so every path — static assets and
  * `index.html` included — passes the gate before any registered handler runs.
- * The bind names one concrete interface: `DSH_LAN_BIND`, or this host's first
- * non-loopback IPv4, because the base webserver rejects the unspecified
- * address, which would expose the port on every interface at once. Setting
+ * The bind names one concrete interface: `DSH_LAN_BIND` when the deployment
+ * sets it, otherwise this host's first non-loopback IPv4, because the base
+ * webserver rejects the unspecified address, which would expose the port on
+ * every interface at once. Discovery is this package's job rather than the
+ * composition row's: the row's `!!js` expression runs against the Loader scope,
+ * which carries no imports, so the row passes a loopback placeholder that
+ * {@link resolveLanBind} replaces. A host with no non-loopback IPv4 fails the
+ * load loudly instead of binding loopback — LAN mode that no LAN peer can reach
+ * is a misconfiguration, never a silent downgrade. Setting
  * `DSH_LAN_TRUST_LOCALHOST=1` additionally exempts requests whose TCP
  * peer and Host header are both loopback from the token judgment; the peer
  * check reads the socket's real remote address, never forwarded headers, so a
  * public hostname riding a loopback peer (the reverse-tunnel shape) stays
- * gated. The composition's web-app runtime derives the LAN trust fence from
- * the real bind (`resolveLanTrust`), so this package never fakes Host or
- * Origin. A request already holding the valid gate cookie passes untouched
+ * gated. The composition's Connection row derives the browser trust fence from
+ * the listener bind the application reads off this server, so this package
+ * never fakes Host or Origin. A request already holding the valid gate cookie passes untouched
  * even when it carries a foreign `?token=`: since the 0.1.2-alpha.1 sync the
  * host's own browser auth guards index and `/api` with a separate process
  * launch token, and that two-stage entry (gate cookie first, then the launch
@@ -28,11 +34,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { isIPv4 } from 'node:net'
 import { networkInterfaces } from 'node:os'
 import type { Duplex } from 'node:stream'
-import { Service } from '@deepseek-ai/cordis'
+import { Service, type Context } from '@deepseek-ai/cordis'
 import { Config as BaseConfig, WebServer } from '@deepseek-ai/dsh-host-webserver'
 
 /** Environment switch: any non-empty value enables the LAN mode. */
 const DSH_LAN_ENABLED_ENV = 'DSH_LAN_ENABLED'
+/** Explicit LAN bind address; overrides interface discovery while the switch is on. */
+const DSH_LAN_BIND_ENV = 'DSH_LAN_BIND'
 /** Shared-secret environment variable; required once the switch is on. */
 const DSH_LAN_TOKEN_ENV = 'DSH_LAN_TOKEN'
 /** Opt-in localhost exemption switch; only `1`/`true` (case-insensitive) enable it. */
@@ -45,12 +53,12 @@ const ROOT_PATH = '/'
 const AUTH_SET_PATH = '/auth-set'
 
 /**
- * This host's first non-internal IPv4 address, or undefined when every
- * interface is loopback. The base webserver rejects the unspecified address at
- * load — binding every interface at once would expose remote code execution
- * without a single named network — so a LAN deployment names one concrete
- * interface, and this is the value a deployment uses when it sets no
- * `DSH_LAN_BIND` of its own.
+ * This host's first non-internal IPv4 address, in interface enumeration order,
+ * or undefined when every interface is loopback. The base webserver rejects the
+ * unspecified address at load — binding every interface at once would expose
+ * remote code execution without a single named network — so a LAN deployment
+ * names one concrete interface, and this is the value discovery picks when the
+ * deployment sets no `DSH_LAN_BIND` of its own.
  * @returns one non-loopback IPv4 literal, or undefined when none exists.
  */
 export function lanIpv4Of(): string | undefined {
@@ -61,6 +69,40 @@ export function lanIpv4Of(): string | undefined {
     }
   }
   return undefined
+}
+
+/**
+ * Resolve the address the listener binds while the LAN switch is on.
+ *
+ * The composition row cannot discover an interface: its `!!js` expression runs
+ * against the Loader scope, which carries no imports. So the row supplies a
+ * loopback placeholder and this resolver owns the real bind, keeping one
+ * authority for "which interface does LAN mode expose":
+ *
+ * - `DSH_LAN_BIND` set — the deployment named the interface, so it wins
+ *   verbatim; the schema has already rejected a non-literal value, and a
+ *   loopback value is a deliberate choice rather than a silent fallback.
+ * - `DSH_LAN_BIND` unset — discovery must produce a concrete non-loopback
+ *   address. When every interface is loopback there is no LAN to serve, so this
+ *   throws instead of binding loopback and reporting a LAN mode that no LAN
+ *   peer can reach.
+ * @param configuredHost - the row's configured host, used verbatim when the switch is off.
+ * @param enabled - whether the LAN switch is on for this process.
+ * @returns the address to bind.
+ * @throws when LAN mode is on, no `DSH_LAN_BIND` is set, and no non-loopback IPv4 exists.
+ */
+export function resolveLanBind(configuredHost: string, enabled: boolean): string {
+  if (!enabled) return configuredHost
+  const explicit = process.env[DSH_LAN_BIND_ENV] ?? ''
+  if (explicit !== '') return explicit
+  const discovered = lanIpv4Of()
+  if (discovered === undefined) {
+    throw new Error(
+      `${DSH_LAN_ENABLED_ENV} is set but this host reports no non-loopback IPv4 interface to bind,`
+      + ` and no ${DSH_LAN_BIND_ENV} names one; refusing to fall back to loopback, which no LAN peer could reach`,
+    )
+  }
+  return discovered
 }
 
 /** Gateway config: the listen address (same fields as the base webserver). */
@@ -229,6 +271,20 @@ function markDocumentUncacheable(req: IncomingMessage, res: ServerResponse): voi
  */
 export class LanAccessWebServer extends WebServer {
   static override Config = lanAccessSchema
+
+  /**
+   * Resolve the real bind before the base class snapshots it. The base reads
+   * `config.host` for both its `host` getter and `listen`, so the corrected
+   * value must reach it through this one object; the Loader hands each
+   * activation a freshly interpolated config, so rewriting it here cannot
+   * mutate another row's config.
+   * @param ctx - the owning context.
+   * @param config - the row's resolved config, with the LAN switch already read.
+   */
+  constructor(ctx: Context, config: Config) {
+    config.host = resolveLanBind(config.host, (process.env[DSH_LAN_ENABLED_ENV] ?? '') !== '')
+    super(ctx, config)
+  }
 
   /** Digest of the configured token; set once, before any request is served. */
   private tokenDigest: Buffer | undefined
