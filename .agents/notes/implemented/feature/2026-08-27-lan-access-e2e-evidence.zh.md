@@ -30,3 +30,4 @@ lan-access 插件在另一台机器交付；验收交接要求在本机以真实
 
 - 三态验收以记录输出完成；行形状修正（disabled 行保留 stock 字段）已折入四笔主序列的 scaffold 笔。
 - 今后涉 webserver/host 层的改动应在任何冒烟前重跑 netstat 旧进程检查；本 Note 记录了该模式第三次在造成伤害前被抓住。
+- **2026-10-13 修正。** 上文 S1/S3 是 2026-08-27 的记录，作为历史证据原样保留，但其中点名的两个机制已不存在。绑定不再是全网卡：它指名一个具体接口（`DSH_LAN_BIND`，未设则发现非回环 IPv4），因为上游 webserver 现在会在 load 期拒绝未指定地址。`resolveLanTrust` 已在 0.2.1-alpha.2 同步中随上游删除。S1 验证的门禁链未变；当前绑定行为及其运行时证据见 `FORK_NOTES.md`，启动配方见[包 README](../../../../packages/extensions/lan-access/README.zh.md#enabling-lan-mode)。

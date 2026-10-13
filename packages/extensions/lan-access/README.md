@@ -8,10 +8,11 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-LAN-access webserver: a subclass of the plain webserver plugin that binds one concrete local interface behind a token gate when `DSH_LAN_ENABLED` is set, and behaves byte-for-byte like the stock server otherwise. The `web-app` bundle's `cordis.patch.yml` replaces the stock `webserver` row with this package's row; the stock row stays present but disabled, so re-enabling it and disabling this row restores the stock server exactly.
+LAN-access webserver: a subclass of the plain webserver plugin that binds one concrete local interface behind a token gate, and behaves byte-for-byte like the stock server otherwise. The `web-app` bundle ships it **disabled** and keeps the stock `webserver` row active, so a deployment enables it with a two-line patch overlay that disables the stock row and enables this one — see Enabling LAN mode. Setting `DSH_LAN_ENABLED=true` alone changes nothing: the row is not mounted until that overlay applies.
 
 ## Table of Contents
 
+- [Enabling LAN mode](#enabling-lan-mode)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -22,13 +23,59 @@ LAN-access webserver: a subclass of the plain webserver plugin that binds one co
 
 | Environment variable | Default | Meaning |
 |---|---|---|
-| `DSH_LAN_ENABLED` | unset (off) | Any non-empty value enables LAN mode. `false`, empty, and unset are all off. |
+| `DSH_LAN_ENABLED` | unset (off) | Any non-empty value enables LAN mode. `false`, empty, and unset are all off. It only takes effect once the row is mounted: the shipped composition disables it, so the deployment must also apply the overlay in [Enabling LAN mode](#enabling-lan-mode). |
 | `DSH_LAN_BIND` | first non-loopback IPv4 | Bind host while enabled. Any concrete IPv4 or IPv6 literal of a local interface, including a loopback literal when serving only this machine is intended. Unset means discovery: the subclass binds this host's first non-loopback IPv4, because the base webserver rejects a bind that would expose the port on every interface at once. A host with no non-loopback IPv4 fails the load loudly rather than binding loopback. |
 | `DSH_LAN_TOKEN` | — | Required when enabled. The shared secret. Missing token fails the whole tree load loudly. |
 | `DSH_LAN_TRUST_LOCALHOST` | unset (off) | Opt-in localhost token exemption. Only `1`/`true` (case-insensitive) enable it; every other value and unset are equally off. See Security warnings for the boundary and cost once enabled. |
 | `DSH_LAN_EXTRA_AUTHORITIES` | unset | Optional comma-separated `host[:port]` list appended to the `/api` browser-trust fence's `trustedHosts`. |
 
-With LAN mode off, the row's `host` expression is the stock `ctx.webStartup.host ?? '127.0.0.1'` — `--host`/`--port` flags behave exactly as before. With it on, `DSH_LAN_BIND` is the bind knob: the row passes a schema-valid loopback placeholder because its `!!js` expression runs against the Loader scope, which carries no imports and so cannot enumerate interfaces, and the subclass replaces that placeholder before listening.
+With LAN mode off, the row's `host` expression is the stock `ctx.webStartup.host ?? '127.0.0.1'` — `--host`/`--port` flags behave exactly as before. With it on, `DSH_LAN_BIND` is the bind knob: the row passes a schema-valid loopback placeholder because its `!!js` expression runs against the Loader scope, which carries no imports and so cannot enumerate interfaces, and the subclass replaces that placeholder before listening. **`--host` does not select the LAN bind**: it feeds `webStartup.host`, which is the row expression LAN mode replaces.
+
+## Enabling LAN mode
+
+The bundle ships the stock `webserver` row active and this package's row disabled. Enabling LAN mode therefore takes two changes at once — an environment pair for the gate, and a patch overlay that mounts this row in place of the stock one. `DSH_LAN_ENABLED` on its own enables nothing: with the row still disabled the stock server keeps serving, binding loopback and carrying no gate.
+
+Write an overlay outside the checkout (one file, two rows — disable the stock row, enable this one):
+
+```yaml
+# lan-enable.overlay.yml
+- id: webserver
+  disabled: true
+- id: lan-access-webserver
+  disabled: false
+```
+
+Then launch with `--patch` **before** the first Web-app flag:
+
+```sh
+DSH_LAN_ENABLED=true \
+DSH_LAN_TOKEN=<random> \
+DSH_LAN_BIND=<LAN-IP> \
+  pnpm dsh --profile web --patch ./lan-enable.overlay.yml --port 3180 --no-open
+```
+
+`--patch` is a launcher flag, and the launcher stops reading its own options at the first token it does not own. Placed after `--port` — or any other Web-app flag — it is forwarded to the Web app instead and the boot dies with `error: unknown option '--patch'`. Keep it ahead of the app flags.
+
+`DSH_LAN_BIND` selects the interface:
+
+- **Set** — the server binds that address verbatim. Any concrete IPv4 or IPv6 literal of a local interface works, a loopback literal included, when serving only this machine is the intent. This is the value to set for a deployment other devices must reach.
+- **Unset** — the subclass discovers the host's first non-loopback IPv4. Discovery walks `os.networkInterfaces()` in enumeration order and does not rank by usefulness, so on a host with virtual adapters it can equally pick a WSL vEthernet, VMware host-only, or VPN interface rather than the physical LAN address. When the server must be reachable from another physical device, set `DSH_LAN_BIND` to that device-facing IPv4 instead of relying on discovery. A host reporting no non-loopback IPv4 fails the load loudly rather than binding loopback.
+
+Verify the deployment:
+
+```sh
+# The startup line names the address actually bound; confirm it against the OS.
+netstat -ano | grep 3180        # Windows
+ss -ltnp | grep 3180            # Linux
+
+curl -i http://<LAN-IP>:3180/api/session/list   # 401 + inline placeholder page, no credential
+curl -i http://127.0.0.1:3180/                  # connection refused: the gate binds the named interface, not loopback
+```
+
+- The startup line prints the LAN URL and the host process's own launch token. When `DSH_LAN_BIND` is unset and the printed address is not the one you meant, that is discovery picking another adapter — set `DSH_LAN_BIND` explicitly.
+- No credential, on any path → `401` with the inline placeholder page. That page is this gate's; the host's own browser auth answers `401` with a different body (`dsh web authentication required…`), so the two layers stay distinguishable.
+- Browsing needs the two-stage entry: open `http://<LAN-IP>:3180/?token=<DSH_LAN_TOKEN>` first (this gate sets the `dsh-lan-token` cookie), then open `http://<LAN-IP>:3180/?token=<launch token>` from the startup line (the host's own exchange mints the browser cookie and the app loads). See the authentication flow below.
+- `curl -i http://LAN-IP:3180/` from another device on the same LAN should reach the gate; a refused connection there means the bind named an interface that device cannot route to.
 
 ## Authentication flow (all paths gated)
 
@@ -66,17 +113,7 @@ The composition row mounts `@deepseek-ai/dsh-host-lan-access/src/server.ts` — 
 
 ## Verification
 
-On the machine running dsh:
-
-```sh
-DSH_LAN_ENABLED=true DSH_LAN_TOKEN=<random> pnpm dsh --profile web --port 3180 --no-open
-```
-
-The startup line prints the LAN URL from the address the subclass actually bound. Set `DSH_LAN_BIND=<LAN-IP>` when discovery would pick an interface other than the one you mean (a host with virtual adapters enumerates them too). From another device on the same LAN:
-
-- `http://<LAN-IP>:3180/?token=<random>` should load the full UI (the token is exchanged for a cookie on first entry and the query is cleared).
-- `curl -i http://<LAN-IP>:3180/api/session/list` without credentials should return `401`.
-- `curl -i http://127.0.0.1:3180/` on the serving machine should fail to connect: LAN mode binds the named interface, not loopback. Set `DSH_LAN_BIND=127.0.0.1` deliberately if a loopback-only gated server is what you want.
+Enabling, the overlay, the launch command, and the probes are in [Enabling LAN mode](#enabling-lan-mode). In short: apply the two-line overlay, pass `DSH_LAN_ENABLED`/`DSH_LAN_TOKEN`/`DSH_LAN_BIND`, confirm the bound address against the OS, and check that a no-credential request answers the gate's `401` while loopback refuses the connection.
 
 Tests: `packages/extensions/lan-access/tests/lan-access.spec.ts` (25 cases: the gate over `/api`, websocket rejection, the auth-set chain, the `?token=` dead-loop closure, placeholder-page opacity, document `no-store` marking — documents, denials, and exchanges carry it; assets and writes do not — disabled-mode byte-for-byte equivalence against the stock server — unset and explicit `false`, headers included — fail-loud missing token, log hygiene, the localhost exemption's loopback peer + loopback Host double for pages and websocket upgrades, the reverse-tunnel and LAN shape denials, the exemption switch parsing, the loopback classification predicates, and the LAN bind resolution: switch-off passthrough, explicit `DSH_LAN_BIND` precedence, non-loopback discovery over the row placeholder, a listener proven to answer on the discovered interface and not on loopback, and the fail-loud refusal when no non-loopback IPv4 exists).
 

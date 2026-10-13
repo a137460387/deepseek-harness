@@ -29,7 +29,7 @@ Using the gate from the machine running dsh web itself (a local browser, self-ch
 
 **Trusting a loopback Origin header, or whitelisting localhost through `DSH_LAN_EXTRA_AUTHORITIES`.** Origin is browser-controllable (some clients send none at all), and that whitelist governs Host-fence trust, not who may skip the token. The exemption's trust anchor must be the transport-layer fact (socket peer) plus the request-line declaration (Host).
 
-**Default-on.** The LAN mode stance is "an all-interfaces bind must authenticate"; a default exemption would silently narrow that stance for every deployment that enables the switch, and local processes would become unaccountable. Off by default keeps the enabled semantics unchanged.
+**Default-on.** The LAN mode stance is "a LAN-reachable bind must authenticate"; a default exemption would silently narrow that stance for every deployment that enables the switch, and local processes would become unaccountable. Off by default keeps the enabled semantics unchanged.
 
 ## Consequences
 

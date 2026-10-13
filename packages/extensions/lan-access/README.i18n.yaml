@@ -9,14 +9,17 @@
   en: 5e2667f6eb02b26d
   zh: c4366c072ae5ca75
 /deepseek-ai-dsh-host-lan-access/summary:
-  en: 9df01297ab5a5933
-  zh: daae8a5f5c7bde39
+  en: 985bf320042dab62
+  zh: 78f6265ac32e590b
 /deepseek-ai-dsh-host-lan-access/table-of-contents:
-  en: f198f5aa88fa3c17
-  zh: 1dd9dce76180bff2
+  en: c211ffcbe539c408
+  zh: 6c0d0b5be92ae3ab
 /deepseek-ai-dsh-host-lan-access/configuration:
-  en: 3b59c9190f26f68d
-  zh: 5c21171c9c873a1e
+  en: e68fd01349134df1
+  zh: fea8081e2a6b7a73
+/deepseek-ai-dsh-host-lan-access/enabling-lan-mode:
+  en: 394b533721ef83eb
+  zh: cd451cdb6277524f
 /deepseek-ai-dsh-host-lan-access/authentication-flow-all-paths-gated:
   en: e6a84fc63e6b3cc4
   zh: e153c4ff0188833a
@@ -27,8 +30,8 @@
   en: 612fd36402b2056a
   zh: c9022ff5a309931d
 /deepseek-ai-dsh-host-lan-access/verification:
-  en: 22e6bce5c677d6ea
-  zh: c8409e563f742f25
+  en: c6c2415ca9f60b5f
+  zh: a08d48d9afc65cc3
 /deepseek-ai-dsh-host-lan-access/model-experience:
   en: 5a85edcfc5b560cd
   zh: 9e7e50bd1ad17f70

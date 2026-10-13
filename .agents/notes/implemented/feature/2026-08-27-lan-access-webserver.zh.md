@@ -12,19 +12,19 @@ Status: implemented
 
 `packages/extensions/lan-access`（`@deepseek-ai/dsh-host-lan-access`）提供 `LanAccessWebServer`——原版 `WebServer` 插件的子类，由 web-app bundle 的 `cordis.patch.yml` 以替换行的形式挂载：
 
-- **行内手术，不建补丁文件。** 原版 `webserver` 行置 `disabled: true`，紧邻插入 `lan-access-webserver` 行，config 的逐字段对照以注释内联在行旁（schema 只有 host/port 两个字段；port 不变，host 增加 LAN 表达式）。行的 `name` 是源码面子路径 `@deepseek-ai/dsh-host-lan-access/src/server.ts`，由 tsx 源码启动经 profile 模块回退符号链接解析——裸包名会装载构建入口而错过子类，`./src/...` 相对名则会解析到 profile 目录而非包内。
+- **行内手术，不建补丁文件。** 原版 `webserver` 行与 `lan-access-webserver` 行并列位于同一文件，config 的逐字段对照以注释内联在行旁（schema 只有 host/port 两个字段；port 不变，host 增加 LAN 表达式）。行的 `name` 是源码面子路径 `@deepseek-ai/dsh-host-lan-access/src/server.ts`，由 tsx 源码启动经 profile 模块回退符号链接解析——裸包名会装载构建入口而错过子类，`./src/...` 相对名则会解析到 profile 目录而非包内。
 - **关闭时完全透明。** `DSH_LAN_ENABLED` 未设/false 时只运行基类 `Service.init`——不剥 listener、不校验、不 throw。disabled 模式测试用相同行分别 boot 原版服务器与子类，在普通请求、POST、404、坏 URL、upgrade 场景下逐字节比对状态码、响应体与头。
 - **半配置 fail-loud。** enabled 而 `DSH_LAN_TOKEN` 缺失时 `Service.init` 直接 throw；Loader 以带标签的树装载失败暴露，进程 exit 1（已端到端验证）。
 - **独占式分派接管。** enabled 模式经受控断言读取基类持有的 `http.Server`（基类字段私有；所有权仍归基类自身的 teardown effect），随后 `removeAllListeners('request'|'upgrade')` 并装回包装函数、由包装函数调用捕获的原件——`prependListener` 挡不住已注册的异步 handler。包装层在任何原 listener 之前对全路径设卡：无凭据 → 内联 401 占位页（无脚本、无 dist 路径）；`?token=` → 校验、设置会话 cookie（属性同 `/auth-set`）、302 到同路径并清参；`/auth-set?token=` → 校验、设置 `dsh-lan-token` cookie（`HttpOnly; SameSite=Lax; Path=/`）、302 回 `/`；有效 cookie → 放行；无凭据的 websocket 握手在任何协议协商之前 401。
 - **常数时间比较与日志卫生。** token 校验用 `crypto.timingSafeEqual` 比对 SHA-256 摘要；任何日志行都不打印含 token 的 URL（测试在 spy console 下跑完成功、拒绝、错误三类路径后钉死）。
-- **不动 fence。** 原版 `resolveLanTrust` 的 LAN 采样与 `/api` 浏览器信任 fence 保持上游原样——让真实绑定自己生效。`DSH_LAN_EXTRA_AUTHORITIES` 只是向 connection 行的 `trustedHosts` 表达式追加条目，即文档写明的额外 authority 组合缝隙。
+- **不动 fence。** `/api` 浏览器信任 fence 保持上游原样——connection 行从 `webStartup` 取 authority，让真实绑定的监听地址自己生效。（本 Note 原文点名的 `resolveLanTrust` 辅助函数已在 0.2.1-alpha.2 同步中随上游删除；组合行现直接读 `ctx.webStartup.trustedHosts`。详见「后果」。）`DSH_LAN_EXTRA_AUTHORITIES` 只是向 connection 行的 `trustedHosts` 表达式追加条目，即文档写明的额外 authority 组合缝隙。
 - **组合遵循全部 fork 扩展约定：** `packages/extensions/` 落位、`./invariant` 伴生件、双语 README 与 i18n sidecar、版本对齐 root、`tsconfig.base.json` paths 登记、host 聚合 project reference、以及 `verify-cordis-config` 门要求的 bundle manifest `dependencies` 条目。
 
 类上不声明 `static inject`——与基类一致，其 `webStartup` 注入来自组合行。类级 `inject` 会让 fiber 在任何不提供 `webStartup` 的上下文（手工构建的测试上下文）里 PENDING，第一轮测试即抓到。
 
 ## 测试
 
-`packages/extensions/lan-access/tests/lan-access.spec.ts`——16 个用例（末 6 例钉死 opt-in localhost 豁免，见 [localhost 豁免 Agent Note](2026-08-27-lan-access-localhost-exemption.zh.md)），走真实 vendored Loader（与 webserver 包自身 spec 相同的 boot 形状）：无 token 时 `/api` 401 且 handler 从未被调用（spy）、websocket 握手无 token 被拒有 token 完成、`?token=` → 302 → `/auth-set` → Set-Cookie → 已鉴权 API/页面全链路、`?token=` 死循环闭环、占位 401 页对四条路径的不泄露、disabled 模式逐字节对照（未设与显式 `false`）、缺 token 的 fail-loud 启动、完整门禁会话的日志卫生、invariant 伴生件注册。端到端用真实 profile 启动在 3180 端口验证三种模式：enabled（401 / 302 / cookie / 鉴权放行、打印 LAN URL）、disabled（原版行为、无 LAN 行）、enabled 无 token（exit 1 带标签诊断）。
+`packages/extensions/lan-access/tests/lan-access.spec.ts`——25 个用例（钉死 opt-in localhost 豁免的 6 例见 [localhost 豁免 Agent Note](2026-08-27-lan-access-localhost-exemption.zh.md)；2026-10-13 修正随之新增的 5 个 LAN 绑定解析用例列在包 README），走真实 vendored Loader（与 webserver 包自身 spec 相同的 boot 形状）：无 token 时 `/api` 401 且 handler 从未被调用（spy）、websocket 握手无 token 被拒有 token 完成、`?token=` → 302 → `/auth-set` → Set-Cookie → 已鉴权 API/页面全链路、`?token=` 死循环闭环、占位 401 页对四条路径的不泄露、disabled 模式逐字节对照（未设与显式 `false`）、缺 token 的 fail-loud 启动、完整门禁会话的日志卫生、invariant 伴生件注册。端到端用真实 profile 启动在 3180 端口验证三种模式：enabled（401 / 302 / cookie / 鉴权放行、打印 LAN URL）、disabled（原版行为、无 LAN 行）、enabled 无 token（exit 1 带标签诊断）。
 
 ## 备选方案
 
@@ -38,6 +38,7 @@ Status: implemented
 
 ## 后果
 
-- web-app bundle 从此在所有组合中 boot `lan-access-webserver`；开关关闭时它就是换了行 id 的原版服务器。回退只需在一个补丁文件里改两行。
+- web-app bundle 出厂时原版 `webserver` 行启用、本行 `disabled: true`；启用 LAN 模式需要一份两行 patch overlay（禁用原版行、启用本行），回退同样是这两行。因此除非部署方套用该 overlay，本行不会服务——overlay 与启动命令见[包 README](../../../../packages/extensions/lan-access/README.zh.md#enabling-lan-mode)。
 - token 是整个 LAN 网段的共享密钥——吊销即轮换 `DSH_LAN_TOKEN` 并重启。README 安全节写明明文传输与隧道要求。
 - 源码面子路径行依赖 tsx 源码启动；组合将来若只从构建产物运行，本包增加构建步骤、行的 `name` 改为裸包名（README 已记录）。
+- **2026-10-13 修正（0.2.1-alpha.2 同步及其后续）。** 本 Note 最初陈述的两条事实已不再成立，原因都是上游 webserver 现在会在 load 期拒绝未指定地址。其一，绑定不再是全网卡：`DSH_LAN_BIND` 指名一个具体接口，未设时由 `resolveLanBind` 发现本机首个非回环 IPv4，且发现不到时 fail-loud 而非退回回环。其二，`resolveLanTrust` 已随上游删除，组合行改为从 `ctx.webStartup` 供给 connection 行的 `trustedHosts`——fence 本身未变。绑定解析放在子类而非组合行，是因为 `!!js` 表达式在 Loader 作用域里求值、不带 import、无法枚举网卡。`--host` 喂给 `webStartup.host`，**不**选择 LAN 绑定地址。上线契约见[包 README](../../../../packages/extensions/lan-access/README.zh.md#enabling-lan-mode)，运行时证据见 `FORK_NOTES.md`。
