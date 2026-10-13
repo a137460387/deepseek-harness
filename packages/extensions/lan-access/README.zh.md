@@ -24,7 +24,7 @@ kind: "package-reference"
 | 环境变量 | 默认值 | 含义 |
 |---|---|---|
 | `DSH_LAN_ENABLED` | 未设（关） | 任意非空值开启 LAN 模式；`false`、空串、未设均为关。只有在行被挂载之后才起作用：出厂组合里本行是禁用的，部署方必须同时套用[启用 LAN 模式](#enabling-lan-mode)里的 overlay。 |
-| `DSH_LAN_BIND` | 首个非回环 IPv4 | 开启时的绑定地址。取本机任一接口的具体 IPv4/IPv6 字面量，也可以在明确只服务本机时使用回环字面量。未设即自动发现：子类绑定本机首个非回环 IPv4，因为基础 webserver 拒绝一次把所有网卡暴露在外的绑定。若本机没有任何非回环 IPv4，加载直接 fail-loud，绝不退回回环。 |
+| `DSH_LAN_BIND` | 首个非回环 IPv4 | 开启时的绑定地址。必须取本机某个接口的一个具体 IPv4/IPv6 字面量；主机名、非法地址或通配地址（`0.0.0.0`、`::` 及其 IPv4-mapped 写法）一律 fail-loud。明确只服务本机时可使用回环字面量。未设即自动发现：子类绑定本机首个非回环 IPv4，因为基础 webserver 拒绝一次把所有网卡暴露在外的绑定。若本机没有任何非回环 IPv4，同样 fail-loud，绝不退回回环。 |
 | `DSH_LAN_TOKEN` | — | 开启后必填的共享密钥。缺失时整个插件树 fail-loud 启动中止。 |
 | `DSH_LAN_TRUST_LOCALHOST` | 未设（关） | 可选的 localhost 免 token 豁免；仅 `1`/`true`（大小写不敏感）生效，其余值与未设同为关闭。开启后的边界与代价见「安全警示」。 |
 | `DSH_LAN_EXTRA_AUTHORITIES` | 未设 | 可选的逗号分隔 `host[:port]` 列表，追加到 `/api` 浏览器信任 fence 的 `trustedHosts`。 |
@@ -59,7 +59,7 @@ DSH_LAN_BIND=<LAN-IP> \
 
 `DSH_LAN_BIND` 用来选网卡：
 
-- **已设** —— 服务器原样绑定该地址。本机任一接口的具体 IPv4/IPv6 字面量都可用，在明确只服务本机时也可以用回环字面量。需要让其他设备访问的部署就设这个值。
+- **已设** —— 服务器原样绑定该地址，但先按基础 webserver 校验配置绑定的同一套规则检查：它必须是**一个具体的 IPv4/IPv6 字面量**。主机名、非法地址或通配地址——`0.0.0.0`、`::`，以及 IPv4 any 的 IPv4-mapped 写法——一律 fail-loud，因为绑定它们会一次把端口暴露在所有网卡上。明确只服务本机时，回环字面量可用。需要让其他设备访问的部署就设这个值。
 - **未设** —— 子类自动发现本机首个非回环 IPv4。发现按 `os.networkInterfaces()` 的枚举顺序走、不按可用性排序，因此在装有虚拟网卡的主机上，它同样可能选中 WSL vEthernet、VMware host-only 或 VPN 接口，而不是物理 LAN 地址。需要让另一台物理设备访问时，请把 `DSH_LAN_BIND` 显式设为面向该设备的 IPv4，不要依赖自动发现。若本机报告没有任何非回环 IPv4，加载直接 fail-loud，绝不退回回环。
 
 验证部署：
@@ -106,6 +106,7 @@ token 比较用 `crypto.timingSafeEqual` 比对 SHA-256 摘要，绝不比较明
 - **跨不可信网络必须套隧道。** 经由非可信网络访问时，用 SSH 隧道（`ssh -L 3180:127.0.0.1:3180 <host>`）或 HTTPS 反向代理包裹连接；不要把端口直接暴露到公网。
 - **token 等于远程代码执行授权。** Web UI 可以创建运行 shell 命令的 agent 会话；请像对待这台机器的 SSH 私钥一样对待 token。
 - **localhost 豁免默认关闭，开启等于信任本机全部进程。** 显式启用 `DSH_LAN_TRUST_LOCALHOST=1/true` 后，TCP 对端与 Host 头均为回环形态（localhost / 127.0.0.0/8 / `[::1]`，均可带端口）的请求跳过 token 判定直接放行，普通请求与 websocket 升级同判。边界：判定只依据 socket 对端真实地址与 Host 头，不读 `X-Forwarded-For` 等任何可伪造的转发头，因此反向隧道形态（回环对端 + 公网 Host，如 cloudflared 入站）与 LAN 形态（非回环对端）都不在豁免之列。代价：本机任何能连上该端口的进程或本地用户都直接获得完整 agent 授权（等价于持有 token），故默认关闭。
+- **`DSH_LAN_BIND` 经过校验，不被直接信任。** 该值来自环境变量，因此从不经过 webserver 的 schema。子类在绑定前施加与 schema 相同的两道检查——必须是具体 IPv4/IPv6 字面量，且不得是未指定地址——因此通配地址无法绕过「不把端口一次暴露在所有网卡上」这条规则。被拒的值直接 fail-loud，不创建任何监听器。
 - 原版 `/api` 浏览器信任 fence（DNS rebinding 与跨站防御）完整保留；本包在其之上加鉴权，绝不替代它。
 
 ## `.ts` 源码直引的约束
@@ -116,7 +117,7 @@ token 比较用 `crypto.timingSafeEqual` 比对 SHA-256 摘要，绝不比较明
 
 启用方式、overlay、启动命令与探针都见 [启用 LAN 模式](#enabling-lan-mode)。简言之：套用两行 overlay，传入 `DSH_LAN_ENABLED`/`DSH_LAN_TOKEN`/`DSH_LAN_BIND`，与操作系统核对实际绑定地址，并确认无凭据请求返回门禁的 `401`、而回环连接被拒。
 
-测试：`packages/extensions/lan-access/tests/lan-access.spec.ts`（25 个用例：`/api` 门禁、websocket 拒绝、auth-set 链路、`?token=` 死循环闭环、占位页不泄露、文档 `no-store` 标记——文档、拒绝与换取响应携带；资源与写请求不带——disabled 模式与原版逐字节对照——未设与显式 `false` 两态，含响应头——缺 token fail-loud、日志卫生、localhost 豁免的双条件与 websocket 升级、隧道与 LAN 形态的维持门禁、豁免开关取值解析、回环分类谓词，以及 LAN 绑定解析：关闭时透传、显式 `DSH_LAN_BIND` 优先、发现结果覆盖行的占位值、监听器确实在被发现的接口上应答且不在回环上应答、以及本机无非回环 IPv4 时的 fail-loud 拒绝）。
+测试：`packages/extensions/lan-access/tests/lan-access.spec.ts`（29 个用例：`/api` 门禁、websocket 拒绝、auth-set 链路、`?token=` 死循环闭环、占位页不泄露、文档 `no-store` 标记——文档、拒绝与换取响应携带；资源与写请求不带——disabled 模式与原版逐字节对照——未设与显式 `false` 两态，含响应头——缺 token fail-loud、日志卫生、localhost 豁免的双条件与 websocket 升级、隧道与 LAN 形态的维持门禁、豁免开关取值解析、回环分类谓词，以及 LAN 绑定解析：关闭时透传、合法 IPv4 与 IPv6 字面量（含带 zone 的写法）、显式回环可用、官方通配检测器识别的每一种通配写法经真实解析路径被拒且不遗留监听端口、主机名与非法地址被拒、发现结果覆盖行的占位值、监听器确实在被发现的接口上应答且不在回环上应答、以及本机无非回环 IPv4 时的 fail-loud 拒绝）。
 
 <a id="model-experience"></a>
 ## 模型体验

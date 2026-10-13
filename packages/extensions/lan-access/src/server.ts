@@ -35,7 +35,7 @@ import { isIPv4 } from 'node:net'
 import { networkInterfaces } from 'node:os'
 import type { Duplex } from 'node:stream'
 import { Service, type Context } from '@deepseek-ai/cordis'
-import { Config as BaseConfig, WebServer } from '@deepseek-ai/dsh-host-webserver'
+import { Config as BaseConfig, isWildcardHost, normalizeBindAddress, WebServer } from '@deepseek-ai/dsh-host-webserver'
 
 /** Environment switch: any non-empty value enables the LAN mode. */
 const DSH_LAN_ENABLED_ENV = 'DSH_LAN_ENABLED'
@@ -79,9 +79,11 @@ export function lanIpv4Of(): string | undefined {
  * loopback placeholder and this resolver owns the real bind, keeping one
  * authority for "which interface does LAN mode expose":
  *
- * - `DSH_LAN_BIND` set — the deployment named the interface, so it wins
- *   verbatim; the schema has already rejected a non-literal value, and a
- *   loopback value is a deliberate choice rather than a silent fallback.
+ * - `DSH_LAN_BIND` set — the deployment named the interface. This value arrives
+ *   from the environment, never through the row's schema, so the schema's own
+ *   literal and wildcard checks have not seen it: {@link verifyBindLiteral}
+ *   applies the same public checks here. A loopback value is a deliberate
+ *   choice rather than a silent fallback, so it passes.
  * - `DSH_LAN_BIND` unset — discovery must produce a concrete non-loopback
  *   address. When every interface is loopback there is no LAN to serve, so this
  *   throws instead of binding loopback and reporting a LAN mode that no LAN
@@ -89,12 +91,13 @@ export function lanIpv4Of(): string | undefined {
  * @param configuredHost - the row's configured host, used verbatim when the switch is off.
  * @param enabled - whether the LAN switch is on for this process.
  * @returns the address to bind.
- * @throws when LAN mode is on, no `DSH_LAN_BIND` is set, and no non-loopback IPv4 exists.
+ * @throws when the switch is on and `DSH_LAN_BIND` names no concrete non-wildcard literal,
+ *   or when it is unset and no non-loopback IPv4 exists.
  */
 export function resolveLanBind(configuredHost: string, enabled: boolean): string {
   if (!enabled) return configuredHost
   const explicit = process.env[DSH_LAN_BIND_ENV] ?? ''
-  if (explicit !== '') return explicit
+  if (explicit !== '') return verifyBindLiteral(explicit)
   const discovered = lanIpv4Of()
   if (discovered === undefined) {
     throw new Error(
@@ -103,6 +106,46 @@ export function resolveLanBind(configuredHost: string, enabled: boolean): string
     )
   }
   return discovered
+}
+
+/**
+ * Apply the upstream bind contract to a `DSH_LAN_BIND` value.
+ *
+ * The row's configured host passes through `WebServer.Config`, which rejects a
+ * non-literal and an unspecified address; a value read straight from the
+ * environment does not. These are the same two rules, taken from the public
+ * exports the schema itself uses rather than re-implemented:
+ * `normalizeBindAddress` throws on anything that is not a concrete IPv4/IPv6
+ * literal (a hostname, a bad address), and `isWildcardHost` catches every
+ * unspecified form — IPv4 any, IPv6 any, and the IPv4-mapped spellings —
+ * because binding them would expose the port on every interface at once.
+ * Loopback is a legitimate explicit choice for a machine-local gated server and
+ * is deliberately not rejected here.
+ *
+ * The value is returned unmodified, matching the schema, which validates and
+ * then returns its input. Normalizing would strip a `%zone`, and that zone is
+ * what `listen` needs to reach a link-local interface.
+ * @param value - the `DSH_LAN_BIND` text.
+ * @returns the value unchanged, once it is a concrete non-wildcard literal.
+ * @throws when the text is no concrete address literal, or names the unspecified address.
+ */
+function verifyBindLiteral(value: string): string {
+  try {
+    normalizeBindAddress(value)
+  } catch (_notLiteral) {
+    throw new Error(
+      `${DSH_LAN_BIND_ENV} ${JSON.stringify(value)} is not a concrete IPv4 or IPv6 address literal;`
+      + ' name one local interface address, for example 192.168.1.10',
+    )
+  }
+  if (isWildcardHost(value)) {
+    throw new Error(
+      `${DSH_LAN_BIND_ENV} ${JSON.stringify(value)} is an unspecified (wildcard) address,`
+      + ' which is not supported: binding every interface would expose remote code execution to the network;'
+      + ' bind one concrete IPv4 or IPv6 address of a local interface instead',
+    )
+  }
+  return value
 }
 
 /** Gateway config: the listen address (same fields as the base webserver). */

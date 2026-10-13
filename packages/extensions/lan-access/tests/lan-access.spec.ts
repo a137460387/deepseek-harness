@@ -21,7 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
-import HttpServer from '@deepseek-ai/dsh-host-webserver'
+import HttpServer, { isWildcardHost } from '@deepseek-ai/dsh-host-webserver'
 import z from '@deepseek-ai/schemastery'
 import { isLoopbackHostHeader, isLoopbackTcpPeer, lanIpv4Of, LanAccessWebServer, resolveLanBind, type Config } from '../src/server.ts'
 
@@ -773,15 +773,87 @@ describe('LAN bind resolution', () => {
     expect(resolveLanBind('10.1.2.3', false)).toBe('10.1.2.3')
   })
 
-  it('binds the explicit DSH_LAN_BIND literal while the switch is on', () => {
+  it('binds a legal explicit literal while the switch is on, IPv4 and IPv6 alike', () => {
     setLanEnv('true', TOKEN)
-    vi.stubEnv('DSH_LAN_BIND', '10.42.7.9')
-    expect(resolveLanBind('127.0.0.1', true)).toBe('10.42.7.9')
+    for (const literal of ['10.42.7.9', '192.168.31.175', '2001:db8::1', '::1']) {
+      vi.stubEnv('DSH_LAN_BIND', literal)
+      expect(resolveLanBind('127.0.0.1', true), literal).toBe(literal)
+    }
 
-    // An explicitly named loopback is a deliberate loopback-only deployment,
-    // not the silent fallback this contract exists to prevent.
-    vi.stubEnv('DSH_LAN_BIND', '127.0.0.1')
-    expect(resolveLanBind('127.0.0.1', true)).toBe('127.0.0.1')
+    // A zone-bearing literal must survive verbatim: the zone is what `listen`
+    // needs to reach a link-local interface, and normalizing would strip it.
+    vi.stubEnv('DSH_LAN_BIND', 'fe80::1%eth0')
+    expect(resolveLanBind('127.0.0.1', true)).toBe('fe80::1%eth0')
+  })
+
+  it('accepts an explicitly named loopback: a machine-local gated server is a deliberate choice', () => {
+    setLanEnv('true', TOKEN)
+    for (const literal of ['127.0.0.1', '127.9.9.9', '::1']) {
+      vi.stubEnv('DSH_LAN_BIND', literal)
+      // Loopback is not the wildcard: it narrows the bind, and rejecting it
+      // would conflate the two. This is not the silent fallback the resolver
+      // exists to prevent — the deployment asked for it by name.
+      expect(resolveLanBind('127.0.0.1', true), literal).toBe(literal)
+    }
+  })
+
+  it('rejects every wildcard spelling the upstream detector recognises, through the real resolver', () => {
+    setLanEnv('true', TOKEN)
+    const wildcards = [
+      '0.0.0.0',
+      '::',
+      '0:0:0:0:0:0:0:0',
+      '::ffff:0.0.0.0',
+      '::0.0.0.0',
+    ]
+    for (const wildcard of wildcards) {
+      vi.stubEnv('DSH_LAN_BIND', wildcard)
+      // The environment bypasses the row's schema, so the resolver is the only
+      // place these can be caught. `isWildcardHost` on each value keeps this
+      // list honest against the upstream detector rather than against a guess.
+      expect(isWildcardHost(wildcard), `fixture ${wildcard} must be a wildcard`).toBe(true)
+      expect(() => resolveLanBind('127.0.0.1', true), wildcard)
+        .toThrow(/is an unspecified \(wildcard\) address, which is not supported/)
+    }
+  })
+
+  it('rejects hostnames, malformed addresses, and port-carrying forms', () => {
+    setLanEnv('true', TOKEN)
+    const rejected = [
+      'localhost',
+      'example.com',
+      'dsh.lgyu.cloud',
+      '999.1.1.1',
+      '192.168.1',
+      'not-an-ip',
+      '192.168.1.10:80',
+      '[::1]',
+      ' 10.0.0.1 ',
+    ]
+    for (const value of rejected) {
+      vi.stubEnv('DSH_LAN_BIND', value)
+      expect(isWildcardHost(value), `fixture ${value} is not a wildcard`).toBe(false)
+      expect(() => resolveLanBind('127.0.0.1', true), value)
+        .toThrow(/is not a concrete IPv4 or IPv6 address literal/)
+    }
+  })
+
+  it('refuses the LAN load without creating a listener when DSH_LAN_BIND is a wildcard', { timeout: 60_000 }, async () => {
+    setLanEnv('true', TOKEN)
+    vi.stubEnv('DSH_LAN_BIND', '0.0.0.0')
+    // The whole tree must fail before `listen`: a rejected bind that still left
+    // a port open would be the vulnerability this guard closes. The port is
+    // named rather than OS-assigned so the check is a real connection attempt.
+    const port = 32_417
+    const loaded = await loadComposition(LanAccessWebServer, '@deepseek-ai/dsh-host-lan-access/src/server.ts', port)
+    const includeEntry = Object.values(loaded.loader.store).find(candidate => candidate.subtree !== undefined)
+    expect(includeEntry).toBeDefined()
+    const entry = Object.values(includeEntry!.subtree!.store)
+      .find(candidate => candidate.options.name === '@deepseek-ai/dsh-host-lan-access/src/server.ts')
+    expect(entry).toBeDefined()
+    await expect(entry!.fiber!.await()).rejects.toThrow(/is an unspecified \(wildcard\) address/)
+    // Nothing bound the port: a wildcard bind would answer, a rejected one refuses.
+    await expect(fetch(`http://127.0.0.1:${String(port)}/`)).rejects.toThrow()
   })
 
   it('discovers a non-loopback IPv4 when the switch is on and DSH_LAN_BIND is unset', () => {
