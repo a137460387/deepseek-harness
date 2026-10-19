@@ -8,21 +8,25 @@
  * storage access — the expanded view reads the message's own text block.
  *
  * The short-text branch mirrors the shipped user bubble (attachments row,
- * `projectUserText` bubble, reference summary, actions row) with this
- * package's own CSS module and a copy+clock actions row (the shipped actions
- * component is package-internal).
+ * reference summary, actions row) with this package's own CSS module and a
+ * copy+clock actions row (the shipped actions component is package-internal).
+ * The bubble body itself renders through the upstream `conversation.user.text`
+ * Factory Slot, so reference actions follow whatever the composition registers
+ * there instead of a package-internal primitive.
  */
 
-import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   FileTypeIcon, IconCheckOutlineMedium, IconCopyOutlineMedium, JsonBlock, Tooltip,
-  fileExtension, fileSizeText, projectUserText, writeClipboard,
+  fileExtension, fileSizeText, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { UserMessageNode } from '@deepseek-ai/dsh-client-ui-chat/client'
-import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsRenderFactories, PropsRuntime, SlotFactoryMap } from '@deepseek-ai/dsh-client-ui-slots'
 import type { MessageImageSource } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { RENDER_FOLD_CHARS, RENDER_FOLD_LINES, countLines } from './markers.ts'
 import css from './FoldView.module.css'
+
+const EMPTY_LABELS: readonly string[] = []
 
 /* jscpd:ignore-start -- intentional mirror of MessageItem.tsx's attachment
    type derivation: the shipped component and its CSS module are
@@ -152,10 +156,22 @@ function LongTextFoldActions({ text, time, t }: {
   )
 }
 
-/** Full props of the fold renderer (upstream owner share + this NS locale). */
+/** Full props of the fold renderer (upstream owner share, render factories, and this NS locale). */
 export type LongTextFoldNodeProps =
   PropsRuntime<'conversation.chat.node', 'user' | 'steering'>
+  & PropsRenderFactories
   & PropsLocale<'longTextFold'>
+
+/** One image and nothing else, so the user-content Factory renders only that image entry. */
+function imageOnly(image: MessageImageSource): UserContentData {
+  return { text: '', attachments: [{ type: 'image', image }], extraBlocks: [] }
+}
+
+/** Prepared user contents for the upstream user-content Factory Slot. */
+type UserContentData = SlotFactoryMap['conversation.chat.user.content']['props']['content']
+
+/** Text-transform facts handed to the upstream user-text Factory Slot. */
+type UserTextFactsInput = SlotFactoryMap['conversation.user.text']['props']['facts']
 
 /**
  * The keyed Chat renderer replacing the shipped user/steering bubble: short
@@ -164,15 +180,22 @@ export type LongTextFoldNodeProps =
  * @param props - the composed chat-node props.
  * @returns the user bubble or the folded card.
  */
-export function LongTextFoldNodeView({ node, renderMessageImages, openFile, openSkill, t }: LongTextFoldNodeProps) {
+export function LongTextFoldNodeView({ node, renderFactorySlot, loadImage, t }: LongTextFoldNodeProps) {
   const data = node.data
-  const parts = contentParts(data.content)
-  const referenceLabels = data.referenceLabels ?? []
-  const skillNames = data.skillNames ?? []
+  const parts = useMemo(() => contentParts(data.content), [data.content])
+  const referenceLabels = data.referenceLabels ?? EMPTY_LABELS
+  const skillNames = data.skillNames
   const fold = parts.text.length >= RENDER_FOLD_CHARS || countLines(parts.text) >= RENDER_FOLD_LINES
+  // The bubble body is the upstream Factory Slot; `sessionLabels` and
+  // `skillNames` arrive through declaration merging from the ui-conversation
+  // rule owner and ui-skill, matching the shipped MessageItem inputs.
+  const facts: UserTextFactsInput = {
+    ...(data.referenceLabels === undefined ? {} : { sessionLabels: data.referenceLabels }),
+    ...(skillNames === undefined ? {} : { skillNames }),
+  }
   const bubble = (): ReactNode => (
     <>
-      {projectUserText(parts.text, referenceLabels, skillNames, 'skill', { openFile, openSkill })}
+      {renderFactorySlot('conversation.user.text', { text: parts.text, facts })}
       {parts.rest.map((block, index) => (
         <JsonBlock
           key={index}
@@ -189,15 +212,15 @@ export function LongTextFoldNodeView({ node, renderMessageImages, openFile, open
         {parts.attachments.length > 0 && (
           <div className={css.attachmentRow} data-message-attachments>
             {/* jscpd:ignore-start -- intentional mirror of the shipped
-                attachment row (MessageItem.tsx is package-internal); the sync
+                attachment row (UserContent.tsx is package-internal); the sync
                 checklist diffs this block against upstream changes. */}
             {parts.attachments.map((attachment, index) => attachment.type === 'image'
               ? (
                 <Fragment key={`image:${index}`}>
-                  {renderMessageImages({
-                    images: [attachment.image],
-                    align: 'end',
-                    compact: parts.attachments.length > 1,
+                  {renderFactorySlot('conversation.chat.user.content', {
+                    content: imageOnly(attachment.image),
+                    loadImage,
+                    facts: {},
                   })}
                 </Fragment>
               )

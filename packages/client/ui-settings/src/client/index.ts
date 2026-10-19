@@ -1,7 +1,7 @@
 /** Shared configuration forms and their Host describe mirror. */
 import type { Context } from '@deepseek-ai/cordis'
-// Type-only: the ctx.remote merge, the fixed Host facts, and the carrier's
-// `connection/reset` lifecycle event, all through the assembly package.
+// Type-only: the ctx.remote merge and the carrier's `connection/reset`
+// lifecycle event, all through the assembly package.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only pair supplying `$on` and its key face without dragging a build
 // artifact into the Host graph (rationale beside the same pair in
@@ -35,13 +35,9 @@ export const inject = ['remote', 'remote.settings']
  */
 export function apply(ctx: Context): void {
   const schema = new SettingsSchemaService(ctx)
-  // Host persistence on every origin. BrowserAuth already authenticates any
-  // session that loaded this bundle, so the former non-loopback memory mode
-  // kept remote preferences session-local without adding protection.
-  // Fork patch reversing upstream's loopback gate — see FORK_NOTES.md
-  // 「已知本地补丁」; an upstream correction retires it.
-  const persistence = 'host'
-  const mirror = new SettingsDescribeMirror(ctx, persistence)
+  // Persistence policy: every authenticated browser persists through the Host document
+  // (.agents/notes/implemented/bug-fix/2026-09-15-authenticated-browser-host-preferences.md).
+  const mirror = new SettingsDescribeMirror(ctx)
   ctx.effect(() => {
     const disposers = [
       ctx.remote.$on('settings/document-updated', () => { void mirror.load() }),
@@ -54,5 +50,5 @@ export function apply(ctx: Context): void {
     void mirror.ensure()
     return () => { for (const dispose of disposers) dispose() }
   }, 'ui-settings: describe mirror invalidations')
-  new ConfigForms(ctx, { mirror, schema, persistence })
+  new ConfigForms(ctx, { mirror, schema })
 }

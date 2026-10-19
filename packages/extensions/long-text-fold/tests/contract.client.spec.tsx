@@ -17,7 +17,6 @@ import { registerPlainText } from '@lexical/plain-text'
 import { registerComposerKeymap } from '@deepseek-ai/dsh-client-ui-conversation/src/client/input/editor/keymap.ts'
 import { en as conversationEn, zh as conversationZh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
 import { en as chatEn, zh as chatZh } from '@deepseek-ai/dsh-client-ui-chat/src/client/locale.ts'
-import { projectUserText } from '@deepseek-ai/dsh-client-ui-primitives'
 import { CLIENT_SLOT_API } from '@deepseek-ai/dsh-cordis-client-runner/src/client/slot-catalog.ts'
 import { en, zh } from '../src/client/locales.ts'
 
@@ -164,10 +163,19 @@ describe('upstream locale contract', () => {
   })
 })
 
-describe('renderer primitive contract', () => {
-  it('projectUserText renders plain text non-empty', () => {
-    const rendered = projectUserText('plain long-text body', [], [], 'skill')
-    expect(rendered).toBeTruthy()
+describe('user-text factory contract', () => {
+  it('keeps the conversation.user.text Factory Slot the fold body renders through', () => {
+    // The fold hands the bubble body to this Factory Slot instead of a
+    // package-internal primitive; an upstream rename must trip here so
+    // fold-view follows in the same change.
+    const node = CLIENT_SLOT_API.find(entry => entry.key === 'conversation.user.text.node')
+    expect(node!.declaredBy).toContain("factory 'conversation.user.text'")
+  })
+
+  it('carries the text and session renderers that plain user text resolves through', () => {
+    const node = CLIENT_SLOT_API.find(entry => entry.key === 'conversation.user.text.node')
+    expect(node!.occupants).toContain("client-ui-conversation PlainUserText key 'text'")
+    expect(node!.occupants).toContain("client-ui-conversation SessionReference key 'session'")
   })
 })
 

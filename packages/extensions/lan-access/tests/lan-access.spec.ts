@@ -132,6 +132,12 @@ async function loadComposition(
   return context
 }
 
+/** The bound port; the Loader settles before a spec probes the listener. */
+function listenedPort(server: { port: number | undefined }): number {
+  if (server.port === undefined) throw new Error('webserver: port read before listen bound one')
+  return server.port
+}
+
 /** GET one path; returns status, headers, and the full body. */
 async function request(port: number, path: string, init?: RequestInit): Promise<{
   status: number
@@ -217,12 +223,12 @@ describe('LAN token gate', () => {
       res.end('<html><head></head><body>real-dist-shell</body></html>')
     })
 
-    const denied = await request(server.port, '/api/session/list')
+    const denied = await request(listenedPort(server), '/api/session/list')
     expect(denied.status).toBe(401)
     expect(apiHandler).not.toHaveBeenCalled()
 
     // A valid cookie passes the gate and reaches the handler.
-    const authed = await request(server.port, '/api/session/list', {
+    const authed = await request(listenedPort(server), '/api/session/list', {
       headers: { cookie: `dsh-lan-token=${TOKEN}` },
     })
     expect(authed.status).toBe(200)
@@ -243,13 +249,13 @@ describe('LAN token gate', () => {
       },
     })
 
-    const denied = await rawUpgrade(server.port, '/events')
+    const denied = await rawUpgrade(listenedPort(server), '/events')
     expect(denied.data).toContain('401 Unauthorized')
     expect(upgradeReached).toBe(false)
     denied.closed.catch(() => {})
 
     // Query-parameter tokens are valid on the upgrade handshake too.
-    const accepted = await rawUpgrade(server.port, `/events?token=${TOKEN}`)
+    const accepted = await rawUpgrade(listenedPort(server), `/events?token=${TOKEN}`)
     expect(accepted.data).toContain('101 Switching Protocols')
     expect(upgradeReached).toBe(true)
   })
@@ -270,7 +276,7 @@ describe('LAN token gate', () => {
     // Entry with ?token= sets the session cookie and redirects to the same
     // path with the query cleared (the wrapper-level redirect for
     // non-/auth-set paths).
-    const entry = await request(server.port, `/?token=${TOKEN}`)
+    const entry = await request(listenedPort(server), `/?token=${TOKEN}`)
     expect(entry.status).toBe(302)
     expect(entry.location).toBe('/')
     expect(entry.setCookie).toContain(`dsh-lan-token=${TOKEN}`)
@@ -280,7 +286,7 @@ describe('LAN token gate', () => {
     expect(entry.setCookie).not.toContain('Secure')
 
     // The /auth-set route validates and sets the cookie.
-    const authSet = await request(server.port, `/auth-set?token=${TOKEN}`)
+    const authSet = await request(listenedPort(server), `/auth-set?token=${TOKEN}`)
     expect(authSet.status).toBe(302)
     expect(authSet.location).toBe('/')
     expect(authSet.setCookie).toContain('dsh-lan-token=')
@@ -289,16 +295,16 @@ describe('LAN token gate', () => {
     expect(authSet.setCookie).not.toContain('Secure')
 
     // The cookie now authorizes API and page loads.
-    const api = await request(server.port, '/api/session/list', {
+    const api = await request(listenedPort(server), '/api/session/list', {
       headers: { cookie: `dsh-lan-token=${TOKEN}` },
     })
     expect(api.status).toBe(200)
-    const page = await request(server.port, '/', { headers: { cookie: `dsh-lan-token=${TOKEN}` } })
+    const page = await request(listenedPort(server), '/', { headers: { cookie: `dsh-lan-token=${TOKEN}` } })
     expect(page.status).toBe(200)
     expect(page.body).toContain('shell')
 
     // An invalid token gets 401, never a cookie.
-    const invalid = await request(server.port, '/auth-set?token=wrong')
+    const invalid = await request(listenedPort(server), '/auth-set?token=wrong')
     expect(invalid.status).toBe(401)
     expect(invalid.setCookie).toBeNull()
   })
@@ -314,7 +320,7 @@ describe('LAN token gate', () => {
 
     // Follow the 401 page's own instruction: append ?token= once. The browser
     // stores the cookie pair (name=value) and drops the attributes.
-    const entry = await request(server.port, `/?token=${TOKEN}`)
+    const entry = await request(listenedPort(server), `/?token=${TOKEN}`)
     expect(entry.status).toBe(302)
     const setCookie = entry.setCookie ?? ''
     const cookie = setCookie.split(';')[0] ?? ''
@@ -322,7 +328,7 @@ describe('LAN token gate', () => {
 
     // Landing on the clean URL with exactly that cookie must serve the real
     // page (200), not the 401 placeholder — the loop is closed.
-    const landing = await request(server.port, '/', { headers: { cookie } })
+    const landing = await request(listenedPort(server), '/', { headers: { cookie } })
     expect(landing.status).toBe(200)
     expect(landing.body).toContain('shell')
   })
@@ -341,14 +347,14 @@ describe('LAN token gate', () => {
     })
 
     // Stage one: the gate token mints the cookie.
-    const entry = await request(server.port, `/?token=${TOKEN}`)
+    const entry = await request(listenedPort(server), `/?token=${TOKEN}`)
     expect(entry.status).toBe(302)
     const cookie = (entry.setCookie ?? '').split(';')[0] ?? ''
     expect(cookie).toBe(`dsh-lan-token=${TOKEN}`)
 
     // Without the cookie a foreign token stays refused and never reaches the
     // handlers; it never mints anything either.
-    const refused = await request(server.port, '/?token=foreign-launch-token')
+    const refused = await request(listenedPort(server), '/?token=foreign-launch-token')
     expect(refused.status).toBe(401)
     expect(refused.setCookie).toBeNull()
     expect(observedUrls).toEqual([])
@@ -356,7 +362,7 @@ describe('LAN token gate', () => {
     // Stage two: the valid gate cookie carries the foreign ?token= through
     // untouched — no redirect, no gate cookie, the downstream exchange sees
     // the exact URL.
-    const stageTwo = await request(server.port, '/?token=foreign-launch-token', { headers: { cookie } })
+    const stageTwo = await request(listenedPort(server), '/?token=foreign-launch-token', { headers: { cookie } })
     expect(stageTwo.status).toBe(200)
     expect(stageTwo.setCookie).toBeNull()
     expect(observedUrls).toEqual(['/?token=foreign-launch-token'])
@@ -380,36 +386,36 @@ describe('LAN token gate', () => {
     const cookie = { headers: { cookie: `dsh-lan-token=${TOKEN}` } }
 
     for (const path of ['/', '/index.html', '/notes.html?ref=x']) {
-      const document = await request(server.port, path, cookie)
+      const document = await request(listenedPort(server), path, cookie)
       expect(document.status).toBe(200)
       expect(document.headers.get('cache-control')).toBe('no-store')
     }
-    const headDocument = await request(server.port, '/', { ...cookie, method: 'HEAD' })
+    const headDocument = await request(listenedPort(server), '/', { ...cookie, method: 'HEAD' })
     expect(headDocument.headers.get('cache-control')).toBe('no-store')
 
     // Writes are never cacheable anyway; the document judgment skips them.
-    const write = await request(server.port, '/', { ...cookie, method: 'POST' })
+    const write = await request(listenedPort(server), '/', { ...cookie, method: 'POST' })
     expect(write.status).toBe(200)
     expect(write.headers.get('cache-control')).toBeNull()
 
-    const asset = await request(server.port, '/assets/index-ABC123.js', cookie)
+    const asset = await request(listenedPort(server), '/assets/index-ABC123.js', cookie)
     expect(asset.status).toBe(200)
     expect(asset.headers.get('cache-control')).toBeNull()
 
-    const denied = await request(server.port, '/')
+    const denied = await request(listenedPort(server), '/')
     expect(denied.status).toBe(401)
     expect(denied.headers.get('cache-control')).toBe('no-store')
 
-    const entryRedirect = await request(server.port, `/?token=${TOKEN}`)
+    const entryRedirect = await request(listenedPort(server), `/?token=${TOKEN}`)
     expect(entryRedirect.status).toBe(302)
     expect(entryRedirect.headers.get('cache-control')).toBe('no-store')
-    const authSet = await request(server.port, `/auth-set?token=${TOKEN}`)
+    const authSet = await request(listenedPort(server), `/auth-set?token=${TOKEN}`)
     expect(authSet.status).toBe(302)
     expect(authSet.headers.get('cache-control')).toBe('no-store')
 
     // A malformed escape cannot name the index; the raw form is judged, so the
     // (never-cached-in-production) 404 shape carries no document header.
-    const malformed = await request(server.port, '/%zz', cookie)
+    const malformed = await request(listenedPort(server), '/%zz', cookie)
     expect(malformed.status).toBe(200)
     expect(malformed.headers.get('cache-control')).toBeNull()
   })
@@ -424,7 +430,7 @@ describe('LAN token gate', () => {
     })
 
     for (const path of ['/', '/index.html', '/assets/index-ABC123.js', '/deeply/nested/route']) {
-      const denied = await request(server.port, path)
+      const denied = await request(listenedPort(server), path)
       expect(denied.status).toBe(401)
       expect(denied.headers.get('content-type')).toContain('text/html')
       // The placeholder names no real asset, path, or script source.
@@ -435,7 +441,7 @@ describe('LAN token gate', () => {
       expect(denied.body).not.toContain('shell')
       expect(denied.body).not.toContain('<script')
       // With the token the same paths reach the real fallback.
-      const allowed = await request(server.port, path, { headers: { cookie: `dsh-lan-token=${TOKEN}` } })
+      const allowed = await request(listenedPort(server), path, { headers: { cookie: `dsh-lan-token=${TOKEN}` } })
       expect(allowed.status).toBe(200)
     }
   })
@@ -474,15 +480,15 @@ describe('disabled-mode equivalence', () => {
       { path: '/probe?token=anything' },
     ]
     for (const scenario of scenarios) {
-      const fromStock = await request(stock.webServer.port, scenario.path, scenario.init)
-      const fromSubclass = await request(subclass.webServer.port, scenario.path, scenario.init)
+      const fromStock = await request(listenedPort(stock.webServer), scenario.path, scenario.init)
+      const fromSubclass = await request(listenedPort(subclass.webServer), scenario.path, scenario.init)
       expect(fromSubclass.status).toBe(fromStock.status)
       expect(fromSubclass.body).toBe(fromStock.body)
       expect(fromSubclass.headers.get('x-probe')).toBe(fromStock.headers.get('x-probe'))
     }
     // Upgrades work through the subclass in disabled mode too.
-    const stockUpgrade = await rawUpgrade(stock.webServer.port, '/events')
-    const subclassUpgrade = await rawUpgrade(subclass.webServer.port, '/events')
+    const stockUpgrade = await rawUpgrade(listenedPort(stock.webServer), '/events')
+    const subclassUpgrade = await rawUpgrade(listenedPort(subclass.webServer), '/events')
     expect(subclassUpgrade.data).toBe(stockUpgrade.data)
     expect(subclassUpgrade.data).toContain('101 Switching Protocols')
   })
@@ -490,11 +496,11 @@ describe('disabled-mode equivalence', () => {
   it('answers identically with DSH_LAN_ENABLED=false explicitly set', { timeout: 60_000 }, async () => {
     setLanEnv('false', TOKEN)
     const { stock, subclass } = await bootPair()
-    const fromStock = await request(stock.webServer.port, '/probe')
-    const fromSubclass = await request(subclass.webServer.port, '/probe')
+    const fromStock = await request(listenedPort(stock.webServer), '/probe')
+    const fromSubclass = await request(listenedPort(subclass.webServer), '/probe')
     expect(fromSubclass).toMatchObject({ status: fromStock.status, body: fromStock.body })
     // The token env is present but inert: no gate was installed.
-    const withToken = await request(subclass.webServer.port, '/probe')
+    const withToken = await request(listenedPort(subclass.webServer), '/probe')
     expect(withToken.status).toBe(200)
   })
 
@@ -505,7 +511,7 @@ describe('disabled-mode equivalence', () => {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
       res.end('<html><body>shell</body></html>')
     })
-    const plain = await request(subclass.webServer.port, '/')
+    const plain = await request(listenedPort(subclass.webServer), '/')
     expect(plain.status).toBe(200)
     expect(plain.headers.get('cache-control')).toBeNull()
   })
@@ -550,10 +556,10 @@ describe('log hygiene', () => {
     })
 
     // Exercise success, denial, and error paths.
-    await request(server.port, `/?token=${TOKEN}`)
-    await request(server.port, '/auth-set?token=wrong')
-    await request(server.port, '/denied')
-    await request(server.port, '/%zz')
+    await request(listenedPort(server), `/?token=${TOKEN}`)
+    await request(listenedPort(server), '/auth-set?token=wrong')
+    await request(listenedPort(server), '/denied')
+    await request(listenedPort(server), '/%zz')
     const consoleText = lines.join('\n')
     expect(consoleText).not.toContain(TOKEN)
     logSpy.mockRestore()
@@ -581,28 +587,28 @@ describe('opt-in localhost exemption (DSH_LAN_TRUST_LOCALHOST)', () => {
     })
 
     // No token, loopback TCP peer, Host localhost → the real page, not 401.
-    const page = await rawRequest(server.port, '127.0.0.1', 'localhost:3080', '/')
+    const page = await rawRequest(listenedPort(server), '127.0.0.1', 'localhost:3080', '/')
     expect(page.status).toBe(200)
     expect(page.body).toContain('shell')
 
     // The IPv4 and bracketed IPv6 Host forms qualify identically (the IPv6
     // peer itself is unreachable through the two-literal bind schema; the
     // predicate suite below pins that half).
-    const ipv4Form = await rawRequest(server.port, '127.0.0.1', `127.0.0.1:${String(server.port)}`, '/')
+    const ipv4Form = await rawRequest(listenedPort(server), '127.0.0.1', `127.0.0.1:${String(listenedPort(server))}`, '/')
     expect(ipv4Form.status).toBe(200)
-    const bracketForm = await rawRequest(server.port, '127.0.0.1', '[::1]:3080', '/')
+    const bracketForm = await rawRequest(listenedPort(server), '127.0.0.1', '[::1]:3080', '/')
     expect(bracketForm.status).toBe(200)
 
     // The websocket handshake takes the same exemption.
-    const upgraded = await rawUpgrade(server.port, '/events', [], 'localhost:3080')
+    const upgraded = await rawUpgrade(listenedPort(server), '/events', [], 'localhost:3080')
     expect(upgraded.data).toContain('101 Switching Protocols')
     expect(upgradeReached).toBe(true)
 
     // The /auth-set token exchange still validates and sets its cookie.
-    const authSet = await rawRequest(server.port, '127.0.0.1', 'localhost:3080', `/auth-set?token=${TOKEN}`)
+    const authSet = await rawRequest(listenedPort(server), '127.0.0.1', 'localhost:3080', `/auth-set?token=${TOKEN}`)
     expect(authSet.status).toBe(302)
     expect(authSet.headers).toContain(`set-cookie: dsh-lan-token=${TOKEN}`)
-    const invalidAuthSet = await rawRequest(server.port, '127.0.0.1', 'localhost:3080', '/auth-set?token=wrong')
+    const invalidAuthSet = await rawRequest(listenedPort(server), '127.0.0.1', 'localhost:3080', '/auth-set?token=wrong')
     expect(invalidAuthSet.status).toBe(401)
   })
 
@@ -627,20 +633,20 @@ describe('opt-in localhost exemption (DSH_LAN_TRUST_LOCALHOST)', () => {
     // The cloudflared shape: the TCP peer is 127.0.0.1 but the Host names
     // the public domain — the exemption's Host half fails, so no token
     // still means 401.
-    const denied = await rawRequest(server.port, '127.0.0.1', 'dsh.lgyu.cloud', '/')
+    const denied = await rawRequest(listenedPort(server), '127.0.0.1', 'dsh.lgyu.cloud', '/')
     expect(denied.status).toBe(401)
 
     // A forged forwarded-for header cannot manufacture the missing half.
-    const forged = await rawRequest(server.port, '127.0.0.1', 'dsh.lgyu.cloud', '/', ['X-Forwarded-For: 127.0.0.1'])
+    const forged = await rawRequest(listenedPort(server), '127.0.0.1', 'dsh.lgyu.cloud', '/', ['X-Forwarded-For: 127.0.0.1'])
     expect(forged.status).toBe(401)
 
     // A valid cookie still passes the gate exactly as before.
-    const authed = await rawRequest(server.port, '127.0.0.1', 'dsh.lgyu.cloud', '/', [`Cookie: dsh-lan-token=${TOKEN}`])
+    const authed = await rawRequest(listenedPort(server), '127.0.0.1', 'dsh.lgyu.cloud', '/', [`Cookie: dsh-lan-token=${TOKEN}`])
     expect(authed.status).toBe(200)
     expect(authed.body).toContain('shell')
 
     // The websocket handshake keeps the same denial for the tunnel shape.
-    const deniedUpgrade = await rawUpgrade(server.port, '/events', [], 'dsh.lgyu.cloud')
+    const deniedUpgrade = await rawUpgrade(listenedPort(server), '/events', [], 'dsh.lgyu.cloud')
     expect(deniedUpgrade.data).toContain('401 Unauthorized')
     expect(upgradeReached).toBe(false)
     deniedUpgrade.closed.catch(() => {})
@@ -665,13 +671,13 @@ describe('opt-in localhost exemption (DSH_LAN_TRUST_LOCALHOST)', () => {
 
     // The TCP peer is non-loopback, so the exemption's peer half already fails:
     // the Host naming that same LAN address cannot rescue it, and the gate stands.
-    const control = await rawRequest(server.port, server.host, `${server.host}:${String(server.port)}`, '/')
+    const control = await rawRequest(listenedPort(server), server.host, `${server.host}:${String(listenedPort(server))}`, '/')
     expect(control.status).toBe(401)
     expect(control.body).toContain('401 Unauthorized')
 
     // The same non-loopback peer with a loopback Host stays gated too: both
     // halves must be loopback, and one loopback half is not enough.
-    const localhostHost = await rawRequest(server.port, server.host, 'localhost:3080', '/')
+    const localhostHost = await rawRequest(listenedPort(server), server.host, 'localhost:3080', '/')
     expect(localhostHost.status).toBe(401)
 
     // Control: the exemption really is armed on this run — a loopback bind on
@@ -683,7 +689,7 @@ describe('opt-in localhost exemption (DSH_LAN_TRUST_LOCALHOST)', () => {
       res.writeHead(200, { 'content-type': 'text/html' })
       res.end('<html><body>shell</body></html>')
     })
-    const exempt = await rawRequest(loopback.webServer.port, '127.0.0.1', 'localhost:3080', '/')
+    const exempt = await rawRequest(listenedPort(loopback.webServer), '127.0.0.1', 'localhost:3080', '/')
     expect(exempt.status).toBe(200)
     expect(exempt.body).toContain('shell')
   })
@@ -698,7 +704,7 @@ describe('opt-in localhost exemption (DSH_LAN_TRUST_LOCALHOST)', () => {
         res.writeHead(200, { 'content-type': 'text/html' })
         res.end('<html><body>shell</body></html>')
       })
-      const denied = await rawRequest(server.port, '127.0.0.1', 'localhost:3080', '/')
+      const denied = await rawRequest(listenedPort(server), '127.0.0.1', 'localhost:3080', '/')
       expect(denied.status, `DSH_LAN_TRUST_LOCALHOST=${value ?? 'unset'} must stay gated`).toBe(401)
       await disposeCurrent()
     }
@@ -711,7 +717,7 @@ describe('opt-in localhost exemption (DSH_LAN_TRUST_LOCALHOST)', () => {
         res.writeHead(200, { 'content-type': 'text/html' })
         res.end('<html><body>shell</body></html>')
       })
-      const allowed = await rawRequest(server.port, '127.0.0.1', 'localhost:3080', '/')
+      const allowed = await rawRequest(listenedPort(server), '127.0.0.1', 'localhost:3080', '/')
       expect(allowed.status, `DSH_LAN_TRUST_LOCALHOST=${value} must exempt`).toBe(200)
       await disposeCurrent()
     }
@@ -885,12 +891,12 @@ describe('LAN bind resolution', () => {
 
     // A no-credential request over the real interface reaches the gate: the
     // concrete-interface bind is proven by the 401 rather than by a predicate.
-    const denied = await rawRequest(server.port, discovered, `${discovered}:${String(server.port)}`, '/api/session/list')
+    const denied = await rawRequest(listenedPort(server), discovered, `${discovered}:${String(listenedPort(server))}`, '/api/session/list')
     expect(denied.status).toBe(401)
     expect(denied.body).toContain('401 Unauthorized')
 
     // Loopback carries no listener: the port is reachable only on the named interface.
-    await expect(fetch(`http://127.0.0.1:${String(server.port)}/api/session/list`)).rejects.toThrow()
+    await expect(fetch(`http://127.0.0.1:${String(listenedPort(server))}/api/session/list`)).rejects.toThrow()
   })
 
   it('fails loud instead of falling back to loopback when discovery finds no non-loopback IPv4', () => {

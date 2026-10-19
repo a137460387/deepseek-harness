@@ -63,11 +63,10 @@ describe('developer tools settings', () => {
     expect(ctx.configForms.developerTools.enabled.getSnapshot()).toBe(false)
   })
 
-  it('shares one remote-browser preference across consumers and disposes it with the plugin', async () => {
+  it('shares one preference instance across consumers and disposes it with the plugin', async () => {
     const ctx = new Context()
     onTestFinished(() => ctx.fiber.dispose())
-    // A non-loopback page authority: Host persistence no longer depends on it,
-    // so the describe read crosses the wire exactly as on loopback.
+    // A non-loopback page authority persists through the same shared instance.
     const describeCall = vi.fn().mockResolvedValue({ ok: true, value: {
       writable: true, hasDocument: true, namespaces: [{
         ns: DEVELOPER_TOOLS_NAMESPACE,
@@ -81,7 +80,6 @@ describe('developer tools settings', () => {
     await fiber.await()
     const preference = ctx.configForms.developerTools
     expect(fiber.ctx.configForms.developerTools.enabled).toBe(preference.enabled)
-    expect(preference.enabled.getSnapshot()).toBe(true)
     await ctx.configForms.describe().ensure()
     expect(describeCall).toHaveBeenCalled()
     await fiber.dispose()
@@ -102,24 +100,6 @@ describe('developer tools settings', () => {
     expect(preference.enabled.getSnapshot()).toBe(true)
     dispose()
   })
-})
-
-it('keeps remote browser choices local and publishes only changed values', async () => {
-  const host = stubConfigForm<DeveloperToolsSettings>()
-  host.publish({ mode: 'memory' })
-  const preference = new DeveloperToolsPreference(host.scope)
-  const notify = vi.fn()
-  const dispose = preference.enabled.subscribe(notify)
-  expect(preference.enabled.getSnapshot()).toBe(true)
-  await preference.setEnabled(false)
-  expect(preference.enabled.getSnapshot()).toBe(false)
-  await preference.setEnabled(false)
-  expect(notify).toHaveBeenCalledOnce()
-  await preference.setEnabled(true)
-  expect(preference.enabled.getSnapshot()).toBe(true)
-  expect(notify).toHaveBeenCalledTimes(2)
-  expect(host.set).not.toHaveBeenCalled()
-  dispose()
 })
 
 it('ignores host revisions that do not change enablement', () => {

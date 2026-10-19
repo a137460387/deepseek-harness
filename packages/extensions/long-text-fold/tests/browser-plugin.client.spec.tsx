@@ -28,6 +28,10 @@ import { cleanup, fireEvent, render, within } from '@testing-library/react'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
+import type { ChatNode, UserMessageNode } from '@deepseek-ai/dsh-client-ui-chat/client'
+import { AttachmentId } from '@deepseek-ai/dsh-attachment'
+import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment/types'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -36,6 +40,7 @@ import { en as conversationEn, zh as conversationZh } from '@deepseek-ai/dsh-cli
 import { apply, inject } from '../src/client/index.ts'
 import { LongTextFoldDock, PreviewPopup, type LongTextFoldDockInjected, type LongTextFoldDockProps, type PreviewPopupProps, type PreviewRequest } from '../src/client/dock.tsx'
 import { LongTextFoldNodeView, type LongTextFoldNodeProps } from '../src/client/fold-view.tsx'
+
 import foldViewCss from '../src/client/FoldView.module.css'
 import type { StagedState } from '../src/client/staged-store.ts'
 import { MAX_STAGED_BYTES, RENDER_FOLD_CHARS, RENDER_FOLD_LINES, markerOf } from '../src/client/markers.ts'
@@ -675,21 +680,40 @@ describe('PreviewPopup component', () => {
 })
 
 describe('LongTextFoldNodeView component', () => {
-  const openFile = vi.fn()
-  const openSkill = vi.fn()
-  const renderMessageImages = vi.fn(() => <div data-testid="images" />)
+  const loadImage = vi.fn()
+  /** Upstream Factory Slot stand-in: the fold delegates text and image bodies here. */
+  const renderFactorySlot = vi.fn((name: string, props: { text?: string }) => name === 'conversation.user.text'
+    ? <span>{props.text}</span>
+    : <div data-testid="images" />)
 
-  function nodeProps(content: readonly unknown[], over: {
+  /** The user-kind props the fold fixtures drive; the surrounding chat-node plumbing is not under test. */
+  type UserNodeProps = LongTextFoldNodeProps & { node: ChatNode<'user'> }
+
+  /** The seats the fold renderer reads, plus inert owner callbacks. */
+  function nodeProps(content: readonly ContentBlock[], over: {
     referenceLabels?: readonly string[]
-  } = {}): LongTextFoldNodeProps {
-    return {
-      node: { data: { content, time: 1_700_000_000_000, referenceLabels: over.referenceLabels, skillNames: undefined } },
-      renderMessageImages,
-      openFile,
-      openSkill,
-      t: T,
-    } as unknown as LongTextFoldNodeProps
+  } = {}): UserNodeProps {
+    const data: UserMessageNode = { kind: 'user', seq: 1, time: 1_700_000_000_000, content, source: null }
+    const node: ChatNode<'user'> = { key: 'fixture:user:1', id: '1', target: 'chat', anchorSeq: 1, location: { kind: 'session' }, visibility: 'visible', kind: 'user', data: { ...data, ...over } }
+    const props: Pick<UserNodeProps, 'renderFactorySlot' | 'loadImage' | 'openFile' | 'inspectCall' | 'forkAt' | 'fileMentions' | 't'> = {
+      renderFactorySlot, loadImage, openFile: vi.fn(), inspectCall: undefined, forkAt: vi.fn(), fileMentions: () => undefined, t: T,
+    }
+    return { ...props, node } as UserNodeProps
   }
+
+  it('renders the bubble body through the upstream conversation.user.text Factory Slot', () => {
+    renderFactorySlot.mockClear()
+    render(<LongTextFoldNodeView {...nodeProps(
+      [{ type: 'text', text: 'short answer' }],
+      { referenceLabels: ['alpha'] },
+    )} />)
+    expect(renderFactorySlot).toHaveBeenCalledOnce()
+    expect(renderFactorySlot.mock.calls[0]![0]).toBe('conversation.user.text')
+    expect(renderFactorySlot.mock.calls[0]![1]).toMatchObject({
+      text: 'short answer',
+      facts: { sessionLabels: ['alpha'] },
+    })
+  })
 
   it('folds a long text into the clamped real-content card and expands on click', () => {
     const long = 'word '.repeat(600)
@@ -729,13 +753,25 @@ describe('LongTextFoldNodeView component', () => {
 
   it('renders a file attachment as the file card', () => {
     const { container } = render(<LongTextFoldNodeView {...nodeProps([
-      { type: 'file', attachment: { attachmentId: 'sha256:aa', name: 'report.pdf', bytes: 2048 } },
+      { type: 'file', attachment: { attachmentId: AttachmentId('sha256:aa'), name: 'report.pdf', bytes: 2048 } },
       { type: 'text', text: 'see attached' },
     ])} />)
     const fileRow = container.querySelector('[data-message-attachments]')
     expect(fileRow).not.toBeNull()
     expect(fileRow!.textContent).toContain('report.pdf')
     expect(fileRow!.textContent).toContain('PDF')
+  })
+
+  it('renders an image attachment through the upstream user-content Factory Slot with the session loader', () => {
+    const { container } = render(<LongTextFoldNodeView {...nodeProps([
+      { type: 'image', attachment: { attachmentId: AttachmentId('sha256:bb'), mediaType: 'image/png', bytes: 1024, width: 8, height: 8 } satisfies ImageAttachmentRef },
+      { type: 'text', text: 'see image' },
+    ])} />)
+    expect(container.querySelector('[data-message-attachments]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="images"]')).not.toBeNull()
+    const imageCall = renderFactorySlot.mock.calls.find(call => call[0] === 'conversation.chat.user.content')
+    expect(imageCall).toBeDefined()
+    expect(imageCall![1]).toMatchObject({ loadImage, content: { text: '' } })
   })
 
   it('renders the mirrored reference summary for labeled messages', () => {
