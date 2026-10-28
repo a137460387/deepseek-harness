@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Busca na conversa",
+    "description": "Ctrl/Cmd+F faz busca literal sem diferenciar maiúsculas nas mensagens da sessão atual, com salto circular e destaque centralizado."
+  }
+}

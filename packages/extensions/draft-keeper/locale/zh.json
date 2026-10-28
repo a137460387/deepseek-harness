@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "草稿保管",
+    "description": "把每个会话未发送的输入草稿镜像到 localStorage，重载或崩溃后自动恢复并提示。"
+  }
+}

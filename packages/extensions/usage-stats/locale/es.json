@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Estadísticas de uso",
+    "description": "Ofrece en la pestaña de ajustes totales de tokens por proveedor y modelo, agregados diarios y mensuales, un calendario de actividad y exportación CSV."
+  }
+}

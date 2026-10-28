@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Plegado de textos largos",
+    "description": "Los pegados de texto muy largo se guardan como tarjetas plegables y dejan solo una marca corta en el borrador; el texto completo se restaura antes de enviar."
+  }
+}

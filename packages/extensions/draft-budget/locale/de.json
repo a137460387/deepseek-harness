@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Entwurfsbudget",
+    "description": "Zeigt unter dem Composer die geschätzten Token-Kosten des Entwurfs und, sofern vom Anbieter gemeldet, die Kontextbelegung nach dem Senden."
+  }
+}

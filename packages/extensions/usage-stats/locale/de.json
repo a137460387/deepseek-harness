@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Nutzungsstatistiken",
+    "description": "Bietet im Einstellungs-Tab Token-Summen nach Anbieter und Modell, Tages- und Monatsaggregate, einen Aktivitätskalender und einen CSV-Export."
+  }
+}

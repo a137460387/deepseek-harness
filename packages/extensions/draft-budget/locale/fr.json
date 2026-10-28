@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Budget du brouillon",
+    "description": "Affiche sous le composeur le coût estimé en jetons du brouillon et, si le fournisseur le signale, l’occupation du contexte après envoi."
+  }
+}

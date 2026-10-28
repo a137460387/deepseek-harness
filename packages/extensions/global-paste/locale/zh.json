@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "全局粘贴",
+    "description": "在 Web UI 的任意位置按 Ctrl/Cmd+V 即可把剪贴板纯文本粘贴进当前会话的输入框草稿。"
+  }
+}

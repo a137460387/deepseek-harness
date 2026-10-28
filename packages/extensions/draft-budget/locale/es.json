@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Presupuesto del borrador",
+    "description": "Muestra bajo el compositor el coste estimado en tokens del borrador y, si el proveedor lo informa, la ocupación del contexto tras enviar."
+  }
+}

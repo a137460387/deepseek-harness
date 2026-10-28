@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Chat-Suche",
+    "description": "Ctrl/Cmd+F durchsucht die Nachrichten der aktuellen Sitzung wörtlich und ohne Groß- und Kleinschreibung, mit Umbruchsprüngen und zentrierter Hervorhebung."
+  }
+}

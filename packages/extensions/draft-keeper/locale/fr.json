@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Conservation des brouillons",
+    "description": "Reflète dans localStorage le brouillon non envoyé de chaque session et le restaure avec un avis après un rechargement ou un plantage."
+  }
+}

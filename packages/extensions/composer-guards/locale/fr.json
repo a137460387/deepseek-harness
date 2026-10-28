@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Gardes partagées du composeur",
+    "description": "Fournit des prédicats partagés de garde en écriture du composeur pour les plugins de saisie du navigateur de ce fork."
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Gemeinsame Composer-Guards",
+    "description": "Stellt gemeinsame Composer-Schreibschutzprädikate für die Browser-Eingabe-Plugins dieses Forks bereit."
+  }
+}

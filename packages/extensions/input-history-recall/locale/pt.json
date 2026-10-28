@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Recuperação do histórico de entrada",
+    "description": "Com o cursor no início do compositor, ↑ recuperará um a um as mensagens enviadas da sessão atual; ↓ volta pelo histórico."
+  }
+}

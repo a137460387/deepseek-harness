@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Guardas compartilhadas do compositor",
+    "description": "Fornece predicados compartilhados de proteção de escrita do compositor para os plugins de entrada do navegador deste fork."
+  }
+}

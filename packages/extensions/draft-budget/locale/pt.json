@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Orçamento do rascunho",
+    "description": "Mostra sob o compositor o custo estimado em tokens do rascunho e, se o provedor informar, a ocupação do contexto após o envio."
+  }
+}

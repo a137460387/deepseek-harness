@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Langtext-Faltung",
+    "description": "Sehr lange eingefügte Texte werden als aufklappbare Karten zwischengespeichert und hinterlassen nur eine kurze Markierung im Entwurf; der Volltext wird vor dem Senden wiederhergestellt."
+  }
+}

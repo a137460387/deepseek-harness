@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "共享 composer 守卫",
+    "description": "为本 fork 的浏览器输入插件提供共享的 composer 写入守卫谓词。"
+  }
+}

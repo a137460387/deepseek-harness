@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Entwurfsspeicherung",
+    "description": "Spiegelt den ungesendeten Entwurf jeder Sitzung in den localStorage und stellt ihn nach Neuladen oder Absturz mit einem Hinweis wieder her."
+  }
+}

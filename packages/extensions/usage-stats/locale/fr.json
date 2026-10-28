@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Statistiques d’utilisation",
+    "description": "Propose dans l’onglet des réglages les totaux de jetons par fournisseur et modèle, des agrégats quotidiens et mensuels, un calendrier d’activité et un export CSV."
+  }
+}

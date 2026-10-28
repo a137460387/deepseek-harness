@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Búsqueda en el chat",
+    "description": "Ctrl/Cmd+F busca literalmente, sin distinguir mayúsculas, en los mensajes de la sesión actual, con salto envolvente y resaltado centrado."
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Recherche dans la conversation",
+    "description": "Ctrl/Cmd+F recherche littéralement, sans distinguer les casses, dans les messages de la session courante, avec rebouclage et surlignage centré."
+  }
+}

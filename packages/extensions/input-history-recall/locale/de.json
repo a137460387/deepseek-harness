@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Eingabeverlauf-Abruf",
+    "description": "Steht der Cursor ganz vorn im Composer, holt ↑ die gesendeten Nachrichten der aktuellen Sitzung einzeln zurück; ↓ wandert rückwärts."
+  }
+}

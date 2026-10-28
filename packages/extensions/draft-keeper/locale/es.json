@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Conserva de borradores",
+    "description": "Refleja en localStorage el borrador no enviado de cada sesión y lo restaura con un aviso tras recargar o tras un fallo."
+  }
+}

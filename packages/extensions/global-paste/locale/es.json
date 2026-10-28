@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Pegado global",
+    "description": "Pulsa Ctrl/Cmd+V en cualquier punto de la Web UI para pegar el texto plano del portapapeles en el borrador del compositor de la sesión actual."
+  }
+}

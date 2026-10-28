@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Guarda de rascunhos",
+    "description": "Espelha no localStorage o rascunho não enviado de cada sessão e o restaura com um aviso após recarregar ou após uma falha."
+  }
+}

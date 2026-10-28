@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Rappel de l’historique de saisie",
+    "description": "Curseur au tout début du composeur, la flèche ↑ rappelle un à un les messages envoyés de la session courante ; la flèche ↓ parcourt en sens inverse."
+  }
+}
